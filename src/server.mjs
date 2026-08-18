@@ -7,6 +7,7 @@ import { incidents } from "./engine/incidents.mjs";
 
 const root = fileURLToPath(new URL("../public/", import.meta.url));
 const port = Number(process.env.PORT || 3000);
+const agentRuns = [];
 
 const mime = {
   ".html": "text/html; charset=utf-8",
@@ -39,15 +40,57 @@ function bodyFrom(req) {
   });
 }
 
+function demoIncidents() {
+  return incidents.map(incident => ({
+    ...incident,
+    source: "demo",
+    diagnosis: diagnose(incident.metrics)
+  }));
+}
+
+function createAgentRun(payload) {
+  if (!payload || typeof payload !== "object" || !payload.metrics || typeof payload.metrics !== "object") {
+    throw new Error("Agent run requires a metrics object.");
+  }
+
+  const context = payload.incident || {};
+  const collectedAt = payload.telemetry?.collectedAt || new Date().toISOString();
+  const run = {
+    id: context.id || `LIVE-${Date.now().toString(36).toUpperCase()}`,
+    title: context.title || "Live endpoint diagnostic",
+    customer: context.customer || "Live endpoint",
+    target: context.target || "Unknown target",
+    location: context.location || payload.agent?.hostname || "Windows endpoint",
+    connection: context.connection || "Windows endpoint",
+    scenario: "live",
+    source: "agent",
+    collectedAt,
+    metrics: payload.metrics,
+    telemetry: payload.telemetry || {},
+    agent: payload.agent || null,
+    diagnosis: diagnose(payload.metrics)
+  };
+
+  agentRuns.unshift(run);
+  if (agentRuns.length > 10) agentRuns.length = 10;
+  return run;
+}
+
 const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
 
     if (req.method === "GET" && url.pathname === "/api/incidents") {
-      return json(res, 200, incidents.map(incident => ({
-        ...incident,
-        diagnosis: diagnose(incident.metrics)
-      })));
+      return json(res, 200, [...agentRuns.slice(0, 3), ...demoIncidents()]);
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/agent-runs") {
+      return json(res, 200, agentRuns);
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/agent-runs") {
+      const payload = await bodyFrom(req);
+      return json(res, 201, createAgentRun(payload));
     }
 
     if (req.method === "POST" && url.pathname === "/api/diagnose") {
