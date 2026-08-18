@@ -2,16 +2,17 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 function emptyState() {
-  return { version: 2, sessions: [], runs: [], probes: [] };
+  return { version: 3, sessions: [], runs: [], probes: [], audit: [] };
 }
 
 function normaliseState(value) {
   if (!value || typeof value !== "object") return emptyState();
   return {
-    version: 2,
+    version: 3,
     sessions: Array.isArray(value.sessions) ? value.sessions : [],
     runs: Array.isArray(value.runs) ? value.runs : [],
-    probes: Array.isArray(value.probes) ? value.probes : []
+    probes: Array.isArray(value.probes) ? value.probes : [],
+    audit: Array.isArray(value.audit) ? value.audit : []
   };
 }
 
@@ -106,6 +107,21 @@ export function createStore(filePath) {
         if (index >= 0) current.probes[index] = probe;
         else current.probes.unshift(probe);
         return probe;
+      });
+    },
+
+    async listAudit(limit = 100) {
+      await load();
+      return [...state.audit]
+        .sort((a, b) => Date.parse(b.at || 0) - Date.parse(a.at || 0))
+        .slice(0, limit);
+    },
+
+    appendAudit(event) {
+      return mutate(current => {
+        current.audit.unshift(event);
+        current.audit = current.audit.slice(0, 1000);
+        return event;
       });
     }
   };
