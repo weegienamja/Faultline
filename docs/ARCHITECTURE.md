@@ -2,36 +2,39 @@
 
 Faultline is designed around one principle: **diagnosis should come from explicit network evidence, not from a model guessing at telemetry.**
 
-The project deliberately has no AI API dependency. The inputs are structured measurements and the diagnosis engine is deterministic, testable and explainable.
+The project deliberately has no AI API dependency. Inputs are structured measurements and the diagnosis engine is deterministic, testable and explainable.
 
-## v0.4 control plane
+## v0.5 control plane
 
 ```text
                                Administrator
                                     |
-                                    | admin bearer token
+                                    | admin credential
                                     v
                          +------------------------+
                          |   Faultline control    |
                          |        plane           |
                          +-----------+------------+
                                      |
-                    create expiring diagnostic session
+               +---------------------+----------------------+
+               |                                            |
+               v                                            v
+      diagnostic sessions                         registered probes
+      short-lived endpoint                        durable identity
+           credentials                             + heartbeat
+               |                                            |
+               v                                            v
+      +----------------+                           private job queue
+      | Windows agent  |                                    |
+      | endpoint path  |                                    v
+      +-------+--------+                            +----------------+
+              |                                     | Remote worker  |
+              | endpoint evidence                   | second network |
+              |                                     +--------+-------+
+              |                                              |
+              +----------------------+-----------------------+
                                      |
-                       +-------------+-------------+
-                       |                           |
-                 endpoint token                probe token
-                       |                           |
-                       v                           v
-              +----------------+          +----------------+
-              | Windows agent  |          | Remote probe   |
-              | endpoint path  |          | second network |
-              +-------+--------+          +--------+-------+
-                      |                            |
-                      | scoped evidence            | scoped evidence
-                      +-------------+--------------+
-                                    |
-                                    v
+                                     v
                          +------------------------+
                          | persistent run store   |
                          | correlation engine     |
@@ -39,55 +42,153 @@ The project deliberately has no AI API dependency. The inputs are structured mea
                          +-----------+------------+
                                      |
                                      v
-                           admin live dashboard
+                    admin dashboard + probe fleet health
 ```
 
-## Diagnostic-session model
+## Credential scopes
 
-A diagnostic is scoped by a generated session ID such as:
+v0.5 has three primary trust scopes.
+
+### Administrator
+
+The admin credential can:
+
+- register probes
+- create diagnostic sessions
+- assign sessions to registered probes
+- inspect all probe health
+- inspect live incidents
+
+It should not be distributed to endpoint or probe hosts.
+
+### Endpoint session credential
+
+Each session receives a short-lived `fl_ep_...` credential. It can submit endpoint evidence for that one session only.
+
+### Registered probe credential
+
+Each registered remote vantage receives a durable `fl_probe_...` credential. It can:
+
+- authenticate as one `PRB-...` identity
+- send heartbeat/runtime metadata for that identity
+- read only that identity's pending jobs
+- submit remote evidence only for sessions assigned to that identity
+
+The raw credential is returned once during registration. Faultline persists only its SHA-256 hash.
+
+For backwards compatibility, an unassigned session can still receive the older short-lived `fl_pr_...` one-off probe credential.
+
+## Registered probe model
+
+A persisted registered probe contains fields such as:
+
+```json
+{
+  "id": "PRB-8A1B2C3D4E",
+  "name": "london-1",
+  "location": "London, UK",
+  "tags": ["uk", "vps"],
+  "enabled": true,
+  "tokenHash": "...",
+  "createdAt": "...",
+  "lastSeenAt": "...",
+  "runtime": {
+    "version": "0.5.0",
+    "platform": "linux",
+    "hostname": "lon-probe-1",
+    "node": "v22.0.0"
+  }
+}
+```
+
+`tokenHash` is never exposed through the public probe representation.
+
+## Probe health
+
+Health is derived by the control plane from authenticated heartbeat timestamps:
 
 ```text
-FL-6A1B2C3D4E
+last heartbeat <= 90 seconds    online
+last heartbeat <= 5 minutes     stale
+older / never seen              offline
+disabled identity               disabled
 ```
 
-Session creation requires the server administrator credential. The control plane generates two independent random credentials:
+This prevents a worker from simply declaring itself healthy.
+
+A successful authenticated job poll also refreshes `lastSeenAt`, because it proves the worker can reach and authenticate to the control plane.
+
+## Assigned job model
+
+A diagnostic session may contain:
+
+```json
+{
+  "assignedProbeId": "PRB-8A1B2C3D4E"
+}
+```
+
+The job becomes visible to that registered probe only after endpoint evidence exists and before remote evidence has been attached.
+
+The queue therefore represents work that is actually ready for second-vantage collection:
 
 ```text
-fl_ep_...    endpoint role
-fl_pr_...    remote-probe role
+session created
+    |
+    v
+endpoint not sampled ----------> no probe job
+    |
+endpoint evidence arrives
+    |
+    v
+assigned probe job appears
+    |
+remote evidence arrives
+    |
+    v
+job disappears
 ```
 
-The raw role credentials are returned to the administrator once. The persistent store records only SHA-256 hashes.
+A registered probe cannot enumerate work assigned to another probe ID because the jobs endpoint authenticates against the requested probe identity.
 
-The two roles are intentionally separate:
-
-- an endpoint credential can submit endpoint telemetry for its session
-- a probe credential can submit the independent remote result for its session
-- an endpoint credential cannot act as the probe
-- a probe credential cannot act as the endpoint
-- both roles expire with the diagnostic session
-
-The administrator credential can inspect the control plane and create sessions but should not be distributed to endpoints or probes.
-
-## Session lifecycle
+## Registered worker lifecycle
 
 ```text
-1. Admin creates session
-2. Faultline returns endpoint + probe credentials
-3. Endpoint fetches safe session metadata
-4. Endpoint collects Windows evidence
-5. POST /api/agent-runs with endpoint credential
-6. Persistent run becomes ENDPOINT ONLY
-7. Remote probe fetches the same safe session metadata
-8. Probe independently measures the target
-9. POST /api/probe-runs with probe credential
-10. Correlation engine merges the two vantage points
-11. Persistent run becomes 2 VANTAGES
-12. Diagnosis is recalculated
-13. Dashboard retrieves the live incident with admin auth
+1. Probe process starts
+2. GET /api/probes/:id to verify identity
+3. POST /api/probes/:id/heartbeat
+4. GET /api/probes/:id/jobs
+5. For each ready job:
+   a. independently resolve target DNS
+   b. measure TCP reachability/timing
+   c. measure HTTP when applicable
+   d. POST /api/probe-runs using the registered credential
+6. Correlation engine attaches trusted probe identity to the run
+7. Worker sleeps and repeats when --watch is enabled
 ```
 
-The endpoint contribution is currently required before the remote probe can attach. This keeps the v0.4 lifecycle simple and avoids presenting a remote-only result as a correlated incident.
+The server does not trust the worker to choose its own registered identity during evidence ingestion. For an assigned session, the control plane resolves the expected probe from `assignedProbeId` and authenticates the bearer token against that stored probe.
+
+## Diagnostic-session lifecycle
+
+For a registered-probe session:
+
+```text
+1. Admin registers a remote probe once
+2. Probe worker begins heartbeating
+3. Admin creates diagnostic session assigned to probe ID
+4. Faultline returns a short-lived endpoint token
+5. Endpoint fetches safe session metadata
+6. Endpoint collects Windows evidence
+7. POST /api/agent-runs
+8. Assigned session enters registered probe's job queue
+9. Probe worker independently measures target
+10. POST /api/probe-runs with registered probe token
+11. Correlation engine merges the two vantage points
+12. Persistent run becomes 2 VANTAGES
+13. Diagnosis is recalculated
+14. Dashboard shows incident and probe fleet health
+```
 
 ## Endpoint vantage
 
@@ -108,24 +209,22 @@ It collects:
 - direct-IP checks after DNS resolution
 - bounded traceroute observations
 
-The endpoint can still run in standalone `--dry-run` mode without authentication. Uploading endpoint telemetry to the control plane requires a valid endpoint session credential.
-
 ## Remote vantage
 
-The remote probe is intentionally portable. It uses Node.js networking APIs rather than platform-specific shell commands and therefore runs on Windows, Linux and macOS with Node.js 20+.
+The portable remote worker uses Node.js networking APIs and runs on Windows, Linux and macOS with Node.js 20+.
 
-It performs:
+It currently performs:
 
 - DNS resolution and lookup timing
 - TCP connection timing to the session target port
 - HTTP response timing for HTTP(S) targets
 - independent target reachability classification
 
-The remote probe does not yet collect remote traceroute or ICMP path data. Its current purpose is to answer a narrower question reliably: **can an independent network vantage reach the same target?**
+It does not yet collect remote traceroute or ICMP path telemetry.
 
 ## Correlation contract
 
-Endpoint measurements remain the primary diagnostic input. A remote result contributes values derived by the correlation layer:
+Endpoint measurements remain the main diagnostic input. Remote evidence contributes values such as:
 
 ```json
 {
@@ -161,13 +260,15 @@ The diagnosis engine assigns evidence-weighted scores to explicit fault domains:
 - endpoint path / policy
 - target service
 
-The strongest supported domain becomes the likely diagnosis. Confidence is based on evidence strength and increases when an independent vantage materially supports the conclusion.
-
-There is no LLM in this path. That is intentional. A networking diagnosis should be reproducible from the same telemetry and its evidence should be inspectable in tests.
+There is no LLM in this path. The same telemetry should produce the same diagnosis and evidence trail.
 
 ## Persistence
 
-v0.4 replaces the previous in-memory live-run array with a persistent store.
+v0.5 state format version 2 stores:
+
+- sessions
+- diagnostic runs
+- registered probes
 
 Default direct-Node path:
 
@@ -181,83 +282,49 @@ Container path:
 /data/faultline.json
 ```
 
-The file stores:
+Existing v0.4 state is normalized by adding an empty probe registry on read.
 
-- session metadata
-- endpoint/probe token hashes
-- endpoint telemetry
-- remote-probe telemetry
-- live run state
-
-Writes use a temporary file followed by rename so a partially-written JSON document is not used as the primary state file.
-
-The store is intentionally scoped to a **single-process prototype**. It is not a replacement for a transactional database and should not be shared by multiple Faultline server replicas.
+Writes still use a temporary file followed by rename. The store remains intentionally single-process and is not a substitute for a transactional database.
 
 ## Dashboard access model
 
-Demo incidents are available through a public endpoint so the product can still be viewed without credentials.
+Demo incidents remain public.
 
-Live diagnostic data is protected by the administrator credential. The browser stores the token in `sessionStorage` after the engineer uses **Unlock live data**.
+Live diagnostic data and registered probe health require the administrator credential. The browser keeps that credential in `sessionStorage`, not in URLs or persistent local storage.
 
-The token is therefore not placed in a query string or persisted in local storage across browser sessions.
-
-Live values rendered through HTML templates are escaped before insertion into the page.
+Live telemetry and probe metadata rendered through HTML templates are escaped before insertion.
 
 ## Transport security
 
-Session credentials are bearer tokens. They must not be sent across an untrusted network using plain HTTP.
+Endpoint and registered-probe credentials are bearer tokens. Remote deployments must use HTTPS between collectors/workers and the control plane.
 
-The Node server currently expects HTTPS termination to happen at a reverse proxy, load balancer or hosting platform. See [DEPLOYMENT.md](DEPLOYMENT.md).
-
-## Privacy boundary
-
-Faultline does not need packet payloads, browser history, application content or user credentials.
-
-A diagnostic can still contain operational metadata such as:
-
-- endpoint hostname
-- adapter descriptions
-- private gateway address
-- VPN adapter names
-- resolved target addresses
-- traceroute hops
-- probe hostname/platform
-- target connection timings
-
-Future hosted versions should add configurable telemetry redaction before collection or upload.
+The Node service expects TLS termination at a reverse proxy, load balancer or hosting platform.
 
 ## Current trust limitations
 
-v0.4 is materially safer to host than v0.3, but the security model remains prototype-grade.
+v0.5 introduces durable probe identity but remains prototype-grade.
 
 Not yet implemented:
 
+- registered-probe credential rotation
+- immediate probe-token revocation API
 - organisation/user identity
-- role-token revocation before expiry
-- credential rotation
-- rate limiting
 - audit logging
-- multi-process database concurrency
-- retention policies
-- registered long-lived probe identity
+- rate limiting
+- push-based job delivery
+- automatic probe selection by location/tag
+- database-backed multi-instance concurrency
+- configurable retention/redaction policies
 - automatic TLS termination
 
-## Next architecture milestone
+## Next architecture choices
 
-The next valuable expansion is a registered probe model:
+The strongest next directions are:
 
-```text
-                          Faultline
-                             |
-               +-------------+-------------+
-               |                           |
-       diagnostic sessions          registered probes
-               |                           |
-       endpoint evidence             health / identity
-               |                           |
-               +-------------+-------------+
-                             |
-                      richer correlation
-```
+1. probe disable/revoke/rotate controls with audit events
+2. scheduler-driven probe selection by region/tag and health
+3. richer remote path measurements
+4. database-backed multi-instance control plane
+5. portable evidence-report export
 
-That can then support probe health, regional selection, richer remote path measurements and portable evidence reports for support escalation.
+None requires an AI dependency for core network diagnosis.
