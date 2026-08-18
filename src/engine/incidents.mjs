@@ -22,6 +22,50 @@ export const incidents = [
     }
   },
   {
+    id: "FL-1040",
+    title: "Cloud calling audio breaking up",
+    customer: "Westbridge Accountancy",
+    target: "Hosted voice service",
+    location: "Remote user · Hamilton",
+    connection: "Ethernet",
+    scenario: "upstream",
+    metrics: {
+      gatewayLoss: 0.2,
+      gatewayLatencyMs: 4,
+      dnsResolved: true,
+      directIpReachable: true,
+      internetReachable: true,
+      vpnRequired: false,
+      upstreamLoss: 7.6,
+      jitterMs: 64,
+      externalProbeHealthy: true,
+      targetReachable: true,
+      targetHttpMs: 44
+    }
+  },
+  {
+    id: "FL-1038",
+    title: "Video calls degrade after connection",
+    customer: "Calder Systems",
+    target: "Video collaboration service",
+    location: "Remote user · Motherwell",
+    connection: "Wi-Fi",
+    scenario: "upstream",
+    metrics: {
+      gatewayLoss: 0,
+      gatewayLatencyMs: 4,
+      dnsResolved: true,
+      directIpReachable: true,
+      internetReachable: true,
+      vpnRequired: false,
+      upstreamLoss: 9.1,
+      jitterMs: 67,
+      externalProbeHealthy: true,
+      targetReachable: true,
+      targetHttpMs: 42
+    }
+  },
+  {
     id: "FL-1041",
     title: "CRM hostname unavailable",
     customer: "Apex Legal",
