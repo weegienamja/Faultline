@@ -2,16 +2,17 @@
 import { collectWindowsDiagnostics } from "./network.mjs";
 
 function help() {
-  console.log(`Faultline Agent v0.5\n\nAuthenticated session mode:\n  npm run agent -- --session <session-id> --token <endpoint-token> [options]\n\nStandalone collection mode:\n  npm run agent -- --target <hostname|IP|URL> --dry-run [options]\n\nOptions:\n  --session <id>            Diagnostic session ID\n  --token <value>           Endpoint session credential (or FAULTLINE_ENDPOINT_TOKEN)\n  --api-base <url>          Faultline control-plane base URL\n                           (default: http://localhost:3000)\n  --target <value>          Standalone target when no session is used\n  --port <number>           Standalone target TCP port (default: 443)\n  --expected-route <CIDR>   Standalone expected IPv4 route\n  --vpn-required            Standalone target requires a VPN\n  --no-trace                Skip traceroute collection\n  --dry-run                 Collect and print telemetry without uploading\n  --json                    Print the full JSON payload\n  --help                    Show this help\n`);
+  console.log(`Faultline Agent v0.6 topology preview\n\nAuthenticated session mode:\n  npm run agent -- --session <session-id> --token <endpoint-token> [options]\n\nStandalone collection mode:\n  npm run agent -- --target <hostname|IP|URL> --dry-run [options]\n\nOptions:\n  --session <id>            Diagnostic session ID\n  --token <value>           Endpoint session credential (or FAULTLINE_ENDPOINT_TOKEN)\n  --api-base <url>          Faultline control-plane base URL\n                           (default: http://localhost:3000)\n  --target <value>          Standalone target when no session is used\n  --port <number>           Standalone target TCP port (default: 443)\n  --expected-route <CIDR>   Standalone expected IPv4 route\n  --vpn-required            Standalone target requires a VPN\n  --no-trace                Skip traceroute collection\n  --no-topology             Do not include passive local topology evidence\n  --dry-run                 Collect and print telemetry without uploading\n  --json                    Print the full JSON payload\n  --help                    Show this help\n\nTopology discovery is passive in this build. It reads the endpoint's existing Windows neighbour table and Wi-Fi association state; it does not sweep the subnet.\n`);
 }
 
 function parseArgs(argv) {
-  const options = { trace: true };
+  const options = { trace: true, topology: true };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--help" || arg === "-h") options.help = true;
     else if (arg === "--vpn-required") options.vpnRequired = true;
     else if (arg === "--no-trace") options.trace = false;
+    else if (arg === "--no-topology") options.topology = false;
     else if (arg === "--dry-run") options.dryRun = true;
     else if (arg === "--json") options.json = true;
     else if (["--session", "--token", "--api-base", "--target", "--port", "--expected-route"].includes(arg)) {
@@ -92,6 +93,7 @@ async function main() {
   const payload = await collectWindowsDiagnostics(options);
   if (session) payload.sessionId = session.id;
   const m = payload.metrics;
+  const topology = payload.telemetry?.topology;
 
   console.log(`  Gateway: ${m.gatewayLatencyMs} ms · ${m.gatewayLoss}% loss`);
   console.log(`  DNS: ${m.dnsResolved ? "resolved" : "failed"} · ${m.dnsLookupMs} ms`);
@@ -99,6 +101,11 @@ async function main() {
   console.log(`  Internet: ${m.internetReachable ? "reachable" : "unreachable"}`);
   console.log(`  Target TCP: ${m.targetReachable ? "reachable" : "unreachable"} · ${m.targetTcpMs} ms`);
   console.log(`  Target ICMP loss: ${m.upstreamLoss}% · jitter ${m.jitterMs} ms`);
+  if (topology) {
+    console.log(`  Topology: ${topology.kind} · ${topology.confidence} confidence · ${topology.nodes.length} nodes`);
+  } else {
+    console.log("  Topology: skipped");
+  }
 
   if (options.json || options.dryRun) console.log(JSON.stringify(payload, null, 2));
   if (options.dryRun) {
