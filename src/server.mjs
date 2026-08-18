@@ -6,7 +6,7 @@ import { diagnose } from "./engine/diagnose.mjs";
 import { correlateAgentRun } from "./engine/correlate.mjs";
 import { incidents } from "./engine/incidents.mjs";
 import { bearerToken, generateCredential, hashCredential, isSessionExpired, verifyCredential, verifySessionRole } from "./security/auth.mjs";
-import { claimDiagnosticInvitation, createDiagnosticSession, findSessionByInvitationToken, publicSession } from "./session/service.mjs";
+import { claimDiagnosticInvitation, createDiagnosticSession, exchangeClientLaunch, findSessionByInvitationToken, publicSession } from "./session/service.mjs";
 import { createRegisteredProbe, publicProbe, touchProbe, verifyProbeCredential } from "./probe/registry.mjs";
 import { createStore } from "./storage/store.mjs";
 
@@ -17,6 +17,7 @@ const store = createStore(dataFile);
 const configuredAdminToken = process.env.FAULTLINE_ADMIN_TOKEN || null;
 const adminToken = configuredAdminToken || generateCredential("fl_admin");
 const adminTokenHash = hashCredential(adminToken);
+const windowsClientUrl = process.env.FAULTLINE_WINDOWS_CLIENT_URL || null;
 
 const mime = {
   ".html": "text/html; charset=utf-8",
@@ -231,11 +232,7 @@ async function pendingProbeJobs(probeId) {
     if (session.assignedProbeId !== probeId || isSessionExpired(session)) continue;
     const run = await store.getRun(session.id);
     if (!run?.endpointMetrics || run.remoteProbe) continue;
-    jobs.push({
-      id: session.id,
-      target: session.target,
-      expiresAt: session.expiresAt
-    });
+    jobs.push({ id: session.id, target: session.target, expiresAt: session.expiresAt });
   }
 
   return jobs.slice(0, 20);
@@ -252,7 +249,8 @@ const server = createServer(async (req, res) => {
         persistence: true,
         registeredProbeFleet: true,
         topologyPreview: true,
-        ephemeralInvitations: true
+        ephemeralInvitations: true,
+        windowsClientPreview: true
       });
     }
 
@@ -270,10 +268,7 @@ const server = createServer(async (req, res) => {
       const payload = await bodyFrom(req);
       const created = createRegisteredProbe(payload);
       await store.putProbe(created.probe);
-      return json(res, 201, {
-        probe: publicProbe(created.probe),
-        credential: created.credential
-      });
+      return json(res, 201, { probe: publicProbe(created.probe), credential: created.credential });
     }
 
     if (req.method === "GET" && url.pathname === "/api/probes") {
@@ -298,10 +293,7 @@ const server = createServer(async (req, res) => {
       const probe = await requireRegisteredProbe(req, id);
       const updated = touchProbe(probe);
       await store.putProbe(updated);
-      return json(res, 200, {
-        probe: publicProbe(updated),
-        jobs: await pendingProbeJobs(id)
-      });
+      return json(res, 200, { probe: publicProbe(updated), jobs: await pendingProbeJobs(id) });
     }
 
     const probeMatch = url.pathname.match(/^\/api\/probes\/([^/]+)$/);
@@ -320,18 +312,38 @@ const server = createServer(async (req, res) => {
           packetPayloads: false,
           browserHistory: false,
           applicationContent: false
-        }
+        },
+        client: { windowsDownloadUrl: windowsClientUrl }
       });
     }
 
     if (req.method === "POST" && url.pathname === "/api/invitations/claim") {
       const { session, token } = await requireInvitation(req);
       const payload = await bodyFrom(req);
-      const claimed = claimDiagnosticInvitation(session, token, payload.consent === true);
+      const claimed = claimDiagnosticInvitation(session, token, {
+        consent: payload.consent === true,
+        includeTopology: payload.includeTopology !== false
+      });
       await store.putSession(claimed.session);
       return json(res, 200, {
         session: publicSession(claimed.session),
-        credentials: { endpointToken: claimed.endpointToken }
+        client: {
+          launchToken: claimed.clientLaunchToken,
+          windowsDownloadUrl: windowsClientUrl
+        }
+      });
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/client/exchange") {
+      const payload = await bodyFrom(req);
+      if (!payload.sessionId) throw new Error("Windows client exchange requires sessionId.");
+      const session = await getSession(String(payload.sessionId));
+      const exchanged = exchangeClientLaunch(session, bearerToken(req));
+      await store.putSession(exchanged.session);
+      return json(res, 200, {
+        session: publicSession(exchanged.session),
+        credentials: { endpointToken: exchanged.endpointToken },
+        client: { includeTopology: exchanged.includeTopology }
       });
     }
 
@@ -369,10 +381,7 @@ const server = createServer(async (req, res) => {
       const run = await store.getRun(id);
       return json(res, 200, {
         ...publicSession(session),
-        vantages: {
-          endpoint: Boolean(run?.endpointMetrics),
-          remoteProbe: Boolean(run?.remoteProbe)
-        }
+        vantages: { endpoint: Boolean(run?.endpointMetrics), remoteProbe: Boolean(run?.remoteProbe) }
       });
     }
 
