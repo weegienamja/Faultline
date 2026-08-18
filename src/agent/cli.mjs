@@ -2,7 +2,7 @@
 import { collectWindowsDiagnostics } from "./network.mjs";
 
 function help() {
-  console.log(`Faultline Agent v0.3\n\nUsage:\n  npm run agent -- --target <hostname|IP|URL> [options]\n\nOptions:\n  --target <value>          Target hostname, IP or URL (required)\n  --port <number>           TCP port when target is not a URL (default: 443)\n  --api-base <url>          Faultline server base URL\n                            (default: http://localhost:3000)\n  --api <url>               Override the full agent ingestion endpoint\n  --expected-route <CIDR>   Require an exact IPv4 route, e.g. 10.40.0.0/16\n  --vpn-required            Mark the target as requiring a VPN\n  --no-trace                Skip traceroute collection\n  --dry-run                 Collect and print telemetry without uploading\n  --json                    Print the full JSON payload\n  --help                    Show this help\n\nExamples:\n  npm run agent -- --target microsoft.com\n  npm run agent -- --target https://example.com/health\n  npm run agent -- --target 10.40.12.25 --port 443 --vpn-required --expected-route 10.40.0.0/16\n`);
+  console.log(`Faultline Agent v0.4\n\nAuthenticated session mode:\n  npm run agent -- --session <session-id> --token <endpoint-token> [options]\n\nStandalone collection mode:\n  npm run agent -- --target <hostname|IP|URL> --dry-run [options]\n\nOptions:\n  --session <id>            Diagnostic session ID\n  --token <value>           Endpoint session credential (or FAULTLINE_ENDPOINT_TOKEN)\n  --api-base <url>          Faultline control-plane base URL\n                           (default: http://localhost:3000)\n  --target <value>          Standalone target when no session is used\n  --port <number>           Standalone target TCP port (default: 443)\n  --expected-route <CIDR>   Standalone expected IPv4 route\n  --vpn-required            Standalone target requires a VPN\n  --no-trace                Skip traceroute collection\n  --dry-run                 Collect and print telemetry without uploading\n  --json                    Print the full JSON payload\n  --help                    Show this help\n`);
 }
 
 function parseArgs(argv) {
@@ -14,14 +14,15 @@ function parseArgs(argv) {
     else if (arg === "--no-trace") options.trace = false;
     else if (arg === "--dry-run") options.dryRun = true;
     else if (arg === "--json") options.json = true;
-    else if (["--target", "--port", "--api", "--api-base", "--expected-route"].includes(arg)) {
+    else if (["--session", "--token", "--api-base", "--target", "--port", "--expected-route"].includes(arg)) {
       const value = argv[index + 1];
       if (!value || value.startsWith("--")) throw new Error(`${arg} requires a value.`);
       index += 1;
+      if (arg === "--session") options.sessionId = value;
+      if (arg === "--token") options.token = value;
+      if (arg === "--api-base") options.apiBase = value.replace(/\/+$/, "");
       if (arg === "--target") options.target = value;
       if (arg === "--port") options.port = Number(value);
-      if (arg === "--api") options.api = value;
-      if (arg === "--api-base") options.apiBase = value.replace(/\/+$/, "");
       if (arg === "--expected-route") options.expectedRoute = value;
     } else {
       throw new Error(`Unknown option: ${arg}`);
@@ -30,13 +31,25 @@ function parseArgs(argv) {
   return options;
 }
 
-async function upload(endpoint, payload) {
-  const response = await fetch(endpoint, {
+async function fetchSession(base, sessionId, token) {
+  const response = await fetch(`${base}/api/sessions/${encodeURIComponent(sessionId)}`, {
+    headers: { authorization: `Bearer ${token}` },
+    cache: "no-store"
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.error || `Faultline API returned HTTP ${response.status}.`);
+  return body;
+}
+
+async function upload(base, token, payload) {
+  const response = await fetch(`${base}/api/agent-runs`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${token}`
+    },
     body: JSON.stringify(payload)
   });
-
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(body.error || `Faultline API returned HTTP ${response.status}.`);
   return body;
@@ -53,53 +66,54 @@ async function main() {
     return;
   }
 
-  if (options.help) {
-    help();
-    return;
-  }
+  if (options.help) return help();
 
-  if (!options.target) {
-    console.error("Error: --target is required.\n");
+  const base = options.apiBase || "http://localhost:3000";
+  const token = options.token || process.env.FAULTLINE_ENDPOINT_TOKEN;
+  let session = null;
+
+  if (options.sessionId) {
+    if (!token) throw new Error("Session mode requires --token or FAULTLINE_ENDPOINT_TOKEN.");
+    session = await fetchSession(base, options.sessionId, token);
+    options.target = session.target.input;
+    options.port = session.target.port;
+    options.vpnRequired = session.vpnRequired;
+    options.expectedRoute = session.expectedRoute;
+  } else if (!options.target) {
+    console.error("Error: use --session for authenticated ingestion, or --target with --dry-run.\n");
     help();
     process.exitCode = 1;
     return;
+  } else if (!options.dryRun) {
+    throw new Error("Uploading endpoint evidence requires an authenticated session. Use npm run session first, or add --dry-run.");
   }
 
-  const apiBase = options.apiBase || "http://localhost:3000";
-  const endpoint = options.api || `${apiBase}/api/agent-runs`;
   console.log(`Faultline: collecting endpoint evidence for ${options.target}...`);
+  const payload = await collectWindowsDiagnostics(options);
+  if (session) payload.sessionId = session.id;
+  const m = payload.metrics;
 
-  try {
-    const payload = await collectWindowsDiagnostics(options);
-    const m = payload.metrics;
+  console.log(`  Gateway: ${m.gatewayLatencyMs} ms · ${m.gatewayLoss}% loss`);
+  console.log(`  DNS: ${m.dnsResolved ? "resolved" : "failed"} · ${m.dnsLookupMs} ms`);
+  if (m.wifiSignalPct != null) console.log(`  Wi-Fi signal: ${m.wifiSignalPct}%`);
+  console.log(`  Internet: ${m.internetReachable ? "reachable" : "unreachable"}`);
+  console.log(`  Target TCP: ${m.targetReachable ? "reachable" : "unreachable"} · ${m.targetTcpMs} ms`);
+  console.log(`  Target ICMP loss: ${m.upstreamLoss}% · jitter ${m.jitterMs} ms`);
 
-    console.log(`  Gateway: ${m.gatewayLatencyMs} ms · ${m.gatewayLoss}% loss`);
-    console.log(`  DNS: ${m.dnsResolved ? "resolved" : "failed"} · ${m.dnsLookupMs} ms`);
-    if (m.wifiSignalPct != null) console.log(`  Wi-Fi signal: ${m.wifiSignalPct}%`);
-    console.log(`  Internet: ${m.internetReachable ? "reachable" : "unreachable"}`);
-    console.log(`  Target TCP: ${m.targetReachable ? "reachable" : "unreachable"} · ${m.targetTcpMs} ms`);
-    console.log(`  Target ICMP loss: ${m.upstreamLoss}% · jitter ${m.jitterMs} ms`);
-
-    if (options.json || options.dryRun) console.log(JSON.stringify(payload, null, 2));
-
-    if (options.dryRun) {
-      console.log("Dry run complete. Nothing was uploaded.");
-      return;
-    }
-
-    const run = await upload(endpoint, payload);
-    console.log(`\nEndpoint-only diagnosis: ${run.diagnosis.faultDomainLabel} (${run.diagnosis.confidence}% confidence)`);
-    console.log(run.diagnosis.summary);
-    console.log(`Run ${run.id} is now available in the Faultline dashboard.`);
-
-    if (!options.api && apiBase) {
-      console.log("\nAdd an independent vantage point with:");
-      console.log(`  npm run probe -- --run ${run.id} --api-base ${apiBase}`);
-    }
-  } catch (error) {
-    console.error(`Faultline agent failed: ${error.message}`);
-    process.exitCode = 1;
+  if (options.json || options.dryRun) console.log(JSON.stringify(payload, null, 2));
+  if (options.dryRun) {
+    console.log("Dry run complete. Nothing was uploaded.");
+    return;
   }
+
+  const run = await upload(base, token, payload);
+  console.log(`\nDiagnosis: ${run.diagnosis.faultDomainLabel} (${run.diagnosis.confidence}% confidence)`);
+  console.log(run.diagnosis.summary);
+  console.log(`Session ${run.id} now contains endpoint evidence.`);
+  console.log("Run the remote-probe command issued when the diagnostic session was created to add the second vantage point.");
 }
 
-main();
+main().catch(error => {
+  console.error(`Faultline agent failed: ${error.message}`);
+  process.exitCode = 1;
+});
