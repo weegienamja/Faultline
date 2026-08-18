@@ -2,86 +2,113 @@
 
 Faultline is designed around one principle: **diagnosis should come from evidence collected at explicit vantage points, not from an LLM guessing at telemetry.**
 
-## v0.2
+## v0.3
 
 ```text
-Windows endpoint
-     |
-     |  local telemetry
-     v
-Faultline Agent
-     |
-     |  POST /api/agent-runs
-     v
-Node HTTP API ---------> deterministic diagnosis engine
-     |                              |
-     |                              v
-     +----------------------> evidence + fault domain + actions
-     |
-     v
-Browser dashboard
+Windows endpoint                                  Remote probe
+     |                                                 |
+     | endpoint telemetry                              | independent target checks
+     v                                                 v
+POST /api/agent-runs                          POST /api/probe-runs
+     |                                                 |
+     +------------------ Faultline API ----------------+
+                              |
+                              v
+                     correlation engine
+                              |
+                              v
+                  deterministic diagnosis
+                              |
+                              v
+              evidence + fault domain + actions
+                              |
+                              v
+                       browser dashboard
 ```
 
-The dashboard continues to include deterministic demo incidents, but v0.2 can also ingest measurements from the Windows endpoint collector. Live runs are held in process memory and automatically appear in the dashboard while the server is running.
+A live endpoint run is created first. Its run ID becomes the correlation key for a later remote-probe result. When the probe joins, Faultline recomputes the same incident using evidence from both vantage points.
 
-## Endpoint collector
+Live state remains in process memory in v0.3.
+
+## Endpoint vantage
 
 The Windows collector uses operating-system networking tools and Node.js probes rather than packet interception.
 
-### Local operating-system state
+It collects:
 
-PowerShell is used to read:
+- active IPv4 default route
+- active adapter metadata
+- Wi-Fi signal when available
+- active VPN-like adapters
+- optional expected-route state
+- gateway ICMP latency and loss
+- DNS resolution and timing
+- general internet TCP controls
+- target TCP and HTTP timing
+- target ICMP loss and jitter
+- direct-IP checks after DNS resolution
+- bounded traceroute observations
 
-- the active IPv4 default route
-- the adapter associated with that route
-- active adapters that look like VPN interfaces
-- IPv4 routes needed for an optional expected-route check
+The endpoint payload also records the normalized target host, port and URL so a remote probe can test the same destination without guessing the target configuration.
 
-`netsh wlan show interfaces` provides best-effort Wi-Fi signal metadata.
+## Remote vantage
 
-### Active measurements
+The v0.3 remote probe is intentionally portable. It uses Node.js rather than operating-system commands and therefore runs on Windows, Linux and macOS with Node.js 20+.
 
-The agent performs:
+It performs:
 
-- ICMP sampling to the default gateway
-- DNS resolution and lookup timing for the target
-- independent TCP control probes for general internet reachability
-- TCP connection timing to the target
-- HTTP response timing when the target is an HTTP(S) URL or hostname
-- ICMP sampling to the target for loss and jitter
-- direct-IP ICMP testing after DNS resolution
-- a bounded `tracert` path observation unless disabled
+- DNS resolution and lookup timing
+- TCP connection timing to the target port
+- HTTP response timing for HTTP(S) targets
+- independent target reachability classification
 
-The collector treats a target that answers TCP/HTTP but blocks ICMP as reachable rather than reporting 100% upstream loss.
+The remote probe does not yet collect remote traceroute or ICMP path data. Its current job is to answer a narrower question reliably: **can an independent network vantage reach the same target?**
 
-## Agent ingestion contract
+## Correlation contract
 
-`POST /api/agent-runs` accepts a payload with three main sections:
+Endpoint measurements remain the primary diagnostic input. A remote probe contributes two additional values to that contract:
 
 ```json
 {
-  "agent": {
-    "name": "faultline-windows",
-    "version": "0.2.0",
-    "hostname": "ENDPOINT-01"
-  },
-  "incident": {
-    "title": "Live diagnostic · example.com",
-    "target": "example.com"
-  },
-  "metrics": {
-    "gatewayLoss": 0,
-    "gatewayLatencyMs": 3,
-    "dnsResolved": true,
-    "internetReachable": true,
-    "upstreamLoss": 0,
-    "jitterMs": 4,
-    "targetReachable": true
-  }
+  "externalProbeHealthy": true,
+  "externalProbeLatencyMs": 28
 }
 ```
 
-The server runs the same deterministic diagnosis engine used by the demo incidents, stores the run in memory, and returns the completed diagnosis.
+Those values are derived from the remote probe payload rather than supplied by the endpoint.
+
+This supports useful comparisons:
+
+```text
+Endpoint fails + remote succeeds
+    -> endpoint-specific path / policy evidence
+
+Endpoint fails + remote fails + general internet healthy
+    -> target-service evidence
+
+Endpoint has upstream loss + remote succeeds
+    -> reinforces endpoint ISP / transit evidence
+
+Endpoint succeeds + remote succeeds
+    -> stronger healthy confidence
+```
+
+## Live-run lifecycle
+
+```text
+1. Endpoint agent collects evidence
+2. POST /api/agent-runs
+3. Faultline creates LIVE-... run
+4. Dashboard shows ENDPOINT ONLY
+5. Remote probe GETs /api/agent-runs/:id
+6. Probe independently measures the target
+7. POST /api/probe-runs with runId
+8. Correlation engine merges probe evidence
+9. Diagnosis is recalculated
+10. Dashboard shows 2 VANTAGES
+```
+
+Using the explicit run ID avoids accidentally correlating unrelated tests that happen to target the same hostname.
 
 ## Diagnosis model
 
@@ -91,38 +118,40 @@ The diagnosis engine assigns evidence-weighted scores to fault domains:
 - DNS
 - VPN / route state
 - ISP / upstream path
+- endpoint path / policy
 - target service
 
-The highest supported domain becomes the likely diagnosis. Confidence is derived from the strength and agreement of the available evidence.
+The highest supported domain becomes the likely diagnosis. Confidence is derived from evidence strength and increases when an independent vantage point materially supports the conclusion.
 
-This remains deterministic. An LLM may later explain a completed diagnosis in customer-friendly language, but it should not invent the underlying fault domain.
-
-## Multi-vantage direction
-
-A single endpoint cannot prove every ownership boundary. The intended next architecture adds a remote probe:
-
-```text
-Endpoint Agent                      Faultline service                    Remote probe
-+----------------+                 +----------------+                 +----------------+
-| LAN / Wi-Fi    |  measurements   | Correlation    |  measurements   | Internet /     |
-| DNS / routes   | --------------> | + diagnosis    | <-------------- | service edge   |
-| VPN / path     |                 | + evidence     |                 | control path   |
-+----------------+                 +----------------+                 +----------------+
-```
-
-That second vantage point is what can materially improve isolation between endpoint, ISP/transit and target-service problems. The v0.2 dashboard therefore reports external-probe data as **not collected** for live endpoint runs rather than inventing a result.
+The engine remains deterministic. An LLM may later explain a completed diagnosis in customer-friendly language, but it should not invent the underlying fault domain.
 
 ## Security and privacy direction
 
-Faultline does not need packet payloads, credentials, browser history or application content. v0.2 collects network state and timing data only.
+Faultline does not require packet payloads, credentials, browser history or application content.
 
-A live run can include interface metadata, private gateway information, resolved IP addresses, VPN adapter names and traceroute hop addresses. Anyone pointing the agent at a remote Faultline API should therefore understand where that telemetry is being sent.
+A live endpoint run can contain interface metadata, private gateway information, resolved IP addresses, VPN adapter names and traceroute hop addresses. A remote probe can contain its hostname, platform, resolved target addresses and target timing data.
 
-Future hosted versions should add:
+The v0.3 run ID is a correlation identifier, **not an authentication token**. The current service should therefore be treated as a local or controlled-network prototype.
 
-- signed, short-lived diagnostic sessions
-- explicit organisation and case scoping
+A hosted version needs:
+
+- authenticated, short-lived diagnostic sessions
+- organisation and case scoping
 - transport authentication
 - configurable telemetry redaction
 - persistent storage with retention controls
 - an audit trail for contributed evidence
+- registered probe identity and health
+
+## Next architecture milestone
+
+The next major step is to make the control plane durable and safe enough to host:
+
+```text
+Endpoint agents -> authenticated sessions -> persistent incident store
+                                              ^
+                                              |
+                                  registered remote probes
+```
+
+After that, remote probes can gain richer path measurements and Faultline can generate portable evidence reports for support escalation.
