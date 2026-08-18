@@ -2,17 +2,19 @@
 
 The Faultline endpoint agent collects local network evidence from Windows and contributes it to an authenticated diagnostic session.
 
+The current repository also includes the first v0.6 topology preview. In addition to path diagnostics, the endpoint can build a passive best-effort map of the local network using Windows interface, Wi-Fi and neighbour-table state.
+
 ## Requirements
 
 - Windows 10 or Windows 11
 - Node.js 20 or newer
 - PowerShell and standard Windows networking utilities on PATH
 
-The collector uses `Get-NetRoute`, `Get-NetAdapter`, `netsh`, `ping` and `tracert`. It does not require a packet-capture driver.
+The collector uses `Get-NetRoute`, `Get-NetAdapter`, `Get-NetIPAddress`, `Get-NetNeighbor`, `netsh`, `ping` and `tracert`. It does not require a packet-capture driver.
 
 ## Authenticated use
 
-Create a diagnostic session first. In v0.5 that session can optionally be assigned to a registered remote probe:
+Create a diagnostic session first. The session can optionally be assigned to a registered remote probe:
 
 ```powershell
 npm run session -- --target microsoft.com --probe PRB-8A1B2C3D4E --admin-token $env:FAULTLINE_ADMIN_TOKEN
@@ -57,6 +59,7 @@ An unauthenticated `--target` run cannot upload. This is deliberate.
 --expected-route <CIDR>      Standalone expected IPv4 route
 --vpn-required               Standalone target requires VPN
 --no-trace                   Skip traceroute collection
+--no-topology                Omit passive local-topology evidence
 --dry-run                    Collect locally without uploading
 --json                       Print the full payload
 ```
@@ -66,6 +69,32 @@ The endpoint token can alternatively be supplied through:
 ```text
 FAULTLINE_ENDPOINT_TOKEN
 ```
+
+## Passive topology discovery
+
+Topology collection is enabled by default in the current preview.
+
+Faultline reads:
+
+- active local IPv4 address and prefix
+- adapter MAC address
+- default gateway
+- Wi-Fi SSID/BSSID, signal, radio type and channel when available
+- the existing Windows IPv4 neighbour table
+
+It then builds `telemetry.topology`, which contains device nodes, links, confidence levels and the inferred affected path.
+
+This initial implementation does **not** sweep the subnet or probe every private address. It only uses information already available from Windows.
+
+Use:
+
+```powershell
+npm run agent -- --session FL-... --token fl_ep_... --no-topology
+```
+
+to omit topology evidence from the payload.
+
+See [TOPOLOGY.md](TOPOLOGY.md) for the inference rules and privacy boundary.
 
 ## VPN sessions
 
@@ -87,8 +116,10 @@ If the VPN is connected but the expected route is missing, the deterministic dia
 ## Evidence collected
 
 - active default gateway
-- active interface metadata
-- Wi-Fi signal percentage when available
+- active interface metadata and IPv4 address
+- adapter MAC address
+- Wi-Fi signal, SSID/BSSID, radio type and channel when available
+- passive local neighbour-table observations for topology
 - active VPN-like adapters
 - DNS result and lookup time
 - gateway packet loss and latency
@@ -133,12 +164,27 @@ ICMP is diagnostic evidence, not proof of ownership. Routers and services may ra
 
 Traceroute hop timeouts do not automatically mean that hop is faulty. The dashboard labels the trace as an endpoint observation rather than ownership proof.
 
+Topology relationships have a similar rule: the neighbour table can prove that Windows has learned about another local device, but it cannot prove the physical switch/AP chain. The topology model therefore records `observed` and `confidence` on relationships.
+
 ## Privacy
 
-The agent does not capture packet payloads, user credentials, browser history or application content. A submitted run can still contain operational network metadata such as hostname, adapter details, private gateway address, VPN adapter names, resolved target addresses and traceroute hop addresses.
+The agent does not capture packet payloads, user credentials, browser history or application content.
 
-Use standalone `--dry-run --json` mode to inspect the exact collector payload.
+A submitted run can still contain operational network metadata such as:
+
+- endpoint hostname
+- private IPv4 address
+- adapter and gateway MAC addresses
+- Wi-Fi BSSID
+- neighbouring-device IP/MAC pairs represented in the inferred topology
+- VPN adapter names
+- resolved target addresses
+- traceroute hop addresses
+
+Use standalone `--dry-run --json` mode to inspect the exact collector payload. Use `--no-topology` if local topology metadata should not be uploaded.
+
+The planned ephemeral-diagnostic workflow should add an explicit evidence preview/consent step before upload.
 
 ## Validation status
 
-Parser and helper functions are covered by automated tests using representative Windows command output. The collector remains Windows-specific, so the full operating-system probe path should continue to be exercised across real adapters and VPN clients before treating Faultline as production network software.
+Parser, diagnostic and topology helper functions are covered by automated tests using representative inputs. The collector remains Windows-specific, so the full operating-system probe path should continue to be exercised across real adapters, Wi-Fi chipsets, mesh systems and VPN clients before treating Faultline as production network software.

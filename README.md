@@ -2,70 +2,81 @@
 
 **Evidence-based network fault isolation across endpoints, networks, ISPs and services.**
 
-Faultline addresses a common support problem: every team can see its own part of a connection, but nobody has enough shared evidence to say where a fault actually begins.
+Faultline addresses a recurring support problem: every team can see its own part of a connection, but nobody has enough shared evidence to say where a fault actually begins.
 
-Instead of producing another wall of network metrics, Faultline correlates observations from explicit vantage points into a likely **fault domain**, explains the evidence behind that decision, and recommends the next action.
-
-## Why Faultline?
-
-A connectivity incident often crosses several ownership boundaries:
+Rather than becoming another wall of network metrics, Faultline correlates observations from explicit vantage points into a likely **fault domain**, shows the evidence behind that conclusion and recommends the next action.
 
 ```text
 Endpoint -> Wi-Fi/LAN -> ISP -> Internet transit -> SaaS / application
 ```
 
-The user sees a broken application. Internal IT sees a healthy LAN. The ISP sees an active circuit. The SaaS provider sees healthy servers.
+The user sees a broken application. Internal IT sees a healthy LAN. The ISP sees an active circuit. The SaaS provider sees healthy servers. Faultline is intended to bridge those viewpoints without requiring every party to share full administrative access.
 
-Faultline is intended to bridge those viewpoints without requiring either side to hand over full administrative access.
+## Current state
 
-## Current build: v0.5
+The stable platform work is **v0.5**, which introduced the persistent registered remote-probe fleet.
 
-Faultline now includes a **persistent registered remote-probe fleet**.
+The repository now also contains the first **v0.6 topology preview**: the Windows endpoint can build a passive, best-effort local network map and the live dashboard can render it as an interactive draggable topology.
 
-Remote probes are no longer only anonymous one-shot processes. An administrator can register a durable probe identity once, run that worker continuously from a VPS or other network, monitor its heartbeat health, and assign diagnostic sessions to it.
+### Implemented platform capabilities
 
-When endpoint evidence arrives, the assigned probe discovers the session from its own authenticated job queue, independently measures the target, and contributes the second vantage point automatically.
-
-### What is implemented
-
-- commercial-style incident dashboard
 - deterministic fault-domain diagnosis engine
 - Windows endpoint collector
 - portable remote probe for Windows, Linux and macOS with Node.js 20+
-- persistent registered probe identities
-- long-lived registered-probe credentials stored as SHA-256 hashes
-- authenticated probe heartbeats
-- `online`, `stale`, `offline` and `disabled` probe health states
-- probe runtime metadata such as version, platform and hostname
-- admin-visible probe-fleet dashboard
-- diagnostic sessions assignable to a specific registered probe
-- per-probe job queues that expose only sessions assigned to that probe
-- automatic registered-probe discovery of endpoint-ready sessions
-- backwards-compatible one-off session probe mode
-- short-lived endpoint session credentials
+- two-vantage endpoint + remote correlation
 - persistent diagnostic sessions and telemetry
-- session expiry enforcement
-- atomic JSON-file writes for the single-process prototype
-- admin-protected live dashboard data
-- public deterministic demo incidents
-- escaped live telemetry before browser rendering
+- short-lived endpoint credentials
+- persistent registered `PRB-...` probe identities
+- hashed registered-probe credentials
+- authenticated heartbeats
+- online / stale / offline / disabled probe health
+- per-probe private job queues
+- registered probe worker mode
+- admin-visible probe fleet
 - Docker and Docker Compose deployment
-- endpoint gateway, DNS, VPN, route, loss, jitter and traceroute observations
-- remote DNS, TCP and HTTP reachability checks
-- automated unit and integration tests
+- public deterministic demo incidents
+- admin-protected live telemetry
 - zero third-party runtime dependencies
+
+### v0.6 topology preview now implemented
+
+The endpoint collector now also reads passive local-network evidence from Windows:
+
+- active IPv4 interface and address
+- adapter MAC address
+- default gateway
+- current Wi-Fi SSID/BSSID, signal, radio type and channel
+- existing Windows IPv4 neighbour table
+
+Faultline converts those observations into an inferred graph containing device nodes, relationships, confidence and an affected path.
+
+The dashboard renders that graph using:
+
+- draggable device nodes
+- device-type glyphs
+- solid links for directly observed relationships
+- dashed links for inferred relationships
+- star / tree / mesh / unknown topology classification
+- high / medium / low confidence markers
+- diagnostic overlays for likely affected local or upstream segments
+
+The first implementation is intentionally conservative. It **does not actively sweep the subnet**. Unknown LAN devices come from the endpoint's existing neighbour cache.
+
+A mesh result is also not presented as certainty. A separate serving BSSID that shares the gateway MAC OUI is treated only as low-confidence evidence consistent with a mesh or same-vendor AP hop.
+
+See [docs/TOPOLOGY.md](docs/TOPOLOGY.md) for the discovery and inference model.
 
 ## No AI API by design
 
 Faultline does **not** use an AI or LLM API.
 
-The diagnostic inputs are structured measurements and the fault domains are explicit. A deterministic evidence engine is easier to test, easier to explain, cheaper to run, and less likely to invent a networking conclusion that is not supported by telemetry.
-
-AI is not part of the architecture simply because it is available. The core diagnostic path remains reproducible:
+The inputs are structured network measurements and the fault domains are explicit. The diagnosis path stays reproducible:
 
 ```text
 same evidence -> same rules -> same diagnosis
 ```
+
+That makes the result easier to test, explain and defend during a support escalation.
 
 ## Architecture
 
@@ -84,9 +95,7 @@ same evidence -> same rules -> same diagnosis
         Windows endpoint                    Registered probe
         short-lived token                   long-lived identity
                 |                                    |
-     LAN / Wi-Fi / VPN / path              heartbeat + job poll
-                |                                    |
-                |                           DNS / TCP / HTTP
+       local topology + path                DNS / TCP / HTTP
                 |                                    |
                 +-----------------+------------------+
                                   |
@@ -94,7 +103,7 @@ same evidence -> same rules -> same diagnosis
                          correlated incident
 ```
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the deeper design.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the deeper architecture and [ROADMAP.md](ROADMAP.md) for the product roadmap.
 
 ## Run Faultline locally
 
@@ -122,17 +131,15 @@ export FAULTLINE_ADMIN_TOKEN='fl_admin_change_this_to_a_long_random_value'
 npm start
 ```
 
-Open:
+Then open:
 
 ```text
 http://localhost:3000
 ```
 
-The public dashboard initially shows deterministic demo incidents. Use **Unlock live data** with the admin credential to view live incidents and the registered probe fleet.
+Demo incidents are public. Use **Unlock live data** with the administrator token to view live endpoint telemetry, the probe fleet and topology data.
 
-## Registered probe fleet
-
-### 1. Register a probe once
+## Register a persistent remote probe
 
 From an administrative machine:
 
@@ -150,22 +157,15 @@ PowerShell:
 npm run probe:register -- --name london-1 --location "London, UK" --tags uk,vps --admin-token $env:FAULTLINE_ADMIN_TOKEN
 ```
 
-Faultline returns a durable probe ID and a raw credential once:
+Faultline returns a durable probe ID and the raw registered-probe credential once:
 
 ```text
 Faultline probe PRB-8A1B2C3D4E registered.
-Name: london-1
-Location: London, UK
-
-Start the registered worker with:
-  npm run probe -- --probe PRB-8A1B2C3D4E --token fl_probe_... --api-base https://faultline.example.com --watch
 ```
 
-Only the SHA-256 hash of the credential is persisted by Faultline.
+Only the credential hash is persisted by the control plane.
 
-### 2. Run the probe worker
-
-On the VPS or independent network:
+Run the registered worker on the VPS or independent network:
 
 ```bash
 npm run probe -- \
@@ -175,35 +175,11 @@ npm run probe -- \
   --watch
 ```
 
-The worker:
+The worker authenticates as its own identity, sends heartbeats, polls only its assigned jobs, measures endpoint-ready sessions and submits the remote evidence.
 
-1. authenticates as its registered probe identity
-2. sends heartbeat/runtime state
-3. polls only its own assigned job queue
-4. independently measures endpoint-ready sessions
-5. submits the remote evidence
-6. continues polling while `--watch` is enabled
+## Run a diagnostic
 
-Default poll interval is 30 seconds. Configure it with `--interval 15-300`.
-
-### Probe health
-
-Faultline derives health from authenticated heartbeats:
-
-```text
-<= 90 seconds since heartbeat    online
-<= 5 minutes                     stale
-> 5 minutes                      offline
-disabled identity                disabled
-```
-
-Health is computed by the control plane rather than trusted from the worker.
-
-## Run a diagnostic using a registered probe
-
-### 1. Create the session
-
-Assign the remote vantage when the session is created:
+Create a session and optionally assign a registered probe:
 
 ```bash
 npm run session -- \
@@ -212,11 +188,7 @@ npm run session -- \
   --admin-token "$FAULTLINE_ADMIN_TOKEN"
 ```
 
-The response contains a short-lived **endpoint credential**. No one-off probe credential is generated because the registered probe already has its own durable identity.
-
-### 2. Run the affected Windows endpoint
-
-Use the generated command on the machine experiencing the problem:
+Run the generated endpoint command on the affected Windows machine:
 
 ```bash
 npm run agent -- \
@@ -225,19 +197,25 @@ npm run agent -- \
   --api-base https://faultline.example.com
 ```
 
-Once endpoint evidence exists, the assigned registered probe sees that session in:
+The endpoint run now collects topology evidence by default. To suppress it:
 
-```text
-GET /api/probes/:probeId/jobs
+```bash
+npm run agent -- \
+  --session FL-1234567890 \
+  --token fl_ep_... \
+  --api-base https://faultline.example.com \
+  --no-topology
 ```
 
-No target is exposed to unrelated probe identities.
+You can inspect the complete endpoint payload without uploading anything:
 
-### 3. Correlation happens automatically
+```powershell
+npm run agent -- --target microsoft.com --dry-run --json
+```
 
-A worker running with `--watch` picks up the session, performs the independent target checks and submits the second vantage point.
+The CLI reports the inferred topology classification and node count alongside the normal network measurements.
 
-The incident transitions from:
+Once endpoint evidence exists, an assigned registered probe discovers the session and adds the independent vantage automatically. The incident transitions from:
 
 ```text
 ENDPOINT ONLY
@@ -249,114 +227,65 @@ to:
 2 VANTAGES
 ```
 
-and the deterministic diagnosis is recalculated.
+and the diagnosis is recalculated.
 
-## One-off remote probe mode
+## Topology model
 
-v0.5 retains the v0.4 workflow for ad hoc testing. If a session is created **without** `--probe`, Faultline still generates a short-lived session probe token:
-
-```bash
-npm run probe -- --session FL-1234567890 --token fl_pr_... --api-base https://faultline.example.com
-```
-
-Registered probes are preferred for a persistent hosted deployment because their identity and health are visible to the control plane.
-
-## CLI summary
-
-### Register a probe
+Topology telemetry is stored under:
 
 ```text
-npm run probe:register --
-  --name <value>            Required probe name
-  --location <value>        Human-readable location
-  --tags <csv>              Probe tags
-  --api-base <url>          Faultline control plane
-  --admin-token <token>     Admin credential
-  --json                    Full registration response
+telemetry.topology
 ```
 
-### Registered probe worker
+Simplified shape:
+
+```json
+{
+  "version": 1,
+  "kind": "tree",
+  "confidence": "medium",
+  "nodes": [],
+  "links": [],
+  "affectedPath": [],
+  "discovery": {
+    "mode": "passive",
+    "activeScan": false
+  }
+}
+```
+
+Current topology classifications:
 
 ```text
-npm run probe --
-  --probe <id>              Registered probe ID
-  --token <token>           Registered probe credential
-  --api-base <url>          Faultline control plane
-  --watch                   Keep polling for jobs
-  --interval <seconds>      15-300, default 30
+star     gateway-centred local network
+
+tree     separate wireless access layer visible
+
+mesh     low-confidence same-vendor wireless-hop evidence
+
+unknown  insufficient default-gateway evidence
 ```
 
-### Diagnostic session
+Important limitation: endpoint-only discovery cannot prove every physical relationship. An Ethernet path may contain an unmanaged switch that Windows cannot see. Faultline therefore distinguishes **observed facts** from **inferred links** instead of claiming a perfect physical diagram.
+
+Future topology work includes OUI vendor data, consented bounded discovery, reverse-DNS/mDNS hints, conservative device classification and router/controller integrations for authoritative switch/AP/mesh relationships.
+
+## Probe health
+
+Faultline derives probe state from authenticated heartbeat age:
 
 ```text
-npm run session --
-  --target <host|IP|URL>    Diagnostic target
-  --probe <id>              Optional registered probe assignment
-  --port <number>           Target TCP port
-  --ttl <minutes>           5-1440 minutes
-  --title <value>           Incident title
-  --customer <value>        Customer/case label
-  --vpn-required            Target requires VPN
-  --expected-route <CIDR>   Endpoint route expectation
+<= 90 seconds     online
+<= 5 minutes      stale
+> 5 minutes       offline
+disabled identity disabled
 ```
 
-See [docs/PROBE_FLEET.md](docs/PROBE_FLEET.md), [docs/REMOTE_PROBE.md](docs/REMOTE_PROBE.md), and [docs/AGENT.md](docs/AGENT.md).
-
-## API additions in v0.5
-
-### Probe administration
-
-```text
-POST /api/probes                 admin only
-GET  /api/probes                 admin only
-GET  /api/probes/:id             admin or matching probe identity
-```
-
-### Registered worker control plane
-
-```text
-POST /api/probes/:id/heartbeat   matching registered probe
-GET  /api/probes/:id/jobs        matching registered probe
-POST /api/probe-runs             assigned registered probe or legacy session probe
-```
-
-A registered probe cannot enumerate another probe's jobs simply by knowing its ID. Authentication is checked against the persisted credential hash for the requested probe identity.
-
-## Persistence
-
-Direct Node deployments store state at:
-
-```text
-data/faultline.json
-```
-
-The v0.5 store contains:
-
-- diagnostic sessions
-- endpoint and remote runs
-- registered probe identities
-- hashed registered-probe credentials
-- last heartbeat and runtime metadata
-
-It does not store raw session or registered-probe credentials.
-
-The file format was advanced to state version 2. Existing v0.4 state is normalized on read by adding an empty probe registry.
-
-## Docker deployment
-
-The existing Docker and Docker Compose control-plane deployment remains supported. The service binds to localhost by default in Compose so HTTPS should terminate at a reverse proxy before traffic reaches Node.
-
-For a remote probe VPS, the simplest worker is currently a Node.js process running:
-
-```bash
-npm run probe -- --probe <id> --token <token> --api-base https://faultline.example.com --watch
-```
-
-See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the control plane and [docs/PROBE_FLEET.md](docs/PROBE_FLEET.md) for long-running worker guidance.
+A worker does not self-declare that it is healthy.
 
 ## Security model
 
-Faultline v0.5 now has three credential scopes:
+Faultline currently has these credential scopes:
 
 ```text
 Admin token
@@ -366,12 +295,18 @@ Endpoint session token
   -> submit endpoint evidence for one short-lived session
 
 Registered probe token
-  -> heartbeat, read that probe's assigned jobs, submit remote evidence for sessions assigned to it
+  -> heartbeat, read that probe's assigned jobs, submit assigned remote evidence
 ```
 
 Legacy one-off sessions may also receive a short-lived `fl_pr_...` probe token.
 
-Registered probe tokens are long-lived in this prototype. Rotation and explicit revocation are future work.
+For hosted use, bearer credentials should only travel over HTTPS.
+
+### Topology privacy
+
+Topology can contain private network metadata including local IPv4 addresses, MAC addresses and Wi-Fi BSSID information. This is useful evidence but may be sensitive.
+
+The current endpoint supports `--no-topology`. The planned v0.6 ephemeral-diagnostic flow will add a clearer consent and evidence-preview step before upload.
 
 ## Tests
 
@@ -380,7 +315,7 @@ npm run check
 npm test
 ```
 
-The suite covers:
+Coverage includes:
 
 - deterministic fault-domain diagnosis
 - Windows command parsing
@@ -388,50 +323,51 @@ The suite covers:
 - evidence correlation
 - session authentication and expiry
 - persistent state
-- registered probe identity and credential hashing
-- probe health transitions
-- persisted probe registry
+- registered probe identity and health
 - complete registered-probe HTTP lifecycle
-- legacy one-off two-vantage compatibility
+- topology MAC normalization
+- direct Wi-Fi star inference
+- separate AP/tree inference
+- low-confidence mesh inference
+- conservative Ethernet-path inference
+- missing-gateway handling
 
 CI also builds the Docker image.
 
 ## Current limitations
 
-Faultline is still a single-instance prototype rather than a production multi-tenant observability platform.
+Faultline remains a single-instance prototype rather than a production multi-tenant observability platform.
 
 - JSON-file persistence rather than a transactional database
 - one process / one writer assumption
 - one administrator security domain
-- registered probe credentials do not yet support rotation or explicit revocation
-- job polling rather than a push/message-queue system
+- no registered-probe credential rotation/revocation yet
+- job polling rather than push/message-queue delivery
 - no rate limiting
 - no organisation/user accounts
 - no audit log
-- remote probes currently collect DNS/TCP/HTTP evidence rather than full remote traceroute and ICMP path telemetry
+- remote probes currently collect DNS/TCP/HTTP rather than full remote path telemetry
 - Windows endpoint collector still needs broader real-world testing across adapters and VPN clients
+- topology is best-effort endpoint inference rather than authoritative physical discovery
+- topology currently uses the existing neighbour table rather than an active discovery pass
 
 ## Roadmap
 
-The full product and engineering roadmap is tracked in [ROADMAP.md](ROADMAP.md).
+The full roadmap is tracked in [ROADMAP.md](ROADMAP.md).
 
-The planned **v0.6** milestone now combines three connected areas:
+The broader **v0.6** milestone contains three connected areas:
 
-1. **ephemeral support diagnostics** so an engineer can send a one-time link/code to a device that is not already managed by Faultline
-2. **interactive inferred network topology** with device icons, star/mesh/tree/mixed classification, confidence-labelled relationships and diagnostic health overlays
-3. **probe fleet intelligence and safety** including geography/tag-based selection, credential lifecycle controls and restrictions that prevent public probes being abused as arbitrary network scanners
+1. **ephemeral support diagnostics**: send a one-time diagnostic link/code to a machine Faultline does not already manage
+2. **interactive inferred topology**: now started in this repository with passive Windows discovery and the draggable graph UI
+3. **probe fleet intelligence and safety**: geography/tag-based selection, credential lifecycle controls and restrictions preventing public probes from becoming arbitrary scanners
 
-The topology view is intended to be a diagnostic surface, not merely a visualisation. Faultline should show which relationships are directly observed, which are inferred, and where the current fault evidence sits on the affected path.
-
-Later milestones cover Connectivity Contracts, deeper remote path evidence, cases and signed evidence packages, cross-party troubleshooting, hosted SaaS architecture, support integrations and multi-vantage incident analysis.
-
-None of those requires an AI API for the core diagnosis.
+Later milestones cover Connectivity Contracts, richer remote path evidence, support cases and signed evidence packages, cross-party troubleshooting, hosted SaaS architecture, integrations and multi-vantage incident analysis.
 
 ## Status
 
-Faultline v0.5 demonstrates the broader product hypothesis: **a support platform can correlate evidence from independently operated network vantage points while keeping identity, access and fault-domain reasoning explicit and testable.**
+Faultline currently demonstrates the broader product hypothesis that a support platform can correlate evidence from independently operated network vantage points while keeping identity, access, topology inference and fault-domain reasoning explicit and testable.
 
-It is not a replacement for production network observability or digital-experience monitoring platforms.
+It is not intended to become a generic replacement for production network-observability platforms.
 
 ## License
 

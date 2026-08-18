@@ -3,7 +3,8 @@ const ids = [
   "incident-title", "incident-id", "customer", "target", "location", "connection",
   "metrics", "evidence-list", "action-list", "path", "route-panel", "route-trace",
   "incident-status", "measured-at", "auth-open", "auth-dialog", "auth-form", "auth-token",
-  "auth-error", "auth-cancel", "probe-fleet-panel", "probe-fleet"
+  "auth-error", "auth-cancel", "probe-fleet-panel", "probe-fleet", "topology-panel",
+  "topology-canvas", "topology-kind", "topology-confidence", "topology-summary"
 ];
 const els = Object.fromEntries(ids.map(id => [id, document.getElementById(id)]));
 
@@ -87,6 +88,208 @@ function renderProbeFleet() {
       </div>
     </article>
   `).join("");
+}
+
+function topologyGlyph(type) {
+  return {
+    laptop: "▰",
+    router: "⌁",
+    "access-point": "◉",
+    "mesh-node": "◈",
+    switch: "▦",
+    printer: "▤",
+    server: "▥",
+    nas: "▥",
+    phone: "▯",
+    tablet: "▭",
+    internet: "◎",
+    unknown: "◇"
+  }[type] || "◇";
+}
+
+function topologyNodeSubtitle(node) {
+  if (node.role === "boundary") return "External network boundary";
+  if (node.ip) return node.ip;
+  if (node.ssid) return node.ssid;
+  return node.type?.replaceAll("-", " ") || "Network device";
+}
+
+function topologyTooltip(node) {
+  return [
+    node.label,
+    `Type: ${node.type || "unknown"}`,
+    `Confidence: ${node.confidence || "unknown"}`,
+    node.ip ? `IP: ${node.ip}` : null,
+    node.mac ? `MAC: ${node.mac}` : null,
+    node.connection ? `Connection: ${node.connection}` : null,
+    node.inferenceReason || null
+  ].filter(Boolean).join("\n");
+}
+
+function isAffectedTopologyLink(link, topology, domain) {
+  const path = topology.affectedPath || [];
+  const position = path.indexOf(link.source);
+  const onPath = position >= 0 && path[position + 1] === link.target;
+  if (!onPath) return "";
+
+  if (domain === "local_network" && link.target !== "internet") return "fault";
+  if (domain === "upstream" && link.target === "internet") return "fault";
+  if (domain === "access_path") return "affected";
+  return domain === "healthy" ? "" : "affected";
+}
+
+function topologyNodeFault(node, domain) {
+  if (domain === "local_network" && ["endpoint", "access", "gateway"].includes(node.role)) return true;
+  if (domain === "upstream" && node.role === "boundary") return true;
+  return false;
+}
+
+function topologyPositions(topology, width, height) {
+  const positions = new Map();
+  const clampX = value => Math.max(75, Math.min(width - 75, value));
+  const clampY = value => Math.max(55, Math.min(height - 55, value));
+
+  positions.set("endpoint", { x: clampX(width * .12), y: clampY(height * .43) });
+  positions.set("wireless-access", { x: clampX(width * .34), y: clampY(height * .43) });
+  positions.set("gateway", { x: clampX(width * .57), y: clampY(height * .43) });
+  positions.set("internet", { x: clampX(width * .86), y: clampY(height * .43) });
+
+  const neighbours = topology.nodes.filter(node => node.role === "neighbour");
+  neighbours.forEach((node, index) => {
+    const count = Math.max(neighbours.length, 1);
+    const spread = Math.min(Math.PI * .9, Math.PI * .22 * Math.max(count - 1, 1));
+    const start = Math.PI / 2 - spread / 2;
+    const angle = count === 1 ? Math.PI / 2 : start + (spread * index / (count - 1));
+    positions.set(node.id, {
+      x: clampX(width * .57 + Math.cos(angle) * Math.min(260, width * .27)),
+      y: clampY(height * .5 + Math.sin(angle) * Math.min(145, height * .32))
+    });
+  });
+
+  topology.nodes.forEach((node, index) => {
+    if (!positions.has(node.id)) {
+      positions.set(node.id, {
+        x: clampX(width * .3 + (index % 4) * 150),
+        y: clampY(75 + Math.floor(index / 4) * 105)
+      });
+    }
+  });
+
+  return positions;
+}
+
+function renderTopology(incident) {
+  const topology = incident.telemetry?.topology;
+  els["topology-panel"].hidden = !topology?.nodes?.length;
+  if (!topology?.nodes?.length) {
+    els["topology-canvas"].replaceChildren();
+    return;
+  }
+
+  els["topology-kind"].textContent = topology.kind || "unknown";
+  els["topology-confidence"].textContent = `${topology.confidence || "low"} confidence`;
+  els["topology-confidence"].className = `topology-pill ${topology.confidence || "low"}`;
+  els["topology-summary"].textContent = `${topology.summary || "Topology evidence collected."} Passive discovery only; dashed links are inferred.`;
+
+  const canvas = els["topology-canvas"];
+  canvas.replaceChildren();
+  const grid = document.createElement("div");
+  grid.className = "topology-grid";
+  canvas.append(grid);
+
+  const width = Math.max(canvas.clientWidth, 720);
+  const height = Math.max(canvas.clientHeight, 390);
+  const positions = topologyPositions(topology, width, height);
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.classList.add("topology-links");
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  svg.setAttribute("preserveAspectRatio", "none");
+  canvas.append(svg);
+
+  const lineById = new Map();
+  for (const link of topology.links || []) {
+    const line = document.createElementNS(ns, "line");
+    const affected = isAffectedTopologyLink(link, topology, incident.diagnosis.faultDomain);
+    line.setAttribute("class", `topology-link ${link.observed ? "" : "inferred"} ${affected}`.trim());
+    line.dataset.source = link.source;
+    line.dataset.target = link.target;
+    const title = document.createElementNS(ns, "title");
+    title.textContent = `${link.type || "relationship"} · ${link.confidence || "unknown"} confidence\n${link.reason || ""}`;
+    line.append(title);
+    svg.append(line);
+    lineById.set(link.id, line);
+  }
+
+  const nodeEls = new Map();
+  for (const node of topology.nodes) {
+    const element = document.createElement("button");
+    element.type = "button";
+    element.className = `topology-node ${node.role || ""}${topologyNodeFault(node, incident.diagnosis.faultDomain) ? " local-fault" : ""}`;
+    element.title = topologyTooltip(node);
+
+    const icon = document.createElement("span");
+    icon.className = "topology-icon";
+    icon.textContent = topologyGlyph(node.type);
+
+    const copy = document.createElement("span");
+    const label = document.createElement("strong");
+    label.textContent = node.label || node.id;
+    const subtitle = document.createElement("small");
+    subtitle.textContent = topologyNodeSubtitle(node);
+    copy.append(label, subtitle);
+
+    const confidence = document.createElement("i");
+    confidence.className = `topology-confidence ${node.confidence || "low"}`;
+    confidence.title = `${node.confidence || "low"} confidence`;
+
+    element.append(icon, copy, confidence);
+    canvas.append(element);
+    nodeEls.set(node.id, element);
+  }
+
+  const placeNodes = () => {
+    for (const [id, element] of nodeEls.entries()) {
+      const point = positions.get(id);
+      if (!point) continue;
+      element.style.left = `${point.x}px`;
+      element.style.top = `${point.y}px`;
+    }
+    for (const link of topology.links || []) {
+      const line = lineById.get(link.id);
+      const source = positions.get(link.source);
+      const target = positions.get(link.target);
+      if (!line || !source || !target) continue;
+      line.setAttribute("x1", source.x);
+      line.setAttribute("y1", source.y);
+      line.setAttribute("x2", target.x);
+      line.setAttribute("y2", target.y);
+    }
+  };
+
+  placeNodes();
+
+  for (const [id, element] of nodeEls.entries()) {
+    element.addEventListener("pointerdown", event => {
+      event.preventDefault();
+      element.setPointerCapture(event.pointerId);
+      const rect = canvas.getBoundingClientRect();
+      const move = moveEvent => {
+        const x = Math.max(72, Math.min(width - 72, (moveEvent.clientX - rect.left) * (width / rect.width)));
+        const y = Math.max(48, Math.min(height - 48, (moveEvent.clientY - rect.top) * (height / rect.height)));
+        positions.set(id, { x, y });
+        placeNodes();
+      };
+      const end = () => {
+        element.removeEventListener("pointermove", move);
+        element.removeEventListener("pointerup", end);
+        element.removeEventListener("pointercancel", end);
+      };
+      element.addEventListener("pointermove", move);
+      element.addEventListener("pointerup", end);
+      element.addEventListener("pointercancel", end);
+    });
+  }
 }
 
 function renderRoute(incident) {
@@ -177,6 +380,7 @@ function render() {
   `).join("");
 
   els["action-list"].innerHTML = result.actions.map(action => `<li>${escapeHtml(action)}</li>`).join("");
+  renderTopology(incident);
   renderRoute(incident);
 }
 
