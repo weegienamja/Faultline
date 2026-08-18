@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { generateCredential, hashCredential, isSessionExpired } from "../security/auth.mjs";
+import { generateCredential, hashCredential, isSessionExpired, verifyCredential } from "../security/auth.mjs";
 
 const DEFAULT_TTL_MINUTES = 60;
 const MAX_TTL_MINUTES = 24 * 60;
@@ -53,37 +53,108 @@ export function normaliseSessionInput(input = {}, now = Date.now()) {
 
 export function createDiagnosticSession(input = {}, now = Date.now()) {
   const normalised = normaliseSessionInput(input, now);
-  const endpointToken = generateCredential("fl_ep");
+  const ephemeral = Boolean(input.ephemeral);
+  const endpointToken = ephemeral ? null : generateCredential("fl_ep");
+  const invitationToken = ephemeral ? generateCredential("fl_inv") : null;
   const probeToken = normalised.assignedProbeId ? null : generateCredential("fl_pr");
   const id = `FL-${randomBytes(5).toString("hex").toUpperCase()}`;
 
   const session = {
     id,
     ...normalised,
-    endpointTokenHash: hashCredential(endpointToken),
-    probeTokenHash: probeToken ? hashCredential(probeToken) : null
+    mode: ephemeral ? "ephemeral" : "direct",
+    endpointTokenHash: endpointToken ? hashCredential(endpointToken) : null,
+    probeTokenHash: probeToken ? hashCredential(probeToken) : null,
+    invitation: invitationToken ? {
+      tokenHash: hashCredential(invitationToken),
+      createdAt: normalised.createdAt,
+      claimedAt: null,
+      consentedAt: null
+    } : null
   };
 
   return {
     session,
     credentials: {
-      endpointToken,
+      ...(endpointToken ? { endpointToken } : {}),
+      ...(invitationToken ? { invitationToken } : {}),
       ...(probeToken ? { probeToken } : {})
     }
   };
 }
 
+export function findSessionByInvitationToken(sessions, token) {
+  if (!token || !Array.isArray(sessions)) return null;
+  return sessions.find(session => verifyCredential(token, session?.invitation?.tokenHash)) || null;
+}
+
+export function claimDiagnosticInvitation(session, token, consent, now = Date.now()) {
+  if (!session || session.mode !== "ephemeral" || !session.invitation?.tokenHash) {
+    const error = new Error("Diagnostic invitation is invalid.");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (!verifyCredential(token, session.invitation.tokenHash)) {
+    const error = new Error("Diagnostic invitation is invalid.");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (isSessionExpired(session, now)) {
+    const error = new Error("Diagnostic invitation has expired.");
+    error.statusCode = 410;
+    throw error;
+  }
+
+  if (session.invitation.claimedAt) {
+    const error = new Error("Diagnostic invitation has already been claimed.");
+    error.statusCode = 410;
+    throw error;
+  }
+
+  if (consent !== true) {
+    const error = new Error("Explicit consent is required before endpoint diagnostics can be activated.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const endpointToken = generateCredential("fl_ep");
+  const claimedAt = new Date(now).toISOString();
+  const updatedSession = {
+    ...session,
+    endpointTokenHash: hashCredential(endpointToken),
+    invitation: {
+      ...session.invitation,
+      claimedAt,
+      consentedAt: claimedAt
+    }
+  };
+
+  return { session: updatedSession, endpointToken };
+}
+
 export function publicSession(session, now = Date.now()) {
+  const expired = isSessionExpired(session, now);
+  const mode = session.mode || "direct";
+  const invitation = session.invitation ? {
+    status: expired ? "expired" : session.invitation.claimedAt ? "claimed" : "available",
+    claimedAt: session.invitation.claimedAt || null,
+    consentedAt: session.invitation.consentedAt || null
+  } : null;
+
   return {
     id: session.id,
     target: session.target,
     title: session.title,
     customer: session.customer,
+    mode,
     vpnRequired: Boolean(session.vpnRequired),
     expectedRoute: session.expectedRoute || null,
     assignedProbeId: session.assignedProbeId || null,
     createdAt: session.createdAt,
     expiresAt: session.expiresAt,
-    status: isSessionExpired(session, now) ? "expired" : "active"
+    status: expired ? "expired" : "active",
+    invitation
   };
 }
