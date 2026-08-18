@@ -272,7 +272,7 @@ export async function collectWindowsDiagnostics(options) {
     options.trace === false ? Promise.resolve([]) : traceRoute(target.host)
   ]);
 
-  const targetReachable = Boolean(tcp.ok || http?.ok || (targetPing.replies > 0));
+  const targetReachable = Boolean(tcp.ok || http?.ok);
   const icmpLikelyFiltered = targetPing.lossPct === 100 && targetReachable;
   const upstreamLoss = icmpLikelyFiltered ? 0 : targetPing.lossPct;
   const expectedRoutePresent = routeMatches(networkState.routes, options.expectedRoute);
