@@ -13,6 +13,15 @@ test("generates opaque role-scoped credentials and stores hashes", () => {
   assert.equal(JSON.stringify(session).includes(credentials.endpointToken), false);
 });
 
+test("assigned registered-probe sessions do not mint one-off probe tokens", () => {
+  const { session, credentials } = createDiagnosticSession({ target: "example.com", assignedProbeId: "PRB-TEST" });
+  assert.match(credentials.endpointToken, /^fl_ep_/);
+  assert.equal("probeToken" in credentials, false);
+  assert.equal(session.probeTokenHash, null);
+  assert.equal(session.assignedProbeId, "PRB-TEST");
+  assert.equal(publicSession(session).assignedProbeId, "PRB-TEST");
+});
+
 test("verifies credentials using hashed constant-time comparison", () => {
   const credential = generateCredential("fl_test");
   const hash = hashCredential(credential);
