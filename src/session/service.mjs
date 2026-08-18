@@ -35,6 +35,16 @@ export function normaliseSessionInput(input = {}, now = Date.now()) {
   const customer = String(input.customer || "Diagnostic session").trim();
   if (title.length > 180 || customer.length > 180) throw new Error("Session title and customer labels must be 180 characters or fewer.");
 
+  const probeSelection = input.probeSelection && typeof input.probeSelection === "object"
+    ? {
+        mode: String(input.probeSelection.mode || "explicit"),
+        selector: input.probeSelection.selector || null,
+        selectedAt: input.probeSelection.selectedAt || createdAt,
+        candidateCount: Number(input.probeSelection.candidateCount || 0),
+        loadAtSelection: Number(input.probeSelection.loadAtSelection || 0)
+      }
+    : null;
+
   return {
     target: { input: target, port },
     title,
@@ -42,6 +52,7 @@ export function normaliseSessionInput(input = {}, now = Date.now()) {
     vpnRequired: Boolean(input.vpnRequired || input.expectedRoute),
     expectedRoute: input.expectedRoute ? String(input.expectedRoute).trim() : null,
     assignedProbeId: input.assignedProbeId ? String(input.assignedProbeId).trim() : null,
+    probeSelection,
     ttlMinutes,
     createdAt,
     expiresAt
@@ -210,6 +221,7 @@ export function publicSession(session, now = Date.now()) {
     vpnRequired: Boolean(session.vpnRequired),
     expectedRoute: session.expectedRoute || null,
     assignedProbeId: session.assignedProbeId || null,
+    probeSelection: session.probeSelection || null,
     createdAt: session.createdAt,
     expiresAt: session.expiresAt,
     status: expired ? "expired" : "active",
