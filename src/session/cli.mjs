@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 function help() {
-  console.log(`Faultline Session CLI v0.4\n\nUsage:\n  npm run session -- --target <hostname|IP|URL> [options]\n\nOptions:\n  --target <value>          Diagnostic target (required)\n  --port <number>           Target TCP port (default inferred from target)\n  --api-base <url>          Faultline control-plane base URL\n                           (default: http://localhost:3000)\n  --admin-token <token>     Admin bearer token (or FAULTLINE_ADMIN_TOKEN)\n  --ttl <minutes>           Session lifetime, 5-1440 minutes (default: 60)\n  --title <value>           Incident title\n  --customer <value>        Customer or case label\n  --vpn-required            Mark target as VPN-dependent\n  --expected-route <CIDR>   Expected IPv4 route for endpoint validation\n  --json                    Print the full creation response\n  --help                    Show this help\n\nExample:\n  npm run session -- --target microsoft.com --admin-token <admin-token>\n`);
+  console.log(`Faultline Session CLI v0.5\n\nUsage:\n  npm run session -- --target <hostname|IP|URL> [options]\n\nOptions:\n  --target <value>          Diagnostic target (required)\n  --port <number>           Target TCP port (default inferred from target)\n  --api-base <url>          Faultline control-plane base URL\n                           (default: http://localhost:3000)\n  --admin-token <token>     Admin bearer token (or FAULTLINE_ADMIN_TOKEN)\n  --probe <id>              Assign a registered probe to this session\n  --ttl <minutes>           Session lifetime, 5-1440 minutes (default: 60)\n  --title <value>           Incident title\n  --customer <value>        Customer or case label\n  --vpn-required            Mark target as VPN-dependent\n  --expected-route <CIDR>   Expected IPv4 route for endpoint validation\n  --json                    Print the full creation response\n  --help                    Show this help\n\nExamples:\n  npm run session -- --target microsoft.com --admin-token <admin-token>\n  npm run session -- --target microsoft.com --probe PRB-ABC123 --admin-token <admin-token>\n`);
 }
 
 function parseNumber(value, label, { min, max, integer = false }) {
@@ -19,7 +19,7 @@ function parseArgs(argv) {
     if (arg === "--help" || arg === "-h") options.help = true;
     else if (arg === "--vpn-required") options.vpnRequired = true;
     else if (arg === "--json") options.json = true;
-    else if (["--target", "--port", "--api-base", "--admin-token", "--ttl", "--title", "--customer", "--expected-route"].includes(arg)) {
+    else if (["--target", "--port", "--api-base", "--admin-token", "--probe", "--ttl", "--title", "--customer", "--expected-route"].includes(arg)) {
       const value = argv[index + 1];
       if (!value || value.startsWith("--")) throw new Error(`${arg} requires a value.`);
       index += 1;
@@ -27,6 +27,7 @@ function parseArgs(argv) {
       if (arg === "--port") options.port = parseNumber(value, "--port", { min: 1, max: 65535, integer: true });
       if (arg === "--api-base") options.apiBase = value.replace(/\/+$/, "");
       if (arg === "--admin-token") options.adminToken = value;
+      if (arg === "--probe") options.assignedProbeId = value;
       if (arg === "--ttl") options.ttlMinutes = parseNumber(value, "--ttl", { min: 5, max: 1440 });
       if (arg === "--title") options.title = value;
       if (arg === "--customer") options.customer = value;
@@ -78,7 +79,8 @@ async function main() {
       title: options.title,
       customer: options.customer,
       vpnRequired: options.vpnRequired,
-      expectedRoute: options.expectedRoute
+      expectedRoute: options.expectedRoute,
+      assignedProbeId: options.assignedProbeId
     })
   });
 
@@ -94,11 +96,20 @@ async function main() {
   console.log(`Faultline session ${session.id} created.`);
   console.log(`Target: ${session.target.input}:${session.target.port}`);
   console.log(`Expires: ${session.expiresAt}`);
+  if (session.assignedProbeId) console.log(`Registered probe: ${session.assignedProbeId}`);
+
   console.log("\nRun the affected Windows endpoint:");
   console.log(`  npm run agent -- --session ${session.id} --token ${credentials.endpointToken} --api-base ${base}`);
-  console.log("\nRun the independent probe from another network or host:");
-  console.log(`  npm run probe -- --session ${session.id} --token ${credentials.probeToken} --api-base ${base}`);
-  console.log("\nThe raw session credentials are shown once and are not stored by Faultline.");
+
+  if (session.assignedProbeId) {
+    console.log("\nThe registered probe worker will discover this session automatically after endpoint evidence arrives.");
+    console.log(`Ensure probe ${session.assignedProbeId} is running in --watch mode.`);
+  } else {
+    console.log("\nRun the one-off independent probe from another network or host:");
+    console.log(`  npm run probe -- --session ${session.id} --token ${credentials.probeToken} --api-base ${base}`);
+  }
+
+  console.log("\nRaw session credentials are shown once and are not stored by Faultline.");
 }
 
 main().catch(error => {

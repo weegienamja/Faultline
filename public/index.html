@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="Faultline isolates where network problems begin using correlated evidence from endpoint and remote vantage points." />
+  <meta name="description" content="Faultline isolates where network problems begin using correlated evidence from endpoint and registered remote vantage points." />
   <title>Faultline · Network fault isolation</title>
   <link rel="stylesheet" href="/styles.css" />
   <style>
@@ -20,6 +20,20 @@
     .auth-actions { display: flex; justify-content: flex-end; gap: 9px; }
     .auth-error { min-height: 18px; color: var(--danger) !important; }
     .secondary-button { border: 1px solid var(--border); border-radius: 9px; background: transparent; color: var(--muted); padding: 9px 12px; }
+    .probe-fleet { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 9px; }
+    .probe-tile { border: 1px solid var(--border-soft); border-radius: 11px; padding: 14px; background: rgba(255,255,255,.012); display: grid; gap: 9px; }
+    .probe-tile-head { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+    .probe-tile h4 { margin: 0; font-size: 13px; }
+    .probe-tile p { margin: 2px 0 0; color: var(--muted); font-size: 10px; }
+    .probe-health { border-radius: 999px; padding: 4px 7px; font-size: 8px; text-transform: uppercase; letter-spacing: .1em; border: 1px solid var(--border); color: var(--muted); }
+    .probe-health.online { color: var(--accent); border-color: rgba(97,230,184,.35); background: var(--accent-soft); }
+    .probe-health.stale { color: var(--warn); border-color: rgba(241,184,91,.35); background: rgba(241,184,91,.07); }
+    .probe-health.offline, .probe-health.disabled { color: var(--danger); border-color: rgba(255,122,104,.3); background: rgba(255,122,104,.05); }
+    .probe-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+    .probe-meta div { border-top: 1px solid var(--border-soft); padding-top: 7px; min-width: 0; }
+    .probe-meta small { color: var(--muted); display: block; font-size: 8px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 3px; }
+    .probe-meta strong { display: block; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .fleet-empty { color: var(--muted); font-size: 12px; margin: 0; }
   </style>
 </head>
 <body>
@@ -33,15 +47,16 @@
       <nav class="nav" aria-label="Primary navigation">
         <a class="nav-item active" href="#overview"><span class="nav-icon">◫</span> Overview</a>
         <a class="nav-item" href="#diagnostics"><span class="nav-icon">⌁</span> Diagnostics</a>
+        <a class="nav-item" href="#probes"><span class="nav-icon">◎</span> Probe fleet</a>
         <a class="nav-item" href="#evidence"><span class="nav-icon">≋</span> Evidence</a>
         <a class="nav-item" href="#actions"><span class="nav-icon">↗</span> Actions</a>
       </nav>
 
       <div class="sidebar-bottom">
         <div class="probe-card">
-          <div class="probe-status"><span class="pulse"></span> Persistent control plane</div>
-          <strong>Authenticated sessions · v0.4</strong>
-          <span>Scoped endpoint + remote-probe credentials</span>
+          <div class="probe-status"><span class="pulse"></span> Registered probe fleet</div>
+          <strong>Persistent identities · v0.5</strong>
+          <span>Heartbeat health + assigned diagnostic jobs</span>
         </div>
         <div class="profile">
           <div class="avatar">JB</div>
@@ -58,7 +73,7 @@
         </div>
         <div class="top-actions">
           <button class="auth-button" id="auth-open">Unlock live data</button>
-          <a class="primary-button" href="https://github.com/weegienamja/Faultline#run-an-authenticated-two-vantage-diagnostic">Run diagnostic</a>
+          <a class="primary-button" href="https://github.com/weegienamja/Faultline#registered-probe-fleet">Probe fleet</a>
         </div>
       </header>
 
@@ -111,6 +126,17 @@
         <div class="metric-grid" id="metrics"></div>
       </section>
 
+      <section class="panel route-panel" id="probe-fleet-panel" hidden>
+        <div class="panel-heading compact">
+          <div>
+            <span class="section-label">REGISTERED VANTAGE POINTS</span>
+            <h3 id="probes">Probe fleet</h3>
+          </div>
+          <span class="route-note">Health derives from authenticated worker heartbeats</span>
+        </div>
+        <div class="probe-fleet" id="probe-fleet"></div>
+      </section>
+
       <section class="panel route-panel" id="route-panel" hidden>
         <div class="panel-heading compact">
           <div>
@@ -146,7 +172,7 @@
       </section>
 
       <footer>
-        <span>Faultline v0.4</span>
+        <span>Faultline v0.5</span>
         <span>Evidence before escalation.</span>
       </footer>
     </main>
@@ -158,7 +184,7 @@
         <span class="section-label">CONTROL PLANE</span>
         <h3>Unlock live diagnostics</h3>
       </div>
-      <p>Demo incidents stay public. Live endpoint and probe telemetry requires the Faultline admin credential and is kept only in this browser tab.</p>
+      <p>Demo incidents stay public. Live endpoint, registered-probe health and probe telemetry require the Faultline admin credential and are kept only in this browser tab.</p>
       <label>
         Admin token
         <input id="auth-token" type="password" autocomplete="off" spellcheck="false" placeholder="fl_admin_…" />

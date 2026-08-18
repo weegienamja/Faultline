@@ -1,46 +1,57 @@
 # Faultline deployment
 
-Faultline v0.4 can run as a small persistent control plane on a VPS or container host. The current deployment model is intentionally simple: one Node.js process, one JSON data file, one administrator credential, and short-lived role-scoped credentials for each diagnostic session.
+Faultline v0.5 can run as a small persistent control plane on a VPS or container host, with registered remote-probe workers running on separate networks.
+
+The deployment model is intentionally simple:
+
+- one Node.js control-plane process
+- one persistent JSON state file
+- one administrator credential
+- short-lived endpoint session credentials
+- long-lived registered-probe credentials
+- one or more remote workers
 
 ## Security boundary
 
 Do not expose a remote Faultline control plane over plain HTTP.
 
-Endpoint and probe credentials are bearer tokens. When Faultline is reachable across an untrusted network, terminate **HTTPS** in front of the Node process using a reverse proxy such as Caddy, nginx, Traefik, or the platform load balancer.
+Endpoint and registered-probe credentials are bearer tokens. When Faultline is reachable across an untrusted network, terminate **HTTPS** in front of Node using a reverse proxy such as Caddy, nginx, Traefik, or a platform load balancer.
 
-The Node server itself currently listens over HTTP and expects TLS termination to happen in front of it.
+The Node server itself listens over HTTP and expects TLS termination to happen in front of it.
 
 ## Generate an admin credential
-
-Generate a long random value rather than using a memorable password:
 
 ```bash
 node -e "console.log('fl_admin_'+require('crypto').randomBytes(32).toString('base64url'))"
 ```
 
-Store it as `FAULTLINE_ADMIN_TOKEN` on the control-plane host.
+Store the result as `FAULTLINE_ADMIN_TOKEN` on the control-plane host.
 
-If the variable is missing when Faultline starts directly with Node, the server generates a temporary development admin credential and prints it to stdout. That behaviour is convenient locally but should not be relied on for a hosted deployment.
+If the variable is missing during a direct local Node start, Faultline generates a temporary development credential and prints it. Do not rely on that behavior for a hosted deployment.
 
-## Docker Compose
+## Docker Compose control plane
 
-Create a `.env` file beside `docker-compose.yml`:
+Create `.env` beside `docker-compose.yml`:
 
 ```text
 FAULTLINE_ADMIN_TOKEN=fl_admin_replace_this_with_a_random_value
 ```
 
-Then start the service:
+Start:
 
 ```bash
 docker compose up -d --build
 ```
 
-The supplied Compose file binds Faultline to `127.0.0.1:3000` on the host rather than exposing port 3000 on every interface. This is intentional: place the HTTPS reverse proxy on the same host and proxy its TLS-protected public hostname to `http://127.0.0.1:3000`.
+The supplied Compose file binds Node to `127.0.0.1:3000` on the host. Put the HTTPS reverse proxy on the same host and forward its public hostname to:
 
-The Compose file also mounts a named volume at `/data`, so diagnostic sessions and live runs survive container restarts.
+```text
+http://127.0.0.1:3000
+```
 
-Check the local health endpoint:
+A named volume is mounted at `/data`, so sessions, runs and registered-probe identities survive container restarts.
+
+Check health:
 
 ```bash
 curl http://127.0.0.1:3000/api/health
@@ -51,14 +62,13 @@ Expected shape:
 ```json
 {
   "ok": true,
-  "version": "0.4.0",
-  "persistence": true
+  "version": "0.5.0",
+  "persistence": true,
+  "registeredProbeFleet": true
 }
 ```
 
-## Direct Node deployment
-
-Faultline requires Node.js 20 or newer.
+## Direct Node control plane
 
 ```bash
 export FAULTLINE_ADMIN_TOKEN='fl_admin_...'
@@ -66,7 +76,7 @@ export FAULTLINE_DATA_FILE='/var/lib/faultline/faultline.json'
 npm start
 ```
 
-On Windows PowerShell:
+PowerShell:
 
 ```powershell
 $env:FAULTLINE_ADMIN_TOKEN = "fl_admin_..."
@@ -74,68 +84,105 @@ $env:FAULTLINE_DATA_FILE = "C:\Faultline\data\faultline.json"
 npm start
 ```
 
-## Create a remote diagnostic session
+## Deploy a registered probe
 
-From a machine with the Faultline repository checked out:
+Register the probe from an administrative machine:
 
 ```bash
-npm run session -- \
-  --target microsoft.com \
+npm run probe:register -- \
+  --name london-1 \
+  --location "London, UK" \
+  --tags uk,vps \
   --api-base https://faultline.example.com \
   --admin-token "$FAULTLINE_ADMIN_TOKEN"
 ```
 
-The control plane returns two different short-lived credentials:
+Store the returned `fl_probe_...` credential on the remote worker host.
 
-- an **endpoint token** that may upload endpoint evidence
-- a **probe token** that may upload the independent remote result
+Example environment file:
 
-The raw session credentials are returned once. Faultline persists SHA-256 hashes rather than the raw values.
+```text
+FAULTLINE_PROBE_TOKEN=fl_probe_...
+```
+
+Run the worker:
+
+```bash
+npm run probe -- \
+  --probe PRB-8A1B2C3D4E \
+  --api-base https://faultline.example.com \
+  --watch
+```
+
+When `FAULTLINE_PROBE_TOKEN` is present in the worker environment, `--token` is unnecessary.
+
+For a long-running VPS deployment, run the worker under systemd, Docker, supervisord, or another process manager. See [PROBE_FLEET.md](PROBE_FLEET.md).
+
+## Create an assigned diagnostic session
+
+```bash
+npm run session -- \
+  --target microsoft.com \
+  --probe PRB-8A1B2C3D4E \
+  --api-base https://faultline.example.com \
+  --admin-token "$FAULTLINE_ADMIN_TOKEN"
+```
+
+The control plane returns a short-lived endpoint token. It does not create a one-off session probe token because the assigned registered worker already owns the remote-probe role for that session.
 
 ## Dashboard access
 
-The public dashboard can display deterministic demo incidents without authentication.
+Demo incidents are public.
 
-Live diagnostic telemetry is returned only from the admin-protected `/api/incidents` endpoint. Use **Unlock live data** in the dashboard and enter the admin credential. The browser stores it in `sessionStorage`, which keeps it out of the URL and clears it when the tab/session is closed.
+Live diagnostic telemetry and registered-probe health require the admin credential. Use **Unlock live data** in the browser. The credential is kept in `sessionStorage`, not in the URL.
 
 ## Persistent data
 
-By default a direct Node deployment stores state at:
+Default direct-Node path:
 
 ```text
 data/faultline.json
 ```
 
-Set `FAULTLINE_DATA_FILE` to move it elsewhere. The file contains:
+Configure another location with:
 
-- session metadata
-- hashed endpoint and probe credentials
+```text
+FAULTLINE_DATA_FILE=/path/to/faultline.json
+```
+
+v0.5 state includes:
+
+- diagnostic sessions
+- hashed endpoint/one-off probe credentials
 - endpoint telemetry
 - remote-probe telemetry
-- correlated live runs
+- registered probe identities
+- hashed registered-probe credentials
+- heartbeat/runtime metadata
 
-It does **not** contain the raw endpoint or probe session credentials.
+Raw credentials are not persisted.
 
-Back up the data file if historical diagnostic sessions matter to you.
+Back up the file if historical diagnostics and registered probe identities matter.
 
 ## Current deployment limits
 
-v0.4 is suitable as a single-instance prototype control plane, not yet as a production multi-tenant service.
+v0.5 is still a single-instance prototype, not a production multi-tenant service.
 
-Known limits include:
+Known limits:
 
-- JSON-file storage rather than a transactional database
+- JSON-file storage instead of a transactional database
 - one server process / one writer assumption
 - one administrator security domain
 - no rate limiting
-- no token rotation or revocation before expiry
-- no organisation or user accounts
+- no registered-probe credential rotation/revocation API yet
+- no organisation/user accounts
 - no audit log
+- polling rather than push-based work delivery
 - no automatic TLS termination
 - no database-level retention policy
 
-A later hosted architecture should move session/run state to a database, add organisation scoping and audit records, and introduce explicit credential revocation.
+A larger hosted architecture should move state to a database, add organisation boundaries, audit events and credential lifecycle controls.
 
 ## No AI dependency
 
-Faultline does not use an AI API. The diagnosis path is deterministic and evidence-based. Deployment therefore does not require an LLM key, inference service, or model dependency.
+Faultline does not use an AI API. The diagnosis path, probe health and job assignment are deterministic. Deployment requires no LLM key, inference service or model dependency.

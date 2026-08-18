@@ -3,11 +3,12 @@ const ids = [
   "incident-title", "incident-id", "customer", "target", "location", "connection",
   "metrics", "evidence-list", "action-list", "path", "route-panel", "route-trace",
   "incident-status", "measured-at", "auth-open", "auth-dialog", "auth-form", "auth-token",
-  "auth-error", "auth-cancel"
+  "auth-error", "auth-cancel", "probe-fleet-panel", "probe-fleet"
 ];
 const els = Object.fromEntries(ids.map(id => [id, document.getElementById(id)]));
 
 let incidents = [];
+let probes = [];
 let activeIndex = 0;
 let adminToken = sessionStorage.getItem("faultlineAdminToken") || "";
 
@@ -29,6 +30,7 @@ function sourceLabel(incident) {
 function applyAuthState() {
   els["auth-open"].textContent = adminToken ? "Live data unlocked" : "Unlock live data";
   els["auth-open"].classList.toggle("unlocked", Boolean(adminToken));
+  els["probe-fleet-panel"].hidden = !adminToken;
 }
 
 function renderIncidentStrip() {
@@ -45,6 +47,46 @@ function renderIncidentStrip() {
       render();
     });
   });
+}
+
+function relativeSeen(value) {
+  if (!value) return "Never";
+  const seconds = Math.max(0, Math.round((Date.now() - Date.parse(value)) / 1000));
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  return `${Math.round(minutes / 60)}h ago`;
+}
+
+function renderProbeFleet() {
+  els["probe-fleet-panel"].hidden = !adminToken;
+  if (!adminToken) {
+    els["probe-fleet"].innerHTML = "";
+    return;
+  }
+
+  if (!probes.length) {
+    els["probe-fleet"].innerHTML = '<p class="fleet-empty">No registered probes yet. Register the first remote vantage from the CLI.</p>';
+    return;
+  }
+
+  els["probe-fleet"].innerHTML = probes.map(probe => `
+    <article class="probe-tile">
+      <div class="probe-tile-head">
+        <div>
+          <h4>${escapeHtml(probe.name)}</h4>
+          <p>${escapeHtml(probe.location || probe.id)}</p>
+        </div>
+        <span class="probe-health ${escapeHtml(probe.health)}">${escapeHtml(probe.health)}</span>
+      </div>
+      <div class="probe-meta">
+        <div><small>Probe ID</small><strong>${escapeHtml(probe.id)}</strong></div>
+        <div><small>Last seen</small><strong>${escapeHtml(relativeSeen(probe.lastSeenAt))}</strong></div>
+        <div><small>Runtime</small><strong>${escapeHtml(probe.runtime?.platform || "Not reported")}</strong></div>
+        <div><small>Version</small><strong>${escapeHtml(probe.runtime?.version || "Not reported")}</strong></div>
+      </div>
+    </article>
+  `).join("");
 }
 
 function renderRoute(incident) {
@@ -71,6 +113,7 @@ function render() {
   const m = incident.metrics;
 
   renderIncidentStrip();
+  renderProbeFleet();
   els["fault-domain"].textContent = result.faultDomainLabel;
   els.confidence.textContent = `${result.confidence}%`;
   els["confidence-ring"].style.setProperty("--confidence", `${result.confidence}%`);
@@ -157,15 +200,20 @@ async function loadIncidents({ initial = false } = {}) {
 
   if (adminToken) {
     try {
-      next = await fetchJson("/api/incidents", adminToken);
+      [next, probes] = await Promise.all([
+        fetchJson("/api/incidents", adminToken),
+        fetchJson("/api/probes", adminToken)
+      ]);
     } catch (error) {
       if (error.status !== 401) throw error;
       adminToken = "";
+      probes = [];
       sessionStorage.removeItem("faultlineAdminToken");
       applyAuthState();
       next = await fetchJson("/api/demo-incidents");
     }
   } else {
+    probes = [];
     next = await fetchJson("/api/demo-incidents");
   }
 
@@ -199,7 +247,10 @@ els["auth-form"].addEventListener("submit", async event => {
 
   els["auth-error"].textContent = "Checking credential…";
   try {
-    incidents = await fetchJson("/api/incidents", candidate);
+    [incidents, probes] = await Promise.all([
+      fetchJson("/api/incidents", candidate),
+      fetchJson("/api/probes", candidate)
+    ]);
     adminToken = candidate;
     sessionStorage.setItem("faultlineAdminToken", candidate);
     activeIndex = 0;

@@ -7,6 +7,7 @@ import { correlateAgentRun } from "./engine/correlate.mjs";
 import { incidents } from "./engine/incidents.mjs";
 import { bearerToken, generateCredential, hashCredential, isSessionExpired, verifyCredential, verifySessionRole } from "./security/auth.mjs";
 import { createDiagnosticSession, publicSession } from "./session/service.mjs";
+import { createRegisteredProbe, publicProbe, touchProbe, verifyProbeCredential } from "./probe/registry.mjs";
 import { createStore } from "./storage/store.mjs";
 
 const root = fileURLToPath(new URL("../public/", import.meta.url));
@@ -70,6 +71,27 @@ async function getSession(id) {
   return session;
 }
 
+async function getProbe(id) {
+  const probe = await store.getProbe(id);
+  if (!probe) {
+    const error = new Error(`Registered probe ${id} was not found.`);
+    error.statusCode = 404;
+    throw error;
+  }
+  return probe;
+}
+
+async function requireRegisteredProbe(req, id) {
+  const probe = await getProbe(id);
+  if (isAdmin(req)) return probe;
+  if (!verifyProbeCredential(probe, bearerToken(req))) {
+    const error = new Error("Registered probe credential required.");
+    error.statusCode = 401;
+    throw error;
+  }
+  return probe;
+}
+
 async function requireSession(req, id, role = null) {
   const session = await getSession(id);
   if (isSessionExpired(session) && !isAdmin(req)) {
@@ -128,7 +150,8 @@ async function createAgentRun(payload, session) {
     metrics: { ...payload.metrics },
     telemetry: payload.telemetry || {},
     agent: payload.agent || null,
-    remoteProbe: existing?.remoteProbe || null
+    remoteProbe: existing?.remoteProbe || null,
+    assignedProbeId: session.assignedProbeId || null
   };
 
   const correlated = correlateAgentRun(run);
@@ -136,7 +159,7 @@ async function createAgentRun(payload, session) {
   return correlated;
 }
 
-async function attachRemoteProbe(payload, session) {
+async function attachRemoteProbe(payload, session, registeredProbe = null) {
   if (!payload?.metrics || typeof payload.metrics !== "object") {
     throw new Error("Remote probe payload requires a metrics object.");
   }
@@ -148,8 +171,19 @@ async function attachRemoteProbe(payload, session) {
     throw error;
   }
 
+  const probeIdentity = registeredProbe
+    ? {
+        id: registeredProbe.id,
+        name: registeredProbe.name,
+        location: registeredProbe.location || null,
+        tags: registeredProbe.tags || [],
+        runtime: registeredProbe.runtime || null,
+        registered: true
+      }
+    : payload.probe || null;
+
   run.remoteProbe = {
-    probe: payload.probe || null,
+    probe: probeIdentity,
     metrics: payload.metrics,
     telemetry: payload.telemetry || {},
     collectedAt: payload.telemetry?.collectedAt || new Date().toISOString()
@@ -165,12 +199,30 @@ async function liveIncidents(limit = 3) {
   return (await store.listRuns(limit)).map(correlateAgentRun);
 }
 
+async function pendingProbeJobs(probeId) {
+  const sessions = await store.listSessions();
+  const jobs = [];
+
+  for (const session of sessions) {
+    if (session.assignedProbeId !== probeId || isSessionExpired(session)) continue;
+    const run = await store.getRun(session.id);
+    if (!run?.endpointMetrics || run.remoteProbe) continue;
+    jobs.push({
+      id: session.id,
+      target: session.target,
+      expiresAt: session.expiresAt
+    });
+  }
+
+  return jobs.slice(0, 20);
+}
+
 const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
 
     if (req.method === "GET" && url.pathname === "/api/health") {
-      return json(res, 200, { ok: true, version: "0.4.0", persistence: true });
+      return json(res, 200, { ok: true, version: "0.5.0", persistence: true, registeredProbeFleet: true });
     }
 
     if (req.method === "GET" && url.pathname === "/api/demo-incidents") {
@@ -182,9 +234,63 @@ const server = createServer(async (req, res) => {
       return json(res, 200, [...await liveIncidents(5), ...demoIncidents()]);
     }
 
+    if (req.method === "POST" && url.pathname === "/api/probes") {
+      requireAdmin(req);
+      const payload = await bodyFrom(req);
+      const created = createRegisteredProbe(payload);
+      await store.putProbe(created.probe);
+      return json(res, 201, {
+        probe: publicProbe(created.probe),
+        credential: created.credential
+      });
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/probes") {
+      requireAdmin(req);
+      const probes = await store.listProbes();
+      return json(res, 200, probes.map(probe => publicProbe(probe)));
+    }
+
+    const heartbeatMatch = url.pathname.match(/^\/api\/probes\/([^/]+)\/heartbeat$/);
+    if (req.method === "POST" && heartbeatMatch) {
+      const id = decodeURIComponent(heartbeatMatch[1]);
+      const probe = await requireRegisteredProbe(req, id);
+      const payload = await bodyFrom(req);
+      const updated = touchProbe(probe, payload);
+      await store.putProbe(updated);
+      return json(res, 200, publicProbe(updated));
+    }
+
+    const jobsMatch = url.pathname.match(/^\/api\/probes\/([^/]+)\/jobs$/);
+    if (req.method === "GET" && jobsMatch) {
+      const id = decodeURIComponent(jobsMatch[1]);
+      const probe = await requireRegisteredProbe(req, id);
+      const updated = touchProbe(probe);
+      await store.putProbe(updated);
+      return json(res, 200, {
+        probe: publicProbe(updated),
+        jobs: await pendingProbeJobs(id)
+      });
+    }
+
+    const probeMatch = url.pathname.match(/^\/api\/probes\/([^/]+)$/);
+    if (req.method === "GET" && probeMatch) {
+      const id = decodeURIComponent(probeMatch[1]);
+      const probe = await requireRegisteredProbe(req, id);
+      return json(res, 200, publicProbe(probe));
+    }
+
     if (req.method === "POST" && url.pathname === "/api/sessions") {
       requireAdmin(req);
       const payload = await bodyFrom(req);
+      if (payload.assignedProbeId) {
+        const probe = await getProbe(String(payload.assignedProbeId));
+        if (probe.enabled === false) {
+          const error = new Error(`Registered probe ${probe.id} is disabled.`);
+          error.statusCode = 409;
+          throw error;
+        }
+      }
       const created = createDiagnosticSession(payload);
       await store.putSession(created.session);
       return json(res, 201, {
@@ -239,8 +345,27 @@ const server = createServer(async (req, res) => {
     if (req.method === "POST" && url.pathname === "/api/probe-runs") {
       const payload = await bodyFrom(req);
       if (!payload.sessionId) throw new Error("Remote probe payload requires sessionId.");
-      const session = await requireSession(req, payload.sessionId, "probe");
-      return json(res, 201, await attachRemoteProbe(payload, session));
+      const session = await getSession(payload.sessionId);
+      if (isSessionExpired(session) && !isAdmin(req)) {
+        const error = new Error(`Diagnostic session ${session.id} has expired.`);
+        error.statusCode = 410;
+        throw error;
+      }
+
+      if (session.assignedProbeId) {
+        if (payload.probeId && payload.probeId !== session.assignedProbeId) {
+          const error = new Error("Probe payload does not match the probe assigned to this session.");
+          error.statusCode = 403;
+          throw error;
+        }
+        const probe = await requireRegisteredProbe(req, session.assignedProbeId);
+        const updatedProbe = touchProbe(probe, { runtime: payload.probe?.runtime || payload.probe || null });
+        await store.putProbe(updatedProbe);
+        return json(res, 201, await attachRemoteProbe(payload, session, updatedProbe));
+      }
+
+      const authorisedSession = await requireSession(req, payload.sessionId, "probe");
+      return json(res, 201, await attachRemoteProbe(payload, authorisedSession));
     }
 
     if (req.method === "POST" && url.pathname === "/api/diagnose") {
@@ -270,7 +395,7 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(port, () => {
-  console.log(`Faultline v0.4 listening on http://localhost:${port}`);
+  console.log(`Faultline v0.5 listening on http://localhost:${port}`);
   console.log(`Persistent store: ${dataFile}`);
   if (!configuredAdminToken) {
     console.log("No FAULTLINE_ADMIN_TOKEN was configured. Generated a development admin credential:");

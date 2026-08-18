@@ -44,6 +44,7 @@ export function normaliseSessionInput(input = {}, now = Date.now()) {
     customer,
     vpnRequired: Boolean(input.vpnRequired || input.expectedRoute),
     expectedRoute: input.expectedRoute ? String(input.expectedRoute).trim() : null,
+    assignedProbeId: input.assignedProbeId ? String(input.assignedProbeId).trim() : null,
     ttlMinutes,
     createdAt,
     expiresAt
@@ -53,19 +54,22 @@ export function normaliseSessionInput(input = {}, now = Date.now()) {
 export function createDiagnosticSession(input = {}, now = Date.now()) {
   const normalised = normaliseSessionInput(input, now);
   const endpointToken = generateCredential("fl_ep");
-  const probeToken = generateCredential("fl_pr");
+  const probeToken = normalised.assignedProbeId ? null : generateCredential("fl_pr");
   const id = `FL-${randomBytes(5).toString("hex").toUpperCase()}`;
 
   const session = {
     id,
     ...normalised,
     endpointTokenHash: hashCredential(endpointToken),
-    probeTokenHash: hashCredential(probeToken)
+    probeTokenHash: probeToken ? hashCredential(probeToken) : null
   };
 
   return {
     session,
-    credentials: { endpointToken, probeToken }
+    credentials: {
+      endpointToken,
+      ...(probeToken ? { probeToken } : {})
+    }
   };
 }
 
@@ -77,6 +81,7 @@ export function publicSession(session, now = Date.now()) {
     customer: session.customer,
     vpnRequired: Boolean(session.vpnRequired),
     expectedRoute: session.expectedRoute || null,
+    assignedProbeId: session.assignedProbeId || null,
     createdAt: session.createdAt,
     expiresAt: session.expiresAt,
     status: isSessionExpired(session, now) ? "expired" : "active"
