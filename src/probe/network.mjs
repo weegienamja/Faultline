@@ -76,7 +76,7 @@ export async function probeHttp(url, timeoutMs = 6000) {
       method: "GET",
       redirect: "follow",
       signal: controller.signal,
-      headers: { "user-agent": "Faultline-Remote-Probe/0.3" }
+      headers: { "user-agent": "Faultline-Remote-Probe/0.4" }
     });
     const elapsedMs = Number((performance.now() - started).toFixed(1));
     await response.body?.cancel().catch(() => {});
@@ -106,10 +106,10 @@ export async function collectRemoteProbe(options) {
   ]);
 
   return {
-    runId: options.runId,
+    sessionId: options.sessionId,
     probe: {
       name: options.name || hostname(),
-      version: "0.3.0",
+      version: "0.4.0",
       platform: platform(),
       hostname: hostname()
     },
