@@ -1,3 +1,5 @@
+import "./intelligence-panel.js";
+
 const openButton = document.getElementById("invite-open");
 const dialog = document.getElementById("invite-dialog");
 const form = document.getElementById("invite-form");

@@ -2,7 +2,7 @@
 
 Faultline is an incident-first, evidence-based network support prototype. It is designed around connectivity problems that cross endpoint, LAN, ISP, VPN, Internet and service ownership boundaries.
 
-The deterministic diagnosis path remains separate from any future statistical or machine-learning analysis.
+The deterministic diagnosis path remains separate from statistical or machine-learning analysis.
 
 ## Product principles
 
@@ -57,22 +57,17 @@ The core support workflow is feature-complete as a prototype.
 - observed versus inferred links
 - draggable Network Map
 
-Future topology improvements include vendor enrichment, stronger device classification, zoom/filtering and optional authoritative controller integrations.
-
 ## 0.6C - Probe fleet intelligence and safety ✅
 
 - public/private probe scopes
-- country/region/tag metadata
-- automatic health-aware scheduling
-- least-loaded selection
+- country/region/tag scheduling metadata
+- automatic health-aware and least-loaded selection
 - drain and maintenance states
 - credential rotation and revocation
 - lifecycle audit events
 - public target/port policy
 - DNS and redirect revalidation
 - mapped/private address protections
-
-Production-scale scheduler leases, distributed limits and tenant-specific policy remain future hardening.
 
 ## 0.6D - Packaged Windows client ✅
 
@@ -83,7 +78,7 @@ Production-scale scheduler leases, distributed limits and tenant-specific policy
 - automatic collection/upload
 - retry and recovery payload
 
-Production hardening still includes code signing, stable binary distribution and broader Windows/enterprise testing.
+Production hardening still includes signing, stable distribution, distributed scheduling/limits and broader Windows testing.
 
 ---
 
@@ -91,50 +86,55 @@ Production hardening still includes code signing, stable binary distribution and
 
 **Goal:** describe which application connectivity conditions are required instead of treating every incident as a single generic target test.
 
-Implemented in the first preview:
+Implemented:
 
 - versioned Connectivity Contract schema
-- session-level contract snapshots for reproducibility
-- validation at the session creation boundary
-- generic built-in profiles:
-  - `basic-reachability`
-  - `secure-web`
-  - `web-api`
-- target placeholders:
-  - `$target.host`
-  - `$target.port`
-  - `$target.url`
-- DNS/TCP/TLS/HTTP condition types
-- dashboard contract picker
-- CLI `--contract` and `--list-contracts`
-- consent-page disclosure of the selected contract and required checks
+- session-level snapshots for reproducibility
+- validation at session creation
+- generic `basic-reachability`, `secure-web` and `web-api` profiles
+- `$target.host`, `$target.port` and `$target.url` placeholders
+- DNS/TCP/TLS/HTTP conditions
+- dashboard and CLI profile selection
+- consent-page contract disclosure
 - Windows-client contract evaluation
-- deterministic contract pass/fail summary
-- contract result evidence in the fault-domain output
-- structured features for later incident analysis:
-  - contract ID/version
-  - pass rate
-  - failed-required count
-  - first failing check type
+- deterministic pass/fail evidence
+- structured pass-rate/failure-stage features
 
-Current limitation: the v0.7 evaluator is deliberately **target-scoped**. Built-in profiles operate on the selected diagnostic target. Verified multi-endpoint vendor profiles and deeper remote-probe contract execution remain later work.
+Current limitation: the first evaluator is target-scoped. Verified multi-endpoint vendor profiles and remote-probe contract execution remain later work.
 
 See [docs/CONNECTIVITY_CONTRACTS.md](docs/CONNECTIVITY_CONTRACTS.md).
 
-**Milestone:** Faultline can answer both:
-
-1. where the evidence suggests the fault begins, and
-2. which required application connectivity condition failed.
-
 ---
 
-# Next portfolio slice - Incident similarity and clustering
+# Incident Intelligence - Data Science preview ✅
 
-**Goal:** demonstrate meaningful Data Science on top of Faultline without replacing deterministic diagnosis.
+**Goal:** identify related support incidents from measured evidence without allowing ML to replace deterministic fault isolation.
 
-This is intentionally a contained portfolio feature rather than a production ML platform.
+Implemented:
 
-Planned feature vector candidates:
+- numerical feature median imputation
+- z-score standardisation with bounded values
+- explicit binary network-state encoding
+- one-hot Connectivity Contract categorical evidence
+- weighted mixed-feature distance
+- pairwise incident similarity scores
+- deterministic similarity explanations
+- DBSCAN unsupervised clustering
+- explicit DBSCAN noise/outlier handling
+- dashboard Related evidence patterns panel
+- demo-only analysis while locked
+- authorised live+demo analysis after admin unlock
+- repeatable three-case upstream-degradation demo cluster
+- unrelated DNS, VPN and local-network demo outliers
+- automated tests for feature space, cluster membership, similarity ordering and noise behaviour
+
+A key methodological constraint is enforced in the dashboard model:
+
+> **Fault-domain labels are removed before fitting the cluster model.**
+
+The model therefore groups incidents using network evidence and Connectivity Contract outcomes rather than using the answer produced by the deterministic diagnosis engine as an input feature.
+
+Current preview features include:
 
 ```text
 gateway latency/loss
@@ -142,92 +142,80 @@ upstream loss
 jitter
 DNS latency
 TCP/HTTP timing
-remote-vantage state
-fault domain
-Connectivity Contract ID/version
-contract pass rate
-first failing contract condition
+endpoint/Internet/remote reachability states
 VPN state
+Connectivity Contract ID
+contract pass rate
+failed-required count
+first failing contract condition
 ```
 
-Planned first implementation:
+Current DBSCAN defaults:
 
-- numerical feature standardisation
-- categorical feature encoding where justified
-- similarity score between incidents
-- unsupervised clustering, likely starting with DBSCAN or hierarchical clustering
-- explicit outlier/noise handling
-- dashboard panel showing related incidents and common characteristics
-- deterministic explanation of which features made cases similar
-- synthetic labelled scenarios for repeatable tests/demo data
+```text
+epsilon = 0.34
+minPts  = 3
+```
 
-The model must not output the authoritative fault domain. Its purpose is to answer:
+These are prototype parameters for a small visible evidence set, not universal network thresholds.
+
+The model's purpose remains:
 
 > **Have we seen other incidents with a similar evidence pattern?**
 
-Potential UI:
+Similarity is descriptive and does not prove a shared root cause.
 
-```text
-RELATED INCIDENT PATTERN
-
-4 diagnostics show a similar evidence signature
-
-Common features
-- healthy local gateway
-- elevated upstream loss
-- remote target healthy
-- same contract failure stage
-
-Most similar
-FL-1032 · 89% similarity
-```
+See [docs/INCIDENT_INTELLIGENCE.md](docs/INCIDENT_INTELLIGENCE.md).
 
 ---
 
-# Later portfolio/product directions
+# Next high-value portfolio work
+
+The core technical story is now broad enough that future work should improve demonstration quality rather than continuously expand infrastructure.
 
 ## Cases and evidence packages
 
-- multiple runs per support case
+Potential next slice:
+
+- group multiple diagnostic runs into one support case
 - before/after comparison
-- exportable evidence packages
-- read-only sharing
-- evidence provenance
+- incident timeline
+- exportable JSON/PDF evidence package
+- clear observed vs inferred vs statistical evidence sections
+- read-only sharing model
 
-## Cross-party troubleshooting
+This would make the cross-organisation support gap especially easy to demonstrate because Faultline could produce an artefact suitable for handing to an ISP, SaaS provider or another support team.
 
-- scoped participant invitations
-- evidence contributions from separate organisations
-- comments/challenges and requested counter-tests
-- immutable case timeline
+## Data Science evaluation extensions
+
+Useful follow-up analysis:
+
+- compare DBSCAN with hierarchical clustering
+- evaluate cluster cohesion/stability
+- time-window features for emerging incident patterns
+- ASN/provider and geography after reliable enrichment exists
+- per-contract check-state vectors
+- engineer-confirmed outcomes for evaluation only
 
 ## Deeper diagnostics
 
-- carefully interpreted ICMP/path evidence
-- richer jitter and latency distributions
 - IPv4/IPv6 differential testing
 - dedicated TLS timing
 - HTTP TTFB
 - path-MTU testing
+- richer path evidence
 - ASN/network-owner enrichment
 
 ## Connectivity profile ecosystem
 
 - verified vendor profiles
 - private organisation profiles
-- profile schema/version tooling
 - multi-endpoint contracts
-- profile history
-
-## Embedded support diagnostics
-
-- diagnostic creation API/SDK
-- embedded "Run connection diagnostic" flow
-- support-ticket correlation IDs
+- profile version/history tooling
 
 ## Network change assurance
 
-Run the same Connectivity Contract before and after a firewall, VPN, DNS, proxy or SD-WAN change and show exactly which required behaviours changed.
+Run the same Connectivity Contract before and after a firewall, VPN, DNS, proxy or SD-WAN change and show which required behaviours changed.
 
 ---
 
@@ -245,4 +233,4 @@ The project deliberately avoids becoming:
 
 Faultline stays centred on the narrower support question:
 
-> **When a network-dependent service is failing across an ownership boundary, what does the available evidence show, where does the fault most likely begin, and have we seen a similar evidence pattern elsewhere?**
+> **When a network-dependent service is failing across an ownership boundary, what does the evidence show, where does the fault most likely begin, and have we seen a similar evidence pattern elsewhere?**
