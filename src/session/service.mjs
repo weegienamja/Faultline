@@ -45,6 +45,10 @@ export function normaliseSessionInput(input = {}, now = Date.now()) {
       }
     : null;
 
+  const connectivityContract = input.connectivityContract && typeof input.connectivityContract === "object"
+    ? structuredClone(input.connectivityContract)
+    : null;
+
   return {
     target: { input: target, port },
     title,
@@ -53,6 +57,7 @@ export function normaliseSessionInput(input = {}, now = Date.now()) {
     expectedRoute: input.expectedRoute ? String(input.expectedRoute).trim() : null,
     assignedProbeId: input.assignedProbeId ? String(input.assignedProbeId).trim() : null,
     probeSelection,
+    connectivityContract,
     ttlMinutes,
     createdAt,
     expiresAt
@@ -222,6 +227,7 @@ export function publicSession(session, now = Date.now()) {
     expectedRoute: session.expectedRoute || null,
     assignedProbeId: session.assignedProbeId || null,
     probeSelection: session.probeSelection || null,
+    connectivityContract: session.connectivityContract ? structuredClone(session.connectivityContract) : null,
     createdAt: session.createdAt,
     expiresAt: session.expiresAt,
     status: expired ? "expired" : "active",
