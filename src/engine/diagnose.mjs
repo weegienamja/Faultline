@@ -6,6 +6,7 @@ const domainLabels = {
   dns: "DNS resolution",
   vpn: "VPN / route configuration",
   upstream: "ISP / upstream network",
+  access_path: "Endpoint path / policy",
   target_service: "Target service",
   inconclusive: "Inconclusive"
 };
@@ -16,11 +17,20 @@ function finding(label, status, detail, value = null) {
 
 export function diagnose(input) {
   const evidence = [];
-  const scores = { local_network: 0, dns: 0, vpn: 0, upstream: 0, target_service: 0 };
+  const scores = {
+    local_network: 0,
+    dns: 0,
+    vpn: 0,
+    upstream: 0,
+    access_path: 0,
+    target_service: 0
+  };
+
   const gatewayLoss = Number(input.gatewayLoss ?? 0);
   const gatewayLatencyMs = Number(input.gatewayLatencyMs ?? 0);
   const upstreamLoss = Number(input.upstreamLoss ?? 0);
   const jitterMs = Number(input.jitterMs ?? 0);
+  const externalProbePresent = typeof input.externalProbeHealthy === "boolean";
 
   if (gatewayLoss >= 5) {
     scores.local_network += 70;
@@ -67,9 +77,9 @@ export function diagnose(input) {
     evidence.push(finding("Upstream packet loss", "fail", "Loss begins after the local gateway, shifting the fault domain upstream.", `${upstreamLoss.toFixed(1)}%`));
   } else if (upstreamLoss >= 2) {
     scores.upstream += 35;
-    evidence.push(finding("Upstream packet loss", "warn", "Elevated packet loss is visible on the internet path.", `${upstreamLoss.toFixed(1)}%`));
+    evidence.push(finding("Upstream packet loss", "warn", "Elevated packet loss is visible on the endpoint path.", `${upstreamLoss.toFixed(1)}%`));
   } else {
-    evidence.push(finding("Upstream packet loss", "pass", "No material packet loss is visible on the measured upstream path.", `${upstreamLoss.toFixed(1)}%`));
+    evidence.push(finding("Upstream packet loss", "pass", "No material packet loss is visible on the measured endpoint path.", `${upstreamLoss.toFixed(1)}%`));
   }
 
   if (jitterMs >= 50 && gatewayLoss < 2) {
@@ -79,34 +89,66 @@ export function diagnose(input) {
     evidence.push(finding("Jitter", "pass", "Latency variation is within the expected range.", `${jitterMs.toFixed(0)} ms`));
   }
 
-  if (input.targetReachable === false && input.externalProbeHealthy === true && gatewayLoss < 2 && upstreamLoss < 5) {
-    scores.target_service += 45;
-    evidence.push(finding("Target reachability", "fail", "The endpoint cannot reach the target while an independent probe can."));
-  }
-
-  if (input.targetReachable === false && input.externalProbeHealthy === false && input.internetReachable === true) {
-    scores.target_service += 85;
-    evidence.push(finding("External probe", "fail", "Both the endpoint and independent probe fail while general internet access remains available."));
+  if (!externalProbePresent) {
+    evidence.push(finding("Remote probe", "neutral", "No independent probe has joined this diagnostic run yet."));
   } else if (input.externalProbeHealthy === true) {
-    evidence.push(finding("External probe", "pass", "The target responds normally from an independent vantage point."));
+    evidence.push(finding(
+      "Remote probe",
+      "pass",
+      "The target is reachable from an independent vantage point.",
+      input.externalProbeLatencyMs != null ? `${Number(input.externalProbeLatencyMs).toFixed(0)} ms` : null
+    ));
+
+    if (input.targetReachable === false && gatewayLoss < 2 && upstreamLoss < 5 && input.dnsResolved !== false && !(input.vpnRequired && input.expectedRoutePresent === false)) {
+      scores.access_path += 85;
+      evidence.push(finding("Vantage comparison", "fail", "The remote probe can reach the target while this endpoint cannot, isolating the problem to the endpoint-specific path or policy."));
+    }
+
+    if (input.targetReachable === false && upstreamLoss >= 5) {
+      scores.upstream += 15;
+    }
+  } else {
+    evidence.push(finding(
+      "Remote probe",
+      "fail",
+      "The independent probe cannot reach the target.",
+      input.externalProbeLatencyMs != null ? `${Number(input.externalProbeLatencyMs).toFixed(0)} ms` : null
+    ));
+
+    if (input.targetReachable === false && input.internetReachable === true) {
+      scores.target_service += 90;
+      evidence.push(finding("Vantage comparison", "fail", "Both endpoint and remote probe fail while general internet access remains available."));
+    }
   }
 
   if (input.targetReachable === true) {
     evidence.push(finding("Target service", "pass", "The target service is reachable from this endpoint.", input.targetHttpMs ? `${Number(input.targetHttpMs).toFixed(0)} ms` : null));
+  } else if (!externalProbePresent) {
+    evidence.push(finding("Target reachability", "fail", "The endpoint cannot reach the target; an independent vantage point is needed to separate path and service faults."));
   }
 
   const ranked = Object.entries(scores).sort((a, b) => b[1] - a[1]);
   const [domain, rawScore] = ranked[0];
-  const allHealthy = input.targetReachable !== false && input.dnsResolved !== false && gatewayLoss < 2 && upstreamLoss < 2 && (!input.vpnRequired || (input.vpnConnected && input.expectedRoutePresent !== false));
+  const allHealthy =
+    input.targetReachable !== false &&
+    input.dnsResolved !== false &&
+    gatewayLoss < 2 &&
+    upstreamLoss < 2 &&
+    (!input.vpnRequired || (input.vpnConnected && input.expectedRoutePresent !== false));
 
   let faultDomain = domain;
   let confidence = clamp(Math.round(rawScore), 0, 99);
+
   if (allHealthy && rawScore < 25) {
     faultDomain = "healthy";
-    confidence = 92;
+    confidence = externalProbePresent && input.externalProbeHealthy === true ? 96 : 92;
   } else if (rawScore < 35) {
     faultDomain = "inconclusive";
-    confidence = 48;
+    confidence = externalProbePresent ? 55 : 48;
+  }
+
+  if (externalProbePresent && rawScore >= 35) {
+    confidence = clamp(confidence + 4, 0, 99);
   }
 
   return {
@@ -127,8 +169,9 @@ function summaryFor(domain) {
     local_network: "The evidence indicates degradation before traffic leaves the local network.",
     dns: "Connectivity is available, but name resolution is preventing the destination from being reached normally.",
     vpn: "The VPN session or route state is preventing traffic from taking the expected corporate path.",
-    upstream: "The local network appears healthy and degradation begins further upstream on the internet path.",
-    target_service: "General connectivity is available, but the target service is not responding as expected.",
+    upstream: "The local network appears healthy and degradation begins further upstream on the endpoint path.",
+    access_path: "The target is healthy from the remote probe but unreachable from this endpoint, pointing to an endpoint-specific route, policy or access-path problem.",
+    target_service: "Independent vantage points agree that the target service is not responding as expected.",
     inconclusive: "The current evidence does not isolate the problem to one fault domain with enough confidence."
   }[domain];
 }
@@ -139,8 +182,9 @@ function actionPlan(domain, input) {
     local_network: ["Test over Ethernet or move closer to the wireless access point.", "Check local congestion, signal quality and gateway health before escalating externally."],
     dns: ["Validate the configured DNS resolver and test the target hostname directly.", "Compare resolution against an approved alternate resolver before changing network routes."],
     vpn: [input.vpnConnected === false ? "Reconnect the required VPN tunnel." : "Validate split-tunnel policy and restore the missing destination route.", "Re-run the diagnostic after the VPN route table changes."],
-    upstream: ["Escalate with the measured loss point, timestamps and route evidence.", "Repeat from a second access network to distinguish ISP-specific degradation from wider transit issues."],
-    target_service: ["Check the target service status and application edge logs.", "Compare endpoint results with an independent probe before changing the local network."],
-    inconclusive: ["Collect another sample while the fault is active.", "Add a second diagnostic vantage point to improve fault-domain confidence."]
+    upstream: ["Escalate with the measured loss point, timestamps and route evidence.", "Compare against the remote probe result to distinguish endpoint-path degradation from a wider service issue."],
+    access_path: ["Compare endpoint routing, proxy, firewall and security policy against a working path.", "Repeat from a second endpoint on the same access network before escalating the target service."],
+    target_service: ["Check the target service status and application edge logs.", "Use the two-vantage failure evidence when escalating to the service owner."],
+    inconclusive: ["Collect another sample while the fault is active.", "Add or repeat an independent remote probe to improve fault-domain confidence."]
   }[domain];
 }
