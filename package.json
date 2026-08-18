@@ -1,6 +1,6 @@
 {
   "name": "faultline",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "Evidence-based network fault isolation across endpoints, networks, ISPs and services.",
@@ -8,8 +8,9 @@
     "dev": "node --watch src/server.mjs",
     "start": "node src/server.mjs",
     "agent": "node src/agent/cli.mjs",
+    "probe": "node src/probe/cli.mjs",
     "test": "node --test",
-    "check": "node --check src/server.mjs && node --check src/engine/diagnose.mjs && node --check src/agent/network.mjs && node --check src/agent/cli.mjs && node --check public/app.js"
+    "check": "node --check src/server.mjs && node --check src/engine/diagnose.mjs && node --check src/engine/correlate.mjs && node --check src/agent/network.mjs && node --check src/agent/cli.mjs && node --check src/probe/network.mjs && node --check src/probe/cli.mjs && node --check public/app.js"
   },
   "engines": {
     "node": ">=20"
