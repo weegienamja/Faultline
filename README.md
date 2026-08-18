@@ -18,28 +18,30 @@ The end user sees a broken application. Internal IT sees a healthy LAN. The ISP 
 
 Faultline is intended to bridge those viewpoints without requiring either side to hand over full administrative access.
 
-## Current build: v0.2
+## Current build: v0.3
 
-Faultline now has a real Windows-first endpoint collector rather than relying exclusively on demo telemetry.
+Faultline now supports **two-vantage diagnostics**. A Windows endpoint agent collects local-path evidence, then a portable remote probe can independently test the same target and attach its result to the existing live run.
 
-The current build includes:
+The diagnosis is recalculated when the second vantage point arrives.
 
-- a commercial-style incident dashboard designed around fault-domain isolation
-- deterministic diagnosis logic for local network, DNS, VPN, upstream and target-service failures
-- a Windows endpoint agent that collects live network evidence
+### What is implemented
+
+- commercial-style incident dashboard
+- deterministic fault-domain diagnosis engine
+- Windows endpoint collector
+- portable remote probe for Windows, Linux and macOS with Node.js 20+
+- live-run correlation by explicit run ID
 - default-gateway latency and packet-loss measurement
 - DNS resolution and lookup timing
-- general internet TCP reachability checks
-- target TCP, HTTP and ICMP observations
-- packet-loss and jitter calculation
+- target TCP and HTTP observations
+- endpoint packet-loss and jitter calculation
 - Wi-Fi signal collection when available
 - VPN adapter discovery and optional expected-route validation
-- bounded traceroute collection
-- live agent ingestion through `POST /api/agent-runs`
-- automatic display of new endpoint runs in the dashboard
-- explicit `Not collected` state for external-probe evidence that does not exist yet
-- four deterministic demo incidents for demonstrations
-- automated tests for the diagnosis engine and Windows command parsers
+- bounded endpoint traceroute collection
+- remote target DNS, TCP and HTTP checks
+- explicit endpoint-only versus two-vantage state in the dashboard
+- evidence explaining why the diagnosis changed
+- automated tests covering diagnosis, endpoint parsing, probe target handling and correlation
 - zero third-party runtime dependencies
 
 ## Run Faultline
@@ -62,68 +64,116 @@ For development with automatic restarts:
 npm run dev
 ```
 
-## Run a live diagnostic
+## Run a two-vantage diagnostic
+
+### 1. Collect the endpoint side
 
 The endpoint collector currently targets Windows 10/11.
-
-Start the Faultline server, then open a second terminal and run:
 
 ```bash
 npm run agent -- --target microsoft.com
 ```
 
-The agent will collect endpoint-side evidence, POST it to the local Faultline API, and print the resulting diagnosis. The dashboard polls for new runs and automatically surfaces the latest live diagnostic.
-
-You can target a URL:
-
-```bash
-npm run agent -- --target https://example.com/health
-```
-
-Or test a VPN-dependent route:
-
-```bash
-npm run agent -- \
-  --target 10.40.12.25 \
-  --port 443 \
-  --vpn-required \
-  --expected-route 10.40.0.0/16
-```
-
-Inspect telemetry without uploading it:
-
-```bash
-npm run agent -- --target microsoft.com --dry-run --json
-```
-
-See [docs/AGENT.md](docs/AGENT.md) for the full collector options and interpretation caveats.
-
-## What the Windows agent measures
+The agent uploads the endpoint evidence and prints a live run ID, for example:
 
 ```text
-Windows endpoint
-      |
-      +-- Default route / active adapter
-      +-- Wi-Fi signal
-      +-- Gateway ping
-      +-- DNS lookup
-      +-- Internet control probes
-      +-- VPN adapter / expected route
-      +-- Target TCP / HTTP
-      +-- Target loss / jitter
-      +-- Traceroute
-      |
-      v
-POST /api/agent-runs
-      |
-      v
-Deterministic diagnosis
-      |
-      v
-Faultline dashboard
+Run LIVE-ME5X2F is now available in the Faultline dashboard.
+
+Add an independent vantage point with:
+  npm run probe -- --run LIVE-ME5X2F --api-base http://localhost:3000
 ```
 
-The agent deliberately uses multiple signals. For example, if a destination blocks ICMP but still answers TCP or HTTP, Faultline does not treat the ICMP timeout alone as 100% upstream packet loss.
+At this point the dashboard labels the incident **ENDPOINT ONLY**.
+
+### 2. Add the independent remote side
+
+Run the printed probe command from another machine or network:
+
+```bash
+npm run probe -- \
+  --run LIVE-ME5X2F \
+  --api-base http://FAULTLINE-SERVER:3000 \
+  --name london-probe
+```
+
+The remote probe retrieves the target associated with that live run, independently performs DNS, TCP and HTTP checks, then submits its evidence to:
+
+```text
+POST /api/probe-runs
+```
+
+Faultline correlates the result with the endpoint measurements, recomputes the diagnosis and updates the same incident. The dashboard then labels the run **2 VANTAGES**.
+
+> Running both commands on the same computer is useful for testing the workflow, but it is not an independent network vantage point. For meaningful path comparison, run the remote probe on a separate network, VPS or hosted probe.
+
+## What the two sides contribute
+
+```text
+Windows endpoint                         Remote probe
+      |                                      |
+      +-- Gateway health                     +-- DNS resolution
+      +-- Wi-Fi signal                       +-- Target TCP
+      +-- DNS                                +-- Target HTTP
+      +-- Internet controls                  +-- Independent reachability
+      +-- VPN / route state                  |
+      +-- Target TCP / HTTP                  |
+      +-- Loss / jitter                      |
+      +-- Traceroute                         |
+      |                                      |
+      +--------------- Faultline ------------+
+                         |
+                         v
+                correlated diagnosis
+```
+
+This lets Faultline reason about cases that a single endpoint cannot separate cleanly.
+
+For example:
+
+```text
+Endpoint cannot reach target
+Remote probe can reach target
+        -> Endpoint path / policy
+
+Endpoint cannot reach target
+Remote probe cannot reach target
+General internet is healthy
+        -> Target service
+
+Endpoint shows upstream loss
+Remote probe reaches target normally
+        -> ISP / upstream endpoint path
+```
+
+The correlation remains deterministic. The remote probe is evidence used by the diagnosis engine, not an AI-generated opinion.
+
+## Endpoint agent options
+
+```text
+--target <hostname|IP|URL>   Required diagnostic target
+--port <number>              Target TCP port, default 443
+--api-base <url>             Faultline server base URL
+--api <url>                  Override the full ingestion endpoint
+--expected-route <CIDR>      Require an exact IPv4 route
+--vpn-required               Mark the target as VPN-dependent
+--no-trace                   Skip traceroute collection
+--dry-run                    Collect without uploading
+--json                       Print the full payload
+```
+
+See [docs/AGENT.md](docs/AGENT.md).
+
+## Remote probe options
+
+```text
+--run <id>                   Existing live run ID
+--api-base <url>             Faultline server base URL
+--name <value>               Friendly probe name
+--dry-run                    Collect without uploading
+--json                       Print the full payload
+```
+
+See [docs/REMOTE_PROBE.md](docs/REMOTE_PROBE.md).
 
 ## Test it
 
@@ -132,73 +182,72 @@ npm test
 npm run check
 ```
 
-The automated suite covers both the fault-domain engine and collector parsing helpers. The Windows collector itself should still be exercised on a real Windows machine before treating this early prototype as production-ready.
+The current suite covers the deterministic diagnosis engine, Windows command parsers, remote-probe target handling and two-vantage correlation logic.
 
-## Diagnosis API
+## API
 
-The original stateless diagnosis endpoint remains available:
+### Stateless diagnosis
 
-```bash
-curl -X POST http://localhost:3000/api/diagnose \
-  -H "content-type: application/json" \
-  -d '{
-    "gatewayLoss": 0,
-    "gatewayLatencyMs": 3,
-    "dnsResolved": true,
-    "internetReachable": true,
-    "upstreamLoss": 8.4,
-    "jitterMs": 71,
-    "externalProbeHealthy": true,
-    "targetReachable": true
-  }'
+```text
+POST /api/diagnose
 ```
 
-The response contains a likely fault domain, confidence score, supporting evidence and recommended actions.
-
-## Live-run API
-
-The Windows collector submits a richer payload to:
+### Endpoint runs
 
 ```text
 POST /api/agent-runs
+GET  /api/agent-runs
+GET  /api/agent-runs/:id
 ```
 
-Recent live runs can be inspected at:
+### Remote probe runs
 
 ```text
-GET /api/agent-runs
+POST /api/probe-runs
+GET  /api/probe-runs
 ```
 
-v0.2 stores live runs **in process memory only**. Restarting the server clears them.
+A probe payload references the endpoint run through `runId`. The server then merges remote reachability into the endpoint diagnosis contract and recalculates the result.
 
-## Product direction
+## Important limitations
 
-The next major step is the second side of the bridge: an independent remote probe.
+Faultline is still an early prototype.
 
-```text
-Endpoint Agent                     Faultline                      Remote Probe
-     |                                |                                |
-     +---------- telemetry ---------->|<---------- telemetry ----------+
-                                      |
-                                      v
-                              correlated diagnosis
-```
+- live runs are stored **in process memory only**
+- restarting the server clears live and probe runs
+- there is no authentication or organisation isolation yet
+- a run ID is currently a correlation key, not a security token
+- the Windows collector still needs real-world exercise across more adapters, VPN clients and Windows configurations
+- the remote probe currently measures application reachability rather than full remote traceroute/ICMP path telemetry
 
-That second vantage point will allow Faultline to compare what the endpoint sees with what an independent location sees, materially improving isolation between local-network, ISP/transit and target-service faults.
+Do not expose the current ingestion API directly to the public internet without adding authentication and transport controls.
 
-After that, the product needs persistent incident storage, authenticated diagnostic sessions and configurable telemetry redaction.
-
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the architecture and design direction.
-
-## Privacy and scope
+## Privacy
 
 Faultline does **not** capture packet payloads, credentials, browser history or application content.
 
-Live endpoint runs can contain operational metadata such as the machine hostname, adapter details, private gateway address, VPN adapter names, resolved target addresses and traceroute hop addresses. Use `--dry-run --json` to inspect exactly what would be submitted before pointing the agent at a remote API.
+Endpoint runs can contain operational metadata such as machine hostname, adapter details, private gateway address, VPN adapter names, resolved target addresses and traceroute hop addresses. Remote probes submit their hostname, platform, resolved addresses and target timing data.
+
+Use `--dry-run --json` on either collector to inspect the payload before sending it to a remote Faultline server.
+
+## Product direction
+
+The next engineering priorities are:
+
+1. persistent incident storage
+2. authenticated, short-lived diagnostic sessions
+3. a hosted probe/control-plane deployment model
+4. configurable telemetry redaction
+5. richer remote path measurements
+6. evidence-report export
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the architecture and design direction.
 
 ## Status
 
-Faultline is an early product prototype, not a replacement for production network observability or digital-experience monitoring platforms. v0.2 provides a real endpoint evidence source, while multi-vantage correlation and a hosted control plane remain future work.
+Faultline v0.3 demonstrates the core product hypothesis: **correlating evidence from both sides of a network boundary can improve fault-domain isolation without requiring either side to expose full administrative access.**
+
+It is not a replacement for production network observability or digital-experience monitoring platforms.
 
 ## License
 
