@@ -13,7 +13,7 @@
     "probe": "node src/probe/cli.mjs",
     "probe:register": "node src/probe/register.mjs",
     "test": "node --test",
-    "check": "node --check src/server.mjs && node --check src/security/auth.mjs && node --check src/storage/store.mjs && node --check src/session/service.mjs && node --check src/session/cli.mjs && node --check src/session/invite.mjs && node --check src/engine/diagnose.mjs && node --check src/engine/correlate.mjs && node --check src/topology/infer.mjs && node --check src/agent/network.mjs && node --check src/agent/cli.mjs && node --check src/probe/network.mjs && node --check src/probe/registry.mjs && node --check src/probe/register.mjs && node --check src/probe/cli.mjs && node --check public/app.js && node --check public/diagnose.js"
+    "check": "node --check src/server.mjs && node --check src/security/auth.mjs && node --check src/storage/store.mjs && node --check src/session/service.mjs && node --check src/session/cli.mjs && node --check src/session/invite.mjs && node --check src/engine/diagnose.mjs && node --check src/engine/correlate.mjs && node --check src/topology/infer.mjs && node --check src/agent/network.mjs && node --check src/agent/cli.mjs && node --check src/probe/network.mjs && node --check src/probe/registry.mjs && node --check src/probe/register.mjs && node --check src/probe/cli.mjs && node --check public/app.js && node --check public/diagnose.js && node --check public/invite-admin.js"
   },
   "engines": {
     "node": ">=20"
