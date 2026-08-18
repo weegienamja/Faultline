@@ -12,10 +12,16 @@ let activeIndex = 0;
 const statusFor = (value, warn, fail) => value >= fail ? "fail" : value >= warn ? "warn" : "pass";
 const displayNumber = (value, suffix = "") => Number.isFinite(Number(value)) ? `${Number(value)}${suffix}` : "Not collected";
 
+function sourceLabel(incident) {
+  if (incident.source === "correlated") return '<b class="source-live">2 VANTAGES</b>';
+  if (incident.source === "agent") return '<b class="source-live">ENDPOINT ONLY</b>';
+  return "DEMO";
+}
+
 function renderIncidentStrip() {
   els["incident-list"].innerHTML = incidents.map((incident, index) => `
     <button class="incident-chip ${index === activeIndex ? "active" : ""}" data-index="${index}">
-      <span>${incident.source === "agent" ? '<b class="source-live">LIVE AGENT</b>' : "DEMO"} · ${incident.id} · ${incident.diagnosis.faultDomainLabel}</span>
+      <span>${sourceLabel(incident)} · ${incident.id} · ${incident.diagnosis.faultDomainLabel}</span>
       <strong>${incident.title}</strong>
     </button>
   `).join("");
@@ -62,10 +68,12 @@ function render() {
   els.target.textContent = incident.target;
   els.location.textContent = incident.location;
   els.connection.textContent = incident.connection;
-  els["incident-status"].textContent = incident.source === "agent" ? "Live agent" : "Demo incident";
-  els["incident-status"].classList.toggle("live", incident.source === "agent");
-  els["measured-at"].textContent = incident.collectedAt
-    ? new Date(incident.collectedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+
+  const twoVantages = incident.vantages?.remoteProbe === true || incident.source === "correlated";
+  els["incident-status"].textContent = incident.source === "demo" ? "Demo incident" : twoVantages ? "2 vantage points" : "Endpoint only";
+  els["incident-status"].classList.toggle("live", incident.source !== "demo");
+  els["measured-at"].textContent = incident.updatedAt || incident.collectedAt
+    ? new Date(incident.updatedAt || incident.collectedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
     : "demo data";
 
   const path = [
@@ -89,9 +97,13 @@ function render() {
   if (m.dnsLookupMs != null) metrics.push(["DNS lookup", displayNumber(m.dnsLookupMs, " ms"), statusFor(m.dnsLookupMs, 300, 1000)]);
   if (m.wifiSignalPct != null) metrics.push(["Wi-Fi signal", `${m.wifiSignalPct}%`, m.wifiSignalPct < 35 ? "fail" : m.wifiSignalPct < 55 ? "warn" : "pass"]);
   if (m.targetTcpMs != null) metrics.push(["Target TCP", `${m.targetTcpMs} ms`, m.targetReachable ? "pass" : "fail"]);
+
+  const probeValue = m.externalProbeHealthy == null
+    ? "Awaiting probe"
+    : `${m.externalProbeHealthy ? "Reachable" : "Unreachable"}${m.externalProbeLatencyMs != null ? ` · ${Number(m.externalProbeLatencyMs).toFixed(0)} ms` : ""}`;
   metrics.push([
-    "External probe",
-    m.externalProbeHealthy == null ? "Not collected" : m.externalProbeHealthy ? "Healthy" : "Degraded",
+    "Remote vantage",
+    probeValue,
     m.externalProbeHealthy == null ? "neutral" : m.externalProbeHealthy ? "pass" : "fail"
   ]);
 
@@ -117,7 +129,7 @@ async function loadIncidents({ initial = false } = {}) {
   const response = await fetch("/api/incidents", { cache: "no-store" });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const next = await response.json();
-  const newestLive = next.find(incident => incident.source === "agent");
+  const newestLive = next.find(incident => incident.source === "agent" || incident.source === "correlated");
   const isNewLive = newestLive && !incidents.some(incident => incident.id === newestLive.id);
   incidents = next;
 
