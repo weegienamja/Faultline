@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Faultline isolates where network problems begin using evidence from multiple fault domains." />
+  <title>Faultline · Network fault isolation</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#" aria-label="Faultline home">
+        <span class="brand-mark"><span></span></span>
+        <span>Faultline</span>
+      </a>
+
+      <nav class="nav" aria-label="Primary navigation">
+        <a class="nav-item active" href="#overview"><span class="nav-icon">◫</span> Overview</a>
+        <a class="nav-item" href="#diagnostics"><span class="nav-icon">⌁</span> Diagnostics</a>
+        <a class="nav-item" href="#evidence"><span class="nav-icon">≋</span> Evidence</a>
+        <a class="nav-item" href="#actions"><span class="nav-icon">↗</span> Actions</a>
+      </nav>
+
+      <div class="sidebar-bottom">
+        <div class="probe-card">
+          <div class="probe-status"><span class="pulse"></span> Cloud probe online</div>
+          <strong>London · eu-west</strong>
+          <span>17 ms control latency</span>
+        </div>
+        <div class="profile">
+          <div class="avatar">JB</div>
+          <div><strong>Jamie Blair</strong><span>Engineer workspace</span></div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <div class="eyebrow">NETWORK DIAGNOSTICS</div>
+          <h1>Incident overview</h1>
+        </div>
+        <div class="top-actions">
+          <div class="view-toggle" role="group" aria-label="View mode">
+            <button class="active">Engineer</button>
+            <button>Customer</button>
+          </div>
+          <button class="primary-button">+ New diagnostic</button>
+        </div>
+      </header>
+
+      <section class="incident-strip" id="incident-list" aria-label="Demo incidents"></section>
+
+      <section class="hero-grid" id="overview">
+        <article class="panel diagnosis-panel">
+          <div class="panel-heading">
+            <div>
+              <span class="section-label">LIKELY FAULT DOMAIN</span>
+              <h2 id="fault-domain">Loading…</h2>
+            </div>
+            <div class="confidence-ring" id="confidence-ring">
+              <strong id="confidence">--%</strong>
+              <span>confidence</span>
+            </div>
+          </div>
+          <p class="diagnosis-copy" id="diagnosis-summary"></p>
+          <div class="signal-line"><span></span><span></span><span></span><span></span><span></span></div>
+          <div class="path" id="path"></div>
+        </article>
+
+        <article class="panel context-panel">
+          <span class="section-label">INCIDENT CONTEXT</span>
+          <div class="context-title">
+            <div>
+              <h3 id="incident-title">Loading…</h3>
+              <span id="incident-id"></span>
+            </div>
+            <span class="status-pill">Investigating</span>
+          </div>
+          <dl class="context-list">
+            <div><dt>Customer</dt><dd id="customer"></dd></div>
+            <div><dt>Target</dt><dd id="target"></dd></div>
+            <div><dt>Location</dt><dd id="location"></dd></div>
+            <div><dt>Connection</dt><dd id="connection"></dd></div>
+          </dl>
+          <div class="timestamp">Last measured <strong>just now</strong></div>
+        </article>
+      </section>
+
+      <section class="panel" id="diagnostics">
+        <div class="panel-heading compact">
+          <div>
+            <span class="section-label">FAULT ISOLATION</span>
+            <h3>Path health</h3>
+          </div>
+          <span class="live-badge"><span></span> Live evidence</span>
+        </div>
+        <div class="metric-grid" id="metrics"></div>
+      </section>
+
+      <section class="lower-grid">
+        <article class="panel" id="evidence">
+          <div class="panel-heading compact">
+            <div>
+              <span class="section-label">WHY FAULTLINE THINKS THIS</span>
+              <h3>Evidence</h3>
+            </div>
+          </div>
+          <div class="evidence-list" id="evidence-list"></div>
+        </article>
+
+        <article class="panel" id="actions">
+          <div class="panel-heading compact">
+            <div>
+              <span class="section-label">NEXT BEST ACTION</span>
+              <h3>Recommended actions</h3>
+            </div>
+          </div>
+          <ol class="action-list" id="action-list"></ol>
+          <button class="report-button">Export evidence report ↗</button>
+        </article>
+      </section>
+
+      <footer>
+        <span>Faultline v0.1</span>
+        <span>Evidence before escalation.</span>
+      </footer>
+    </main>
+  </div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
