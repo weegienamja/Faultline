@@ -2,7 +2,7 @@
 import { collectRemoteProbe } from "./network.mjs";
 
 function help() {
-  console.log(`Faultline Remote Probe v0.3\n\nUsage:\n  npm run probe -- --run <run-id> [options]\n\nOptions:\n  --run <id>               Existing Faultline live run ID (required)\n  --api-base <url>         Faultline server base URL\n                           (default: http://localhost:3000)\n  --name <value>           Friendly name for this probe\n  --dry-run                Collect and print telemetry without uploading\n  --json                   Print the full JSON payload\n  --help                   Show this help\n\nExample:\n  npm run probe -- --run LIVE-ME5X2F --api-base http://192.168.1.20:3000 --name london-probe\n`);
+  console.log(`Faultline Remote Probe v0.4\n\nUsage:\n  npm run probe -- --session <session-id> --token <probe-token> [options]\n\nOptions:\n  --session <id>            Diagnostic session ID (required)\n  --token <value>           Probe session credential (or FAULTLINE_PROBE_TOKEN)\n  --api-base <url>          Faultline control-plane base URL\n                           (default: http://localhost:3000)\n  --name <value>            Friendly name for this probe\n  --dry-run                 Collect and print telemetry without uploading\n  --json                    Print the full JSON payload\n  --help                    Show this help\n\nExample:\n  npm run probe -- --session FL-ABC123 --token <probe-token> --api-base https://faultline.example.com --name london-probe\n`);
 }
 
 function parseArgs(argv) {
@@ -12,11 +12,12 @@ function parseArgs(argv) {
     if (arg === "--help" || arg === "-h") options.help = true;
     else if (arg === "--dry-run") options.dryRun = true;
     else if (arg === "--json") options.json = true;
-    else if (["--run", "--api-base", "--name"].includes(arg)) {
+    else if (["--session", "--token", "--api-base", "--name"].includes(arg)) {
       const value = argv[index + 1];
       if (!value || value.startsWith("--")) throw new Error(`${arg} requires a value.`);
       index += 1;
-      if (arg === "--run") options.runId = value;
+      if (arg === "--session") options.sessionId = value;
+      if (arg === "--token") options.token = value;
       if (arg === "--api-base") options.apiBase = value.replace(/\/+$/, "");
       if (arg === "--name") options.name = value;
     } else {
@@ -26,17 +27,23 @@ function parseArgs(argv) {
   return options;
 }
 
-async function getRun(base, runId) {
-  const response = await fetch(`${base}/api/agent-runs/${encodeURIComponent(runId)}`, { cache: "no-store" });
+async function getSession(base, sessionId, token) {
+  const response = await fetch(`${base}/api/sessions/${encodeURIComponent(sessionId)}`, {
+    headers: { authorization: `Bearer ${token}` },
+    cache: "no-store"
+  });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(body.error || `Faultline API returned HTTP ${response.status}.`);
   return body;
 }
 
-async function upload(base, payload) {
+async function upload(base, token, payload) {
   const response = await fetch(`${base}/api/probe-runs`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${token}`
+    },
     body: JSON.stringify(payload)
   });
   const body = await response.json().catch(() => ({}));
@@ -55,57 +62,45 @@ async function main() {
     return;
   }
 
-  if (options.help) {
-    help();
-    return;
-  }
-
-  if (!options.runId) {
-    console.error("Error: --run is required.\n");
+  if (options.help) return help();
+  if (!options.sessionId) {
+    console.error("Error: --session is required.\n");
     help();
     process.exitCode = 1;
     return;
   }
 
+  const token = options.token || process.env.FAULTLINE_PROBE_TOKEN;
+  if (!token) throw new Error("Provide --token or set FAULTLINE_PROBE_TOKEN.");
   const base = options.apiBase || "http://localhost:3000";
+  const session = await getSession(base, options.sessionId, token);
 
-  try {
-    const run = await getRun(base, options.runId);
-    const target = run.telemetry?.target || {
-      input: run.target,
-      host: run.target,
-      port: 443,
-      url: /^https?:\/\//i.test(run.target) ? run.target : null
-    };
+  console.log(`Faultline: probing ${session.target.input} for session ${session.id}...`);
+  const payload = await collectRemoteProbe({
+    sessionId: session.id,
+    target: session.target.input,
+    port: session.target.port,
+    name: options.name
+  });
 
-    console.log(`Faultline: probing ${target.input || target.host} for run ${run.id}...`);
-    const payload = await collectRemoteProbe({
-      runId: run.id,
-      target: target.input || target.host,
-      port: target.port,
-      name: options.name
-    });
+  const m = payload.metrics;
+  console.log(`  DNS: ${m.dnsResolved ? "resolved" : "failed"} · ${m.dnsLookupMs} ms`);
+  console.log(`  Target TCP: ${m.targetReachable ? "reachable" : "unreachable"} · ${m.targetTcpMs} ms`);
+  if (m.targetHttpMs != null) console.log(`  Target HTTP: ${m.targetHttpMs} ms`);
 
-    const m = payload.metrics;
-    console.log(`  DNS: ${m.dnsResolved ? "resolved" : "failed"} · ${m.dnsLookupMs} ms`);
-    console.log(`  Target TCP: ${m.targetReachable ? "reachable" : "unreachable"} · ${m.targetTcpMs} ms`);
-    if (m.targetHttpMs != null) console.log(`  Target HTTP: ${m.targetHttpMs} ms`);
-
-    if (options.json || options.dryRun) console.log(JSON.stringify(payload, null, 2));
-
-    if (options.dryRun) {
-      console.log("Dry run complete. Nothing was uploaded.");
-      return;
-    }
-
-    const correlated = await upload(base, payload);
-    console.log(`\nCorrelated diagnosis: ${correlated.diagnosis.faultDomainLabel} (${correlated.diagnosis.confidence}% confidence)`);
-    console.log(correlated.diagnosis.summary);
-    console.log(`Run ${correlated.id} now has ${correlated.vantages.remoteProbe ? "two" : "one"} vantage point(s).`);
-  } catch (error) {
-    console.error(`Faultline remote probe failed: ${error.message}`);
-    process.exitCode = 1;
+  if (options.json || options.dryRun) console.log(JSON.stringify(payload, null, 2));
+  if (options.dryRun) {
+    console.log("Dry run complete. Nothing was uploaded.");
+    return;
   }
+
+  const correlated = await upload(base, token, payload);
+  console.log(`\nCorrelated diagnosis: ${correlated.diagnosis.faultDomainLabel} (${correlated.diagnosis.confidence}% confidence)`);
+  console.log(correlated.diagnosis.summary);
+  console.log(`Session ${correlated.id} now has two vantage points.`);
 }
 
-main();
+main().catch(error => {
+  console.error(`Faultline remote probe failed: ${error.message}`);
+  process.exitCode = 1;
+});
