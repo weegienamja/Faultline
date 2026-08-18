@@ -4,6 +4,7 @@ import { hostname, platform } from "node:os";
 import net from "node:net";
 import { performance } from "node:perf_hooks";
 import { promisify } from "node:util";
+import { buildTopology } from "../topology/infer.mjs";
 
 const execFileAsync = promisify(execFile);
 
@@ -93,13 +94,17 @@ export async function getWindowsNetworkState() {
   const script = `
 $default = Get-NetRoute -AddressFamily IPv4 -DestinationPrefix '0.0.0.0/0' -ErrorAction SilentlyContinue | Sort-Object RouteMetric, InterfaceMetric | Select-Object -First 1
 $adapter = if ($default) { Get-NetAdapter -InterfaceIndex $default.InterfaceIndex -ErrorAction SilentlyContinue | Select-Object -First 1 Name, InterfaceDescription, Status, MacAddress, LinkSpeed, MediaType, InterfaceIndex }
+$address = if ($default) { Get-NetIPAddress -InterfaceIndex $default.InterfaceIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object { $_.IPAddress -notlike '169.254.*' } | Select-Object -First 1 IPAddress, PrefixLength }
 $vpn = @(Get-NetAdapter -ErrorAction SilentlyContinue | Where-Object { $_.Status -eq 'Up' -and ($_.Name -match 'VPN|Cisco|AnyConnect|Secure Client|WireGuard|TAP|TUN|GlobalProtect|Forti' -or $_.InterfaceDescription -match 'VPN|Cisco|AnyConnect|Secure Client|WireGuard|TAP|TUN|GlobalProtect|Forti') } | Select-Object Name, InterfaceDescription, Status, InterfaceIndex)
 $routes = @(Get-NetRoute -AddressFamily IPv4 -ErrorAction SilentlyContinue | Sort-Object RouteMetric, InterfaceMetric | Select-Object -First 120 DestinationPrefix, NextHop, InterfaceAlias, RouteMetric, InterfaceMetric, InterfaceIndex)
+$neighbors = if ($default) { @(Get-NetNeighbor -InterfaceIndex $default.InterfaceIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue | Where-Object { $_.State -ne 'Unreachable' -and $_.LinkLayerAddress -and $_.LinkLayerAddress -ne '00-00-00-00-00-00' } | Select-Object -First 64 IPAddress, LinkLayerAddress, State) } else { @() }
 [pscustomobject]@{
   defaultRoute = if ($default) { [pscustomobject]@{ NextHop=$default.NextHop; InterfaceAlias=$default.InterfaceAlias; RouteMetric=$default.RouteMetric; InterfaceMetric=$default.InterfaceMetric; InterfaceIndex=$default.InterfaceIndex } } else { $null }
   adapter = $adapter
+  address = $address
   vpnAdapters = $vpn
   routes = $routes
+  neighbors = $neighbors
 } | ConvertTo-Json -Depth 6 -Compress
 `;
 
@@ -107,8 +112,14 @@ $routes = @(Get-NetRoute -AddressFamily IPv4 -ErrorAction SilentlyContinue | Sor
   return {
     defaultRoute: state.defaultRoute || null,
     adapter: state.adapter || null,
+    address: state.address || null,
     vpnAdapters: asArray(state.vpnAdapters),
-    routes: asArray(state.routes)
+    routes: asArray(state.routes),
+    neighbours: asArray(state.neighbors).map(item => ({
+      ip: item.IPAddress,
+      mac: item.LinkLayerAddress,
+      state: item.State
+    }))
   };
 }
 
@@ -116,12 +127,16 @@ export async function getWifiState() {
   const result = await runExecutable("netsh.exe", ["wlan", "show", "interfaces"], { timeout: 6_000 });
   const signal = result.stdout.match(/^\s*Signal\s*:\s*(\d+)%/mi);
   const ssid = result.stdout.match(/^\s*SSID\s*:\s*(.+)$/mi);
+  const bssid = result.stdout.match(/^\s*BSSID\s*:\s*([0-9a-f:-]{17})/mi);
   const radio = result.stdout.match(/^\s*Radio type\s*:\s*(.+)$/mi);
+  const channel = result.stdout.match(/^\s*Channel\s*:\s*(\d+)/mi);
 
   return {
     signalPct: signal ? Number(signal[1]) : null,
     ssid: ssid?.[1]?.trim() || null,
-    radioType: radio?.[1]?.trim() || null
+    bssid: bssid?.[1]?.trim() || null,
+    radioType: radio?.[1]?.trim() || null,
+    channel: channel ? Number(channel[1]) : null
   };
 }
 
@@ -193,7 +208,7 @@ export async function httpProbe(url, timeoutMs = 5_000) {
       method: "GET",
       redirect: "follow",
       signal: controller.signal,
-      headers: { "user-agent": "Faultline-Agent/0.5" }
+      headers: { "user-agent": "Faultline-Agent/0.6-topology" }
     });
     const elapsedMs = Number((performance.now() - started).toFixed(1));
     await response.body?.cancel().catch(() => {});
@@ -249,13 +264,25 @@ function connectionLabel(adapter, wifi) {
 
 export async function collectWindowsDiagnostics(options) {
   if (platform() !== "win32") {
-    throw new Error("Faultline Agent v0.5 currently supports Windows only.");
+    throw new Error("Faultline Agent currently supports Windows only.");
   }
 
   const target = normaliseTarget(options.target, options.port);
   const networkState = await getWindowsNetworkState();
   const wifi = await getWifiState();
   const gateway = networkState.defaultRoute?.NextHop || null;
+  const connection = connectionLabel(networkState.adapter, wifi);
+  const topology = options.topology === false ? null : buildTopology({
+    endpoint: {
+      hostname: hostname(),
+      ip: networkState.address?.IPAddress || null,
+      mac: networkState.adapter?.MacAddress || null,
+      connection
+    },
+    gateway: { ip: gateway },
+    wifi,
+    neighbours: networkState.neighbours
+  });
 
   const [gatewayPing, dns, internet] = await Promise.all([
     gateway ? pingHost(gateway, 6) : Promise.resolve(null),
@@ -299,7 +326,7 @@ export async function collectWindowsDiagnostics(options) {
   return {
     agent: {
       name: "faultline-windows",
-      version: "0.5.0",
+      version: "0.6-topology",
       platform: "win32",
       hostname: hostname()
     },
@@ -309,7 +336,7 @@ export async function collectWindowsDiagnostics(options) {
       customer: "Live endpoint",
       target: target.input,
       location: `${hostname()} · Windows`,
-      connection: connectionLabel(networkState.adapter, wifi)
+      connection
     },
     metrics,
     telemetry: {
@@ -324,10 +351,14 @@ export async function collectWindowsDiagnostics(options) {
       adapter: networkState.adapter ? {
         name: networkState.adapter.Name,
         description: networkState.adapter.InterfaceDescription,
+        macAddress: networkState.adapter.MacAddress,
         linkSpeed: networkState.adapter.LinkSpeed,
-        mediaType: networkState.adapter.MediaType
+        mediaType: networkState.adapter.MediaType,
+        ipv4: networkState.address?.IPAddress || null,
+        prefixLength: networkState.address?.PrefixLength ?? null
       } : null,
       wifi,
+      topology,
       vpnAdapters: networkState.vpnAdapters.map(adapter => ({
         name: adapter.Name,
         description: adapter.InterfaceDescription,
