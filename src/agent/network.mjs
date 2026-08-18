@@ -193,7 +193,7 @@ export async function httpProbe(url, timeoutMs = 5_000) {
       method: "GET",
       redirect: "follow",
       signal: controller.signal,
-      headers: { "user-agent": "Faultline-Agent/0.4" }
+      headers: { "user-agent": "Faultline-Agent/0.5" }
     });
     const elapsedMs = Number((performance.now() - started).toFixed(1));
     await response.body?.cancel().catch(() => {});
@@ -249,7 +249,7 @@ function connectionLabel(adapter, wifi) {
 
 export async function collectWindowsDiagnostics(options) {
   if (platform() !== "win32") {
-    throw new Error("Faultline Agent v0.4 currently supports Windows only.");
+    throw new Error("Faultline Agent v0.5 currently supports Windows only.");
   }
 
   const target = normaliseTarget(options.target, options.port);
@@ -299,7 +299,7 @@ export async function collectWindowsDiagnostics(options) {
   return {
     agent: {
       name: "faultline-windows",
-      version: "0.4.0",
+      version: "0.5.0",
       platform: "win32",
       hostname: hostname()
     },
