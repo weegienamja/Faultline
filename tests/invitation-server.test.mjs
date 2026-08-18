@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 const ADMIN_TOKEN = "test-admin-token";
+const STARTED = "Faultline v0.6 preview listening";
 
 function startServer(port, dataFile) {
   const child = spawn(process.execPath, ["src/server.mjs"], {
@@ -28,7 +29,7 @@ function startServer(port, dataFile) {
 
     const onData = chunk => {
       output += chunk.toString();
-      if (output.includes("Faultline v0.5 listening")) {
+      if (output.includes(STARTED)) {
         clearTimeout(timer);
         child.stdout.off("data", onData);
         resolve(child);
@@ -38,7 +39,7 @@ function startServer(port, dataFile) {
     child.stdout.on("data", onData);
     child.stderr.on("data", chunk => { output += chunk.toString(); });
     child.once("exit", code => {
-      if (code !== null && !output.includes("Faultline v0.5 listening")) {
+      if (code !== null && !output.includes(STARTED)) {
         clearTimeout(timer);
         reject(new Error(`Faultline server exited with ${code}. Output: ${output}`));
       }

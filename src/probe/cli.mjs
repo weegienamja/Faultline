@@ -3,7 +3,7 @@ import { hostname, platform } from "node:os";
 import { collectRemoteProbe } from "./network.mjs";
 
 function help() {
-  console.log(`Faultline Remote Probe v0.5\n\nRegistered worker:\n  npm run probe -- --probe <probe-id> --token <probe-token> [--watch]\n\nOne-off session probe:\n  npm run probe -- --session <session-id> --token <session-probe-token>\n\nOptions:\n  --probe <id>              Registered probe ID\n  --session <id>            Legacy one-off diagnostic session ID\n  --token <value>           Probe credential (or FAULTLINE_PROBE_TOKEN)\n  --api-base <url>          Faultline control-plane base URL\n                            (default: http://localhost:3000)\n  --name <value>            Friendly name used by one-off probes\n  --watch                   Keep registered probe online and poll for jobs\n  --interval <seconds>      Worker poll interval, 15-300 seconds (default: 30)\n  --dry-run                 Collect and print telemetry without uploading\n  --json                    Print full payloads\n  --help                    Show this help\n\nExamples:\n  npm run probe -- --probe PRB-ABC123 --token <registered-token> --watch\n  npm run probe -- --session FL-ABC123 --token <session-token>\n`);
+  console.log(`Faultline Remote Probe v0.6\n\nRegistered worker:\n  npm run probe -- --probe <probe-id> --token <probe-token> [--watch]\n\nOne-off session probe:\n  npm run probe -- --session <session-id> --token <session-probe-token>\n\nOptions:\n  --probe <id>              Registered probe ID\n  --session <id>            Legacy one-off diagnostic session ID\n  --token <value>           Probe credential (or FAULTLINE_PROBE_TOKEN)\n  --api-base <url>          Faultline control-plane base URL\n                            (default: http://localhost:3000)\n  --name <value>            Friendly name used by one-off probes\n  --watch                   Keep registered probe online and poll for jobs\n  --interval <seconds>      Worker poll interval, 15-300 seconds (default: 30)\n  --dry-run                 Collect and print telemetry without uploading\n  --json                    Print full payloads\n  --help                    Show this help\n\nRegistered probe scope is controlled by the server. Public probes enforce public-target safety on every DNS resolution, TCP connection and HTTP redirect.\n`);
 }
 
 function parseInterval(value) {
@@ -56,7 +56,7 @@ async function api(base, path, token, { method = "GET", body } = {}) {
 
 function runtime() {
   return {
-    version: "0.5.0",
+    version: "0.6-fleet-safety",
     platform: platform(),
     hostname: hostname(),
     node: process.version
@@ -69,10 +69,11 @@ async function collectJob(base, token, probe, job, options) {
     sessionId: job.id,
     target: job.target.input,
     port: job.target.port,
-    name: probe.name
+    name: probe.name,
+    scope: probe.scope || "public"
   });
   payload.probeId = probe.id;
-  payload.probe = { runtime: runtime() };
+  payload.probe = { runtime: runtime(), scope: probe.scope || "public" };
 
   const m = payload.metrics;
   console.log(`  DNS: ${m.dnsResolved ? "resolved" : "failed"} · ${m.dnsLookupMs} ms`);
@@ -94,7 +95,7 @@ async function registeredCycle(base, token, probeId, options) {
 
   const queue = await api(base, `/api/probes/${encodeURIComponent(probeId)}/jobs`, token);
   if (!queue.jobs.length) {
-    console.log(`[${new Date().toISOString()}] ${queue.probe.name}: online · no pending jobs`);
+    console.log(`[${new Date().toISOString()}] ${queue.probe.name}: ${queue.probe.health} · no pending jobs`);
     return queue.probe;
   }
 
@@ -103,7 +104,8 @@ async function registeredCycle(base, token, probeId, options) {
     try {
       await collectJob(base, token, queue.probe, job, options);
     } catch (error) {
-      console.error(`  Session ${job.id} failed: ${error.message}`);
+      const prefix = error.code === "TARGET_POLICY" ? "blocked by target policy" : "failed";
+      console.error(`  Session ${job.id} ${prefix}: ${error.message}`);
     }
   }
   return queue.probe;
@@ -113,6 +115,7 @@ async function runRegistered(options, base, token) {
   const probe = await api(base, `/api/probes/${encodeURIComponent(options.probeId)}`, token);
   console.log(`Faultline registered probe: ${probe.name} (${probe.id})`);
   if (probe.location) console.log(`Location: ${probe.location}`);
+  console.log(`Scope: ${probe.scope || "public"}`);
 
   do {
     await registeredCycle(base, token, probe.id, options);
@@ -129,7 +132,8 @@ async function runOneOff(options, base, token) {
     sessionId: session.id,
     target: session.target.input,
     port: session.target.port,
-    name: options.name
+    name: options.name,
+    scope: "private"
   });
 
   const m = payload.metrics;

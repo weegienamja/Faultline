@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 const ADMIN_TOKEN = "fleet-admin-token";
+const STARTED = "Faultline v0.6 preview listening";
 
 function startServer(port, dataFile) {
   const child = spawn(process.execPath, ["src/server.mjs"], {
@@ -28,7 +29,7 @@ function startServer(port, dataFile) {
 
     const onData = chunk => {
       output += chunk.toString();
-      if (output.includes("Faultline v0.5 listening")) {
+      if (output.includes(STARTED)) {
         clearTimeout(timer);
         child.stdout.off("data", onData);
         resolve(child);
@@ -61,7 +62,7 @@ async function request(base, path, { method = "GET", body, token } = {}) {
   return { status: response.status, body: await response.json() };
 }
 
-test("registers, heartbeats and assigns a trusted remote probe", { timeout: 20_000 }, async () => {
+test("registers heartbeats and assigns a trusted remote probe", { timeout: 20_000 }, async () => {
   const dir = await mkdtemp(join(tmpdir(), "faultline-fleet-"));
   const dataFile = join(dir, "faultline.json");
   const port = 39000 + Math.floor(Math.random() * 1500);
@@ -74,12 +75,13 @@ test("registers, heartbeats and assigns a trusted remote probe", { timeout: 20_0
     const registration = await request(base, "/api/probes", {
       method: "POST",
       token: ADMIN_TOKEN,
-      body: { name: "london-1", location: "London, UK", tags: ["uk", "vps"] }
+      body: { name: "london-1", location: "London, UK", country: "gb", region: "europe-west", scope: "public", tags: ["uk", "vps"] }
     });
     assert.equal(registration.status, 201);
     assert.match(registration.body.probe.id, /^PRB-/);
     assert.match(registration.body.credential, /^fl_probe_/);
     assert.equal(registration.body.probe.health, "offline");
+    assert.equal(registration.body.probe.scope, "public");
 
     const probeId = registration.body.probe.id;
     const probeToken = registration.body.credential;
@@ -89,7 +91,7 @@ test("registers, heartbeats and assigns a trusted remote probe", { timeout: 20_0
     const heartbeat = await request(base, `/api/probes/${probeId}/heartbeat`, {
       method: "POST",
       token: probeToken,
-      body: { runtime: { version: "0.5.0", platform: "linux", hostname: "lon-probe-1", node: "v22" } }
+      body: { runtime: { version: "0.6", platform: "linux", hostname: "lon-probe-1", node: "v22" } }
     });
     assert.equal(heartbeat.status, 200);
     assert.equal(heartbeat.body.health, "online");
@@ -150,7 +152,7 @@ test("registers, heartbeats and assigns a trusted remote probe", { timeout: 20_0
       body: {
         sessionId,
         probeId,
-        probe: { runtime: { version: "0.5.0", platform: "linux", hostname: "lon-probe-1" } },
+        probe: { runtime: { version: "0.6", platform: "linux", hostname: "lon-probe-1" } },
         metrics: { dnsResolved: true, targetReachable: true, targetTcpMs: 14 },
         telemetry: { collectedAt: "2026-08-18T19:00:10.000Z" }
       }
@@ -159,6 +161,7 @@ test("registers, heartbeats and assigns a trusted remote probe", { timeout: 20_0
     assert.equal(correlated.body.source, "correlated");
     assert.equal(correlated.body.remoteProbe.probe.id, probeId);
     assert.equal(correlated.body.remoteProbe.probe.registered, true);
+    assert.equal(correlated.body.remoteProbe.probe.scope, "public");
 
     const drained = await request(base, `/api/probes/${probeId}/jobs`, { token: probeToken });
     assert.equal(drained.body.jobs.length, 0);

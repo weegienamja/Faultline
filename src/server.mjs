@@ -6,8 +6,18 @@ import { diagnose } from "./engine/diagnose.mjs";
 import { correlateAgentRun } from "./engine/correlate.mjs";
 import { incidents } from "./engine/incidents.mjs";
 import { bearerToken, generateCredential, hashCredential, isSessionExpired, verifyCredential, verifySessionRole } from "./security/auth.mjs";
-import { claimDiagnosticInvitation, createDiagnosticSession, exchangeClientLaunch, findSessionByInvitationToken, publicSession } from "./session/service.mjs";
-import { createRegisteredProbe, publicProbe, touchProbe, verifyProbeCredential } from "./probe/registry.mjs";
+import { assertLiteralTargetAllowed } from "./security/target.mjs";
+import { claimDiagnosticInvitation, createDiagnosticSession, exchangeClientLaunch, findSessionByInvitationToken, normaliseSessionInput, publicSession } from "./session/service.mjs";
+import {
+  createRegisteredProbe,
+  publicProbe,
+  revokeProbeCredential,
+  rotateProbeCredential,
+  touchProbe,
+  updateProbeLifecycle,
+  verifyProbeCredential
+} from "./probe/registry.mjs";
+import { normaliseProbeSelector, selectProbe } from "./probe/scheduler.mjs";
 import { createStore } from "./storage/store.mjs";
 
 const root = fileURLToPath(new URL("../public/", import.meta.url));
@@ -18,6 +28,7 @@ const configuredAdminToken = process.env.FAULTLINE_ADMIN_TOKEN || null;
 const adminToken = configuredAdminToken || generateCredential("fl_admin");
 const adminTokenHash = hashCredential(adminToken);
 const windowsClientUrl = process.env.FAULTLINE_WINDOWS_CLIENT_URL || null;
+const probeSubmissionLimits = new Map();
 
 const mime = {
   ".html": "text/html; charset=utf-8",
@@ -62,6 +73,30 @@ function requireAdmin(req) {
   }
 }
 
+function consumeRateLimit(key, max = 30, windowMs = 60_000) {
+  const now = Date.now();
+  const current = probeSubmissionLimits.get(key);
+  if (!current || now - current.startedAt >= windowMs) {
+    probeSubmissionLimits.set(key, { startedAt: now, count: 1 });
+    return;
+  }
+  if (current.count >= max) {
+    const error = new Error("Probe submission rate limit exceeded.");
+    error.statusCode = 429;
+    throw error;
+  }
+  current.count += 1;
+}
+
+async function appendAudit(type, probeId, details = {}) {
+  return store.appendAudit({
+    at: new Date().toISOString(),
+    type,
+    probeId: probeId || null,
+    details
+  });
+}
+
 async function getSession(id) {
   const session = await store.getSession(id);
   if (!session) {
@@ -80,6 +115,19 @@ async function getProbe(id) {
     throw error;
   }
   return probe;
+}
+
+function ensureProbeAssignable(probe) {
+  if (probe.enabled === false || probe.revokedAt) {
+    const error = new Error(`Registered probe ${probe.id} is disabled or revoked.`);
+    error.statusCode = 409;
+    throw error;
+  }
+  if (probe.draining || probe.maintenance) {
+    const error = new Error(`Registered probe ${probe.id} is not accepting new work.`);
+    error.statusCode = 409;
+    throw error;
+  }
 }
 
 async function requireRegisteredProbe(req, id) {
@@ -201,6 +249,9 @@ async function attachRemoteProbe(payload, session, registeredProbe = null) {
         id: registeredProbe.id,
         name: registeredProbe.name,
         location: registeredProbe.location || null,
+        country: registeredProbe.country || null,
+        region: registeredProbe.region || null,
+        scope: registeredProbe.scope || "public",
         tags: registeredProbe.tags || [],
         runtime: registeredProbe.runtime || null,
         registered: true
@@ -225,6 +276,8 @@ async function liveIncidents(limit = 3) {
 }
 
 async function pendingProbeJobs(probeId) {
+  const probe = await getProbe(probeId);
+  if (probe.maintenance || probe.revokedAt || probe.enabled === false) return [];
   const sessions = await store.listSessions();
   const jobs = [];
 
@@ -232,10 +285,57 @@ async function pendingProbeJobs(probeId) {
     if (session.assignedProbeId !== probeId || isSessionExpired(session)) continue;
     const run = await store.getRun(session.id);
     if (!run?.endpointMetrics || run.remoteProbe) continue;
+    try {
+      assertLiteralTargetAllowed(session.target.input, session.target.port, probe.scope || "public");
+    } catch {
+      continue;
+    }
     jobs.push({ id: session.id, target: session.target, expiresAt: session.expiresAt });
   }
 
   return jobs.slice(0, 20);
+}
+
+async function resolveProbeAssignment(payload) {
+  const normalised = normaliseSessionInput(payload);
+
+  if (payload.assignedProbeId) {
+    const probe = await getProbe(String(payload.assignedProbeId));
+    ensureProbeAssignable(probe);
+    assertLiteralTargetAllowed(normalised.target.input, normalised.target.port, probe.scope || "public");
+    return {
+      assignedProbeId: probe.id,
+      probeSelection: {
+        mode: "explicit",
+        selector: null,
+        selectedAt: new Date().toISOString(),
+        candidateCount: 1,
+        loadAtSelection: 0
+      }
+    };
+  }
+
+  if (!payload.probeSelector) return { assignedProbeId: null, probeSelection: null };
+
+  const selector = normaliseProbeSelector(payload.probeSelector);
+  const selected = selectProbe({
+    probes: await store.listProbes(),
+    sessions: await store.listSessions(),
+    runs: await store.listRuns(1000),
+    selector
+  });
+  assertLiteralTargetAllowed(normalised.target.input, normalised.target.port, selected.probe.scope || "public");
+
+  return {
+    assignedProbeId: selected.probe.id,
+    probeSelection: {
+      mode: "automatic",
+      selector: selected.selector,
+      selectedAt: new Date().toISOString(),
+      candidateCount: selected.candidateCount,
+      loadAtSelection: selected.load
+    }
+  };
 }
 
 const server = createServer(async (req, res) => {
@@ -245,9 +345,11 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/api/health") {
       return json(res, 200, {
         ok: true,
-        version: "0.5.0",
+        version: "0.6-preview",
         persistence: true,
         registeredProbeFleet: true,
+        probeScheduling: true,
+        publicProbeSafety: true,
         topologyPreview: true,
         ephemeralInvitations: true,
         windowsClientPreview: true
@@ -268,6 +370,12 @@ const server = createServer(async (req, res) => {
       const payload = await bodyFrom(req);
       const created = createRegisteredProbe(payload);
       await store.putProbe(created.probe);
+      await appendAudit("probe.registered", created.probe.id, {
+        scope: created.probe.scope,
+        country: created.probe.country,
+        region: created.probe.region,
+        tags: created.probe.tags
+      });
       return json(res, 201, { probe: publicProbe(created.probe), credential: created.credential });
     }
 
@@ -275,6 +383,11 @@ const server = createServer(async (req, res) => {
       requireAdmin(req);
       const probes = await store.listProbes();
       return json(res, 200, probes.map(probe => publicProbe(probe)));
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/audit") {
+      requireAdmin(req);
+      return json(res, 200, await store.listAudit(200));
     }
 
     const heartbeatMatch = url.pathname.match(/^\/api\/probes\/([^/]+)\/heartbeat$/);
@@ -296,7 +409,48 @@ const server = createServer(async (req, res) => {
       return json(res, 200, { probe: publicProbe(updated), jobs: await pendingProbeJobs(id) });
     }
 
+    const rotateMatch = url.pathname.match(/^\/api\/probes\/([^/]+)\/rotate$/);
+    if (req.method === "POST" && rotateMatch) {
+      requireAdmin(req);
+      const id = decodeURIComponent(rotateMatch[1]);
+      const probe = await getProbe(id);
+      const rotated = rotateProbeCredential(probe);
+      await store.putProbe(rotated.probe);
+      await appendAudit("probe.credential_rotated", id, { credentialVersion: rotated.probe.credentialVersion });
+      return json(res, 200, { probe: publicProbe(rotated.probe), credential: rotated.credential });
+    }
+
+    const revokeMatch = url.pathname.match(/^\/api\/probes\/([^/]+)\/revoke$/);
+    if (req.method === "POST" && revokeMatch) {
+      requireAdmin(req);
+      const id = decodeURIComponent(revokeMatch[1]);
+      const probe = await getProbe(id);
+      const revoked = revokeProbeCredential(probe);
+      await store.putProbe(revoked);
+      await appendAudit("probe.revoked", id);
+      return json(res, 200, publicProbe(revoked));
+    }
+
     const probeMatch = url.pathname.match(/^\/api\/probes\/([^/]+)$/);
+    if (req.method === "PATCH" && probeMatch) {
+      requireAdmin(req);
+      const id = decodeURIComponent(probeMatch[1]);
+      const probe = await getProbe(id);
+      const payload = await bodyFrom(req);
+      const updated = updateProbeLifecycle(probe, payload);
+      await store.putProbe(updated);
+      await appendAudit("probe.lifecycle_updated", id, {
+        enabled: updated.enabled,
+        draining: updated.draining,
+        maintenance: updated.maintenance,
+        scope: updated.scope,
+        country: updated.country,
+        region: updated.region,
+        tags: updated.tags
+      });
+      return json(res, 200, publicProbe(updated));
+    }
+
     if (req.method === "GET" && probeMatch) {
       const id = decodeURIComponent(probeMatch[1]);
       const probe = await requireRegisteredProbe(req, id);
@@ -350,16 +504,15 @@ const server = createServer(async (req, res) => {
     if (req.method === "POST" && url.pathname === "/api/sessions") {
       requireAdmin(req);
       const payload = await bodyFrom(req);
-      if (payload.assignedProbeId) {
-        const probe = await getProbe(String(payload.assignedProbeId));
-        if (probe.enabled === false) {
-          const error = new Error(`Registered probe ${probe.id} is disabled.`);
-          error.statusCode = 409;
-          throw error;
-        }
-      }
-      const created = createDiagnosticSession(payload);
+      const assignment = await resolveProbeAssignment(payload);
+      const created = createDiagnosticSession({ ...payload, ...assignment });
       await store.putSession(created.session);
+      if (created.session.assignedProbeId) {
+        await appendAudit("probe.session_assigned", created.session.assignedProbeId, {
+          sessionId: created.session.id,
+          mode: created.session.probeSelection?.mode || "explicit"
+        });
+      }
       return json(res, 201, {
         session: publicSession(created.session),
         credentials: created.credentials,
@@ -426,6 +579,8 @@ const server = createServer(async (req, res) => {
           throw error;
         }
         const probe = await requireRegisteredProbe(req, session.assignedProbeId);
+        consumeRateLimit(`probe:${probe.id}`);
+        assertLiteralTargetAllowed(session.target.input, session.target.port, probe.scope || "public");
         const updatedProbe = touchProbe(probe, { runtime: payload.probe?.runtime || payload.probe || null });
         await store.putProbe(updatedProbe);
         return json(res, 201, await attachRemoteProbe(payload, session, updatedProbe));
@@ -461,12 +616,12 @@ const server = createServer(async (req, res) => {
     }
   } catch (error) {
     const status = error.statusCode || (/not found/i.test(error.message) ? 404 : 400);
-    json(res, status, { error: error.message });
+    json(res, status, { error: error.message, ...(error.code ? { code: error.code } : {}) });
   }
 });
 
 server.listen(port, () => {
-  console.log(`Faultline v0.5 listening on http://localhost:${port}`);
+  console.log(`Faultline v0.6 preview listening on http://localhost:${port}`);
   console.log(`Persistent store: ${dataFile}`);
   if (!configuredAdminToken) {
     console.log("No FAULTLINE_ADMIN_TOKEN was configured. Generated a development admin credential:");
