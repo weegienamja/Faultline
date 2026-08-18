@@ -36,10 +36,7 @@ export function normaliseSessionInput(input = {}, now = Date.now()) {
   if (title.length > 180 || customer.length > 180) throw new Error("Session title and customer labels must be 180 characters or fewer.");
 
   return {
-    target: {
-      input: target,
-      port
-    },
+    target: { input: target, port },
     title,
     customer,
     vpnRequired: Boolean(input.vpnRequired || input.expectedRoute),
@@ -57,7 +54,7 @@ export function createDiagnosticSession(input = {}, now = Date.now()) {
   const endpointToken = ephemeral ? null : generateCredential("fl_ep");
   const invitationToken = ephemeral ? generateCredential("fl_inv") : null;
   const probeToken = normalised.assignedProbeId ? null : generateCredential("fl_pr");
-  const id = `FL-${randomBytes(5).toString("hex").toUpperCase()}`;
+  const id = `FL-${randomBytes(8).toString("hex").toUpperCase()}`;
 
   const session = {
     id,
@@ -69,7 +66,9 @@ export function createDiagnosticSession(input = {}, now = Date.now()) {
       tokenHash: hashCredential(invitationToken),
       createdAt: normalised.createdAt,
       claimedAt: null,
-      consentedAt: null
+      consentedAt: null,
+      includeTopology: null,
+      clientLaunch: null
     } : null
   };
 
@@ -88,51 +87,104 @@ export function findSessionByInvitationToken(sessions, token) {
   return sessions.find(session => verifyCredential(token, session?.invitation?.tokenHash)) || null;
 }
 
-export function claimDiagnosticInvitation(session, token, consent, now = Date.now()) {
+export function findSessionByClientLaunchToken(sessions, token) {
+  if (!token || !Array.isArray(sessions)) return null;
+  return sessions.find(session => verifyCredential(token, session?.invitation?.clientLaunch?.tokenHash)) || null;
+}
+
+export function claimDiagnosticInvitation(session, token, options = {}, now = Date.now()) {
   if (!session || session.mode !== "ephemeral" || !session.invitation?.tokenHash) {
     const error = new Error("Diagnostic invitation is invalid.");
     error.statusCode = 404;
     throw error;
   }
-
   if (!verifyCredential(token, session.invitation.tokenHash)) {
     const error = new Error("Diagnostic invitation is invalid.");
     error.statusCode = 404;
     throw error;
   }
-
   if (isSessionExpired(session, now)) {
     const error = new Error("Diagnostic invitation has expired.");
     error.statusCode = 410;
     throw error;
   }
-
   if (session.invitation.claimedAt) {
     const error = new Error("Diagnostic invitation has already been claimed.");
     error.statusCode = 410;
     throw error;
   }
-
-  if (consent !== true) {
+  if (options.consent !== true) {
     const error = new Error("Explicit consent is required before endpoint diagnostics can be activated.");
     error.statusCode = 400;
     throw error;
   }
 
-  const endpointToken = generateCredential("fl_ep");
+  const clientLaunchToken = generateCredential("fl_launch");
   const claimedAt = new Date(now).toISOString();
+  const includeTopology = options.includeTopology !== false;
+  const updatedSession = {
+    ...session,
+    endpointTokenHash: null,
+    invitation: {
+      ...session.invitation,
+      tokenHash: null,
+      claimedAt,
+      consentedAt: claimedAt,
+      includeTopology,
+      clientLaunch: {
+        tokenHash: hashCredential(clientLaunchToken),
+        createdAt: claimedAt,
+        exchangedAt: null
+      }
+    }
+  };
+
+  return { session: updatedSession, clientLaunchToken };
+}
+
+export function exchangeClientLaunch(session, token, now = Date.now()) {
+  const launch = session?.invitation?.clientLaunch;
+  if (!session || session.mode !== "ephemeral" || !launch?.tokenHash) {
+    const error = new Error("Windows client launch credential is invalid or already used.");
+    error.statusCode = 404;
+    throw error;
+  }
+  if (!verifyCredential(token, launch.tokenHash)) {
+    const error = new Error("Windows client launch credential is invalid.");
+    error.statusCode = 404;
+    throw error;
+  }
+  if (isSessionExpired(session, now)) {
+    const error = new Error("Diagnostic session has expired.");
+    error.statusCode = 410;
+    throw error;
+  }
+  if (launch.exchangedAt) {
+    const error = new Error("Windows client launch credential has already been used.");
+    error.statusCode = 410;
+    throw error;
+  }
+
+  const endpointToken = generateCredential("fl_ep");
+  const exchangedAt = new Date(now).toISOString();
   const updatedSession = {
     ...session,
     endpointTokenHash: hashCredential(endpointToken),
     invitation: {
       ...session.invitation,
-      tokenHash: null,
-      claimedAt,
-      consentedAt: claimedAt
+      clientLaunch: {
+        ...launch,
+        tokenHash: null,
+        exchangedAt
+      }
     }
   };
 
-  return { session: updatedSession, endpointToken };
+  return {
+    session: updatedSession,
+    endpointToken,
+    includeTopology: updatedSession.invitation.includeTopology !== false
+  };
 }
 
 export function publicSession(session, now = Date.now()) {
@@ -141,7 +193,12 @@ export function publicSession(session, now = Date.now()) {
   const invitation = session.invitation ? {
     status: expired ? "expired" : session.invitation.claimedAt ? "claimed" : "available",
     claimedAt: session.invitation.claimedAt || null,
-    consentedAt: session.invitation.consentedAt || null
+    consentedAt: session.invitation.consentedAt || null,
+    includeTopology: session.invitation.includeTopology,
+    clientLaunchStatus: session.invitation.clientLaunch
+      ? session.invitation.clientLaunch.exchangedAt ? "exchanged" : "available"
+      : null,
+    clientExchangedAt: session.invitation.clientLaunch?.exchangedAt || null
   } : null;
 
   return {
