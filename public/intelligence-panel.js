@@ -1,4 +1,4 @@
-import { analyseIncidents } from "./intelligence.js";
+import { analyseEvidencePatterns } from "./evidence-patterns.js";
 
 const strip = document.getElementById("incident-list");
 const lowerGrid = document.querySelector(".lower-grid");
@@ -147,7 +147,7 @@ function render() {
 async function refresh() {
   try {
     data = await fetchVisibleIncidents();
-    analysis = analyseIncidents(data);
+    analysis = analyseEvidencePatterns(data);
     render();
   } catch (error) {
     summary.textContent = `Incident intelligence unavailable: ${error.message}`;
