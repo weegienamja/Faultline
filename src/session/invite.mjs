@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 function help() {
-  console.log(`Faultline Invitation CLI v0.6 preview\n\nUsage:\n  npm run invite -- --target <hostname|IP|URL> [options]\n\nOptions:\n  --target <value>          Diagnostic target (required)\n  --port <number>           Target TCP port (default inferred from target)\n  --api-base <url>          Public Faultline base URL\n                           (default: http://localhost:3000)\n  --admin-token <token>     Admin bearer token (or FAULTLINE_ADMIN_TOKEN)\n  --probe <id>              Assign a registered probe to the session\n  --ttl <minutes>           Invitation/session lifetime, 5-1440 minutes\n  --title <value>           Incident title shown to the user\n  --customer <value>        Customer or support-case label\n  --vpn-required            Mark target as VPN-dependent\n  --expected-route <CIDR>   Expected IPv4 route for endpoint validation\n  --json                    Print the full creation response\n  --help                    Show this help\n\nExample:\n  npm run invite -- --target microsoft.com --probe PRB-ABC123 --admin-token <admin-token>\n`);
+  console.log(`Faultline Invitation CLI v0.6 preview\n\nUsage:\n  npm run invite -- --target <hostname|IP|URL> [options]\n\nOptions:\n  --target <value>          Diagnostic target (required)\n  --port <number>           Target TCP port (default inferred from target)\n  --api-base <url>          Public Faultline base URL\n                            (default: http://localhost:3000)\n  --admin-token <token>     Admin bearer token (or FAULTLINE_ADMIN_TOKEN)\n  --probe <id>              Explicitly assign a registered probe\n  --one-off-probe           Do not auto-select a registered probe\n  --probe-country <value>   Auto-selection country label\n  --probe-region <value>    Auto-selection region label\n  --probe-tags <csv>        Required auto-selection tags\n  --probe-scope <value>     public or private (default: public)\n  --ttl <minutes>           Invitation/session lifetime, 5-1440 minutes\n  --title <value>           Incident title shown to the user\n  --customer <value>        Customer or support-case label\n  --vpn-required            Mark target as VPN-dependent\n  --expected-route <CIDR>   Expected IPv4 route for endpoint validation\n  --json                    Print the full creation response\n  --help                    Show this help\n\nBy default Faultline chooses the least-loaded matching online public probe.\n`);
 }
 
 function parseNumber(value, label, { min, max, integer = false }) {
@@ -13,13 +13,14 @@ function parseNumber(value, label, { min, max, integer = false }) {
 }
 
 function parseArgs(argv) {
-  const options = {};
+  const options = { autoProbe: true };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--help" || arg === "-h") options.help = true;
     else if (arg === "--vpn-required") options.vpnRequired = true;
+    else if (arg === "--one-off-probe") options.autoProbe = false;
     else if (arg === "--json") options.json = true;
-    else if (["--target", "--port", "--api-base", "--admin-token", "--probe", "--ttl", "--title", "--customer", "--expected-route"].includes(arg)) {
+    else if (["--target", "--port", "--api-base", "--admin-token", "--probe", "--probe-country", "--probe-region", "--probe-tags", "--probe-scope", "--ttl", "--title", "--customer", "--expected-route"].includes(arg)) {
       const value = argv[index + 1];
       if (!value || value.startsWith("--")) throw new Error(`${arg} requires a value.`);
       index += 1;
@@ -27,7 +28,11 @@ function parseArgs(argv) {
       if (arg === "--port") options.port = parseNumber(value, "--port", { min: 1, max: 65535, integer: true });
       if (arg === "--api-base") options.apiBase = value.replace(/\/+$/, "");
       if (arg === "--admin-token") options.adminToken = value;
-      if (arg === "--probe") options.assignedProbeId = value;
+      if (arg === "--probe") { options.assignedProbeId = value; options.autoProbe = false; }
+      if (arg === "--probe-country") options.probeCountry = value;
+      if (arg === "--probe-region") options.probeRegion = value;
+      if (arg === "--probe-tags") options.probeTags = value.split(",");
+      if (arg === "--probe-scope") options.probeScope = value;
       if (arg === "--ttl") options.ttlMinutes = parseNumber(value, "--ttl", { min: 5, max: 1440 });
       if (arg === "--title") options.title = value;
       if (arg === "--customer") options.customer = value;
@@ -75,6 +80,13 @@ async function main() {
   }
 
   const base = validatePublicBase(options.apiBase || "http://localhost:3000");
+  const probeSelector = options.autoProbe ? {
+    scope: options.probeScope || "public",
+    country: options.probeCountry,
+    region: options.probeRegion,
+    tags: options.probeTags
+  } : undefined;
+
   const response = await fetch(`${base}/api/sessions`, {
     method: "POST",
     headers: {
@@ -90,6 +102,7 @@ async function main() {
       vpnRequired: options.vpnRequired,
       expectedRoute: options.expectedRoute,
       assignedProbeId: options.assignedProbeId,
+      probeSelector,
       ephemeral: true
     })
   });
@@ -109,7 +122,9 @@ async function main() {
   console.log(`Faultline support diagnostic ${session.id} created.`);
   console.log(`Target: ${session.target.input}:${session.target.port}`);
   console.log(`Expires: ${session.expiresAt}`);
-  if (session.assignedProbeId) console.log(`Registered probe: ${session.assignedProbeId}`);
+  if (session.assignedProbeId) {
+    console.log(`Registered probe: ${session.assignedProbeId} (${session.probeSelection?.mode || "explicit"})`);
+  }
 
   console.log("\nSend this one-time link to the affected user:");
   console.log(`  ${invitationUrl}`);
@@ -118,7 +133,7 @@ async function main() {
   if (session.assignedProbeId) {
     console.log(`Registered probe ${session.assignedProbeId} will pick up the job after endpoint evidence arrives.`);
   } else if (credentials.probeToken) {
-    console.log("\nRun the independent probe from another network after the endpoint completes:");
+    console.log("\nRun the independent one-off probe from another network after the endpoint completes:");
     console.log(`  npm run probe -- --session ${session.id} --token ${credentials.probeToken} --api-base ${base}`);
   }
 }
