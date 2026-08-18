@@ -34,6 +34,41 @@
     .probe-meta small { color: var(--muted); display: block; font-size: 8px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 3px; }
     .probe-meta strong { display: block; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .fleet-empty { color: var(--muted); font-size: 12px; margin: 0; }
+
+    .topology-panel { margin-top: 13px; overflow: hidden; }
+    .topology-heading-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    .topology-pill { border: 1px solid rgba(97,230,184,.28); color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 5px 8px; font-size: 9px; text-transform: uppercase; letter-spacing: .08em; }
+    .topology-pill.low { color: var(--warn); border-color: rgba(241,184,91,.3); background: rgba(241,184,91,.07); }
+    .topology-copy { color: var(--muted); font-size: 11px; line-height: 1.55; margin: -6px 0 14px; max-width: 850px; }
+    .topology-canvas { position: relative; min-height: 390px; border: 1px solid var(--border-soft); border-radius: 12px; overflow: hidden; background: radial-gradient(circle at center, rgba(97,230,184,.055), transparent 45%), rgba(3,11,10,.42); touch-action: none; }
+    .topology-grid { position: absolute; inset: 0; opacity: .18; background-image: linear-gradient(rgba(97,230,184,.08) 1px, transparent 1px), linear-gradient(90deg, rgba(97,230,184,.08) 1px, transparent 1px); background-size: 28px 28px; pointer-events: none; }
+    .topology-links { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+    .topology-link { stroke: #355b52; stroke-width: 2; opacity: .8; }
+    .topology-link.inferred { stroke-dasharray: 7 7; opacity: .55; }
+    .topology-link.affected { stroke: var(--accent); stroke-width: 2.5; opacity: .95; }
+    .topology-link.fault { stroke: var(--danger); stroke-width: 3; opacity: 1; filter: drop-shadow(0 0 5px rgba(255,122,104,.28)); }
+    .topology-node { position: absolute; width: 132px; min-height: 70px; transform: translate(-50%, -50%); border: 1px solid #29433d; border-radius: 12px; background: rgba(11,24,21,.94); color: var(--text); display: grid; grid-template-columns: 31px 1fr; gap: 8px; align-items: center; padding: 10px; text-align: left; box-shadow: 0 10px 35px rgba(0,0,0,.24); user-select: none; cursor: grab; z-index: 2; }
+    .topology-node:active { cursor: grabbing; }
+    .topology-node.endpoint { border-color: rgba(97,230,184,.55); }
+    .topology-node.gateway { border-color: rgba(97,230,184,.34); }
+    .topology-node.boundary { border-color: rgba(139,160,154,.28); }
+    .topology-node.local-fault { border-color: rgba(255,122,104,.72); box-shadow: 0 0 0 1px rgba(255,122,104,.08), 0 10px 35px rgba(0,0,0,.24); }
+    .topology-icon { width: 31px; height: 31px; border-radius: 9px; display: grid; place-items: center; background: rgba(97,230,184,.09); color: var(--accent); font-size: 16px; border: 1px solid rgba(97,230,184,.16); }
+    .topology-node strong { display: block; font-size: 10px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .topology-node small { display: block; margin-top: 3px; color: var(--muted); font-size: 8px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .topology-confidence { position: absolute; right: 6px; top: 6px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+    .topology-confidence.medium { background: var(--warn); }
+    .topology-confidence.low { background: #8ba09a; }
+    .topology-legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; color: var(--muted); font-size: 9px; }
+    .topology-legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .legend-line { width: 24px; height: 0; border-top: 2px solid #355b52; }
+    .legend-line.inferred { border-top-style: dashed; }
+    .legend-line.fault { border-color: var(--danger); }
+    .topology-empty { min-height: 180px; display: grid; place-items: center; color: var(--muted); font-size: 12px; }
+    @media (max-width: 760px) {
+      .topology-canvas { min-height: 520px; }
+      .topology-heading-meta { justify-content: flex-start; }
+    }
   </style>
 </head>
 <body>
@@ -47,6 +82,7 @@
       <nav class="nav" aria-label="Primary navigation">
         <a class="nav-item active" href="#overview"><span class="nav-icon">◫</span> Overview</a>
         <a class="nav-item" href="#diagnostics"><span class="nav-icon">⌁</span> Diagnostics</a>
+        <a class="nav-item" href="#topology"><span class="nav-icon">◇</span> Network map</a>
         <a class="nav-item" href="#probes"><span class="nav-icon">◎</span> Probe fleet</a>
         <a class="nav-item" href="#evidence"><span class="nav-icon">≋</span> Evidence</a>
         <a class="nav-item" href="#actions"><span class="nav-icon">↗</span> Actions</a>
@@ -126,6 +162,27 @@
         <div class="metric-grid" id="metrics"></div>
       </section>
 
+      <section class="panel topology-panel" id="topology-panel" hidden>
+        <div class="panel-heading compact">
+          <div>
+            <span class="section-label">INFERRED LOCAL TOPOLOGY</span>
+            <h3 id="topology">Network map</h3>
+          </div>
+          <div class="topology-heading-meta">
+            <span class="topology-pill" id="topology-kind">unknown</span>
+            <span class="topology-pill" id="topology-confidence">low confidence</span>
+          </div>
+        </div>
+        <p class="topology-copy" id="topology-summary"></p>
+        <div class="topology-canvas" id="topology-canvas" aria-label="Interactive inferred network topology"></div>
+        <div class="topology-legend">
+          <span><i class="legend-line"></i> observed relationship</span>
+          <span><i class="legend-line inferred"></i> inferred relationship</span>
+          <span><i class="legend-line fault"></i> likely affected segment</span>
+          <span>Drag nodes to rearrange the map</span>
+        </div>
+      </section>
+
       <section class="panel route-panel" id="probe-fleet-panel" hidden>
         <div class="panel-heading compact">
           <div>
@@ -172,7 +229,7 @@
       </section>
 
       <footer>
-        <span>Faultline v0.5</span>
+        <span>Faultline v0.5 · v0.6 topology preview</span>
         <span>Evidence before escalation.</span>
       </footer>
     </main>
