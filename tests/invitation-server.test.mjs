@@ -73,7 +73,7 @@ async function request(base, path, { method = "GET", body, token } = {}) {
   };
 }
 
-test("one-time support invitation requires consent and survives as a claimed session", { timeout: 20_000 }, async () => {
+test("one-time invitation hands off to packaged client before endpoint access", { timeout: 20_000 }, async () => {
   const dir = await mkdtemp(join(tmpdir(), "faultline-invite-"));
   const dataFile = join(dir, "faultline.json");
   const port = 38000 + Math.floor(Math.random() * 1500);
@@ -86,6 +86,7 @@ test("one-time support invitation requires consent and survives as a claimed ses
     const page = await request(base, "/diagnose");
     assert.equal(page.status, 200);
     assert.match(page.body, /Help diagnose this connection/);
+    assert.match(page.body, /Faultline\.exe/);
 
     const created = await request(base, "/api/sessions", {
       method: "POST",
@@ -109,8 +110,6 @@ test("one-time support invitation requires consent and survives as a claimed ses
     const probeToken = created.body.credentials.probeToken;
     const sessionId = created.body.session.id;
 
-    assert.equal((await request(base, "/api/invitations")).status, 401);
-
     const preview = await request(base, "/api/invitations", { token: inviteToken });
     assert.equal(preview.status, 200);
     assert.equal(preview.body.session.id, sessionId);
@@ -126,15 +125,41 @@ test("one-time support invitation requires consent and survives as a claimed ses
     const claimed = await request(base, "/api/invitations/claim", {
       method: "POST",
       token: inviteToken,
-      body: { consent: true }
+      body: { consent: true, includeTopology: false }
     });
     assert.equal(claimed.status, 200);
     assert.equal(claimed.body.session.invitation.status, "claimed");
-    assert.equal(claimed.body.credentials.endpointToken.startsWith("fl_ep_"), true);
-
+    assert.equal(claimed.body.session.invitation.clientLaunchStatus, "available");
+    assert.equal(claimed.body.client.launchToken.startsWith("fl_launch_"), true);
+    assert.equal(claimed.body.session.invitation.includeTopology, false);
+    assert.equal("credentials" in claimed.body, false);
     assert.equal((await request(base, "/api/invitations", { token: inviteToken })).status, 404);
 
-    const endpointToken = claimed.body.credentials.endpointToken;
+    const launchToken = claimed.body.client.launchToken;
+    const wrongExchange = await request(base, "/api/client/exchange", {
+      method: "POST",
+      token: "fl_launch_wrong",
+      body: { sessionId }
+    });
+    assert.equal(wrongExchange.status, 404);
+
+    const exchanged = await request(base, "/api/client/exchange", {
+      method: "POST",
+      token: launchToken,
+      body: { sessionId }
+    });
+    assert.equal(exchanged.status, 200);
+    assert.equal(exchanged.body.client.includeTopology, false);
+    assert.equal(exchanged.body.credentials.endpointToken.startsWith("fl_ep_"), true);
+    assert.equal(exchanged.body.session.invitation.clientLaunchStatus, "exchanged");
+
+    assert.equal((await request(base, "/api/client/exchange", {
+      method: "POST",
+      token: launchToken,
+      body: { sessionId }
+    })).status, 404);
+
+    const endpointToken = exchanged.body.credentials.endpointToken;
     assert.equal((await request(base, `/api/sessions/${sessionId}`, { token: endpointToken })).status, 200);
     assert.equal((await request(base, `/api/sessions/${sessionId}`, { token: probeToken })).status, 200);
 
@@ -166,6 +191,7 @@ test("one-time support invitation requires consent and survives as a claimed ses
     const restored = sessions.body.find(session => session.id === sessionId);
     assert.equal(restored.invitation.status, "claimed");
     assert.equal(restored.invitation.claimedAt != null, true);
+    assert.equal(restored.invitation.clientLaunchStatus, "exchanged");
   } finally {
     await stopServer(server);
     await rm(dir, { recursive: true, force: true });
