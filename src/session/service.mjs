@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { validateConnectivityContract } from "../contracts/registry.mjs";
 import { generateCredential, hashCredential, isSessionExpired, verifyCredential } from "../security/auth.mjs";
 
 const DEFAULT_TTL_MINUTES = 60;
@@ -45,8 +46,8 @@ export function normaliseSessionInput(input = {}, now = Date.now()) {
       }
     : null;
 
-  const connectivityContract = input.connectivityContract && typeof input.connectivityContract === "object"
-    ? structuredClone(input.connectivityContract)
+  const connectivityContract = input.connectivityContract
+    ? validateConnectivityContract(input.connectivityContract)
     : null;
 
   return {
