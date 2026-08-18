@@ -2,7 +2,7 @@
 import { collectWindowsDiagnostics } from "./network.mjs";
 
 function help() {
-  console.log(`Faultline Agent v0.4\n\nAuthenticated session mode:\n  npm run agent -- --session <session-id> --token <endpoint-token> [options]\n\nStandalone collection mode:\n  npm run agent -- --target <hostname|IP|URL> --dry-run [options]\n\nOptions:\n  --session <id>            Diagnostic session ID\n  --token <value>           Endpoint session credential (or FAULTLINE_ENDPOINT_TOKEN)\n  --api-base <url>          Faultline control-plane base URL\n                           (default: http://localhost:3000)\n  --target <value>          Standalone target when no session is used\n  --port <number>           Standalone target TCP port (default: 443)\n  --expected-route <CIDR>   Standalone expected IPv4 route\n  --vpn-required            Standalone target requires a VPN\n  --no-trace                Skip traceroute collection\n  --dry-run                 Collect and print telemetry without uploading\n  --json                    Print the full JSON payload\n  --help                    Show this help\n`);
+  console.log(`Faultline Agent v0.5\n\nAuthenticated session mode:\n  npm run agent -- --session <session-id> --token <endpoint-token> [options]\n\nStandalone collection mode:\n  npm run agent -- --target <hostname|IP|URL> --dry-run [options]\n\nOptions:\n  --session <id>            Diagnostic session ID\n  --token <value>           Endpoint session credential (or FAULTLINE_ENDPOINT_TOKEN)\n  --api-base <url>          Faultline control-plane base URL\n                           (default: http://localhost:3000)\n  --target <value>          Standalone target when no session is used\n  --port <number>           Standalone target TCP port (default: 443)\n  --expected-route <CIDR>   Standalone expected IPv4 route\n  --vpn-required            Standalone target requires a VPN\n  --no-trace                Skip traceroute collection\n  --dry-run                 Collect and print telemetry without uploading\n  --json                    Print the full JSON payload\n  --help                    Show this help\n`);
 }
 
 function parseArgs(argv) {
@@ -110,7 +110,11 @@ async function main() {
   console.log(`\nDiagnosis: ${run.diagnosis.faultDomainLabel} (${run.diagnosis.confidence}% confidence)`);
   console.log(run.diagnosis.summary);
   console.log(`Session ${run.id} now contains endpoint evidence.`);
-  console.log("Run the remote-probe command issued when the diagnostic session was created to add the second vantage point.");
+  if (session?.assignedProbeId) {
+    console.log(`Registered probe ${session.assignedProbeId} can now discover this session from its job queue.`);
+  } else {
+    console.log("Run the one-off remote-probe command issued when the diagnostic session was created to add the second vantage point.");
+  }
 }
 
 main().catch(error => {
