@@ -15,11 +15,18 @@
     .auth-form h3 { margin: 0; }
     .auth-form p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
     .auth-form label { display: grid; gap: 7px; color: var(--muted); font-size: 11px; }
-    .auth-form input { width: 100%; border: 1px solid var(--border); border-radius: 9px; background: var(--bg); color: var(--text); padding: 11px 12px; font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; outline: none; }
-    .auth-form input:focus { border-color: rgba(97,230,184,.5); }
+    .auth-form input, .auth-form select { width: 100%; border: 1px solid var(--border); border-radius: 9px; background: var(--bg); color: var(--text); padding: 11px 12px; font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; outline: none; }
+    .auth-form input:focus, .auth-form select:focus { border-color: rgba(97,230,184,.5); }
     .auth-actions { display: flex; justify-content: flex-end; gap: 9px; }
     .auth-error { min-height: 18px; color: var(--danger) !important; }
     .secondary-button { border: 1px solid var(--border); border-radius: 9px; background: transparent; color: var(--muted); padding: 9px 12px; }
+    .invite-dialog { width: min(640px, calc(100vw - 32px)); }
+    .invite-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .invite-grid .wide { grid-column: 1 / -1; }
+    .invite-result { border: 1px solid rgba(97,230,184,.3); border-radius: 10px; padding: 13px; background: var(--accent-soft); display: grid; gap: 8px; }
+    .invite-result code { display: block; overflow-wrap: anywhere; color: var(--accent); font-size: 10px; line-height: 1.5; }
+    .invite-result-actions { display: flex; gap: 8px; justify-content: flex-end; }
+    @media (max-width: 620px) { .invite-grid { grid-template-columns: 1fr; } .invite-grid .wide { grid-column: auto; } }
     .probe-fleet { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 9px; }
     .probe-tile { border: 1px solid var(--border-soft); border-radius: 11px; padding: 14px; background: rgba(255,255,255,.012); display: grid; gap: 9px; }
     .probe-tile-head { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
@@ -109,6 +116,7 @@
         </div>
         <div class="top-actions">
           <button class="auth-button" id="auth-open">Unlock live data</button>
+          <button class="primary-button" id="invite-open" type="button">New diagnostic</button>
           <a class="primary-button" href="https://github.com/weegienamja/Faultline#registered-probe-fleet">Probe fleet</a>
         </div>
       </header>
@@ -229,7 +237,7 @@
       </section>
 
       <footer>
-        <span>Faultline v0.5 · v0.6 topology preview</span>
+        <span>Faultline v0.5 · v0.6 topology + invitation preview</span>
         <span>Evidence before escalation.</span>
       </footer>
     </main>
@@ -254,6 +262,51 @@
     </form>
   </dialog>
 
+  <dialog class="auth-dialog invite-dialog" id="invite-dialog">
+    <form class="auth-form" id="invite-form">
+      <div>
+        <span class="section-label">EPHEMERAL SUPPORT DIAGNOSTIC</span>
+        <h3>Create one-time diagnostic</h3>
+      </div>
+      <p>Create a short-lived invitation for a device that is not already managed by Faultline. The endpoint credential is minted only after the user reviews the collection scope and consents.</p>
+      <div class="invite-grid">
+        <label class="wide">Target
+          <input id="invite-target" required placeholder="microsoft.com or https://service.example/health" />
+        </label>
+        <label>Case title
+          <input id="invite-case-title" placeholder="Teams calls dropping" />
+        </label>
+        <label>Customer / label
+          <input id="invite-customer" placeholder="ABC Ltd" />
+        </label>
+        <label>Expires after
+          <select id="invite-ttl">
+            <option value="30">30 minutes</option>
+            <option value="60" selected>1 hour</option>
+            <option value="240">4 hours</option>
+            <option value="1440">24 hours</option>
+          </select>
+        </label>
+        <label>Remote vantage
+          <select id="invite-probe"><option value="">One-off probe / assign later</option></select>
+        </label>
+      </div>
+      <p class="auth-error" id="invite-admin-error"></p>
+      <div class="invite-result" id="invite-result" hidden>
+        <strong>One-time user link</strong>
+        <code id="invite-link"></code>
+        <div class="invite-result-actions">
+          <button class="secondary-button" id="invite-copy" type="button">Copy link</button>
+        </div>
+      </div>
+      <div class="auth-actions">
+        <button class="secondary-button" type="button" id="invite-cancel">Close</button>
+        <button class="primary-button" type="submit" id="invite-create">Create invitation</button>
+      </div>
+    </form>
+  </dialog>
+
   <script type="module" src="/app.js"></script>
+  <script type="module" src="/invite-admin.js"></script>
 </body>
 </html>

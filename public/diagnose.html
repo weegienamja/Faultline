@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex,nofollow" />
+  <meta name="description" content="Run a one-time Faultline network diagnostic for a support case." />
+  <title>Faultline · One-time network diagnostic</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    body { min-height: 100vh; display: grid; place-items: center; padding: 28px; }
+    .invite-shell { width: min(780px, 100%); display: grid; gap: 14px; }
+    .invite-brand { display: flex; align-items: center; gap: 11px; color: var(--text); font-weight: 760; font-size: 19px; }
+    .invite-brand .brand-mark { padding: 0; }
+    .invite-card { border: 1px solid var(--border); border-radius: 16px; background: linear-gradient(180deg, rgba(17,29,27,.98), rgba(11,21,19,.98)); box-shadow: var(--shadow); padding: 28px; }
+    .invite-card h1 { margin: 7px 0 9px; font-size: clamp(25px, 5vw, 38px); }
+    .invite-card > p { color: #a9bdb7; line-height: 1.65; margin: 0; }
+    .invite-context { margin: 23px 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .invite-context div { border: 1px solid var(--border-soft); background: rgba(255,255,255,.012); border-radius: 10px; padding: 12px; min-width: 0; }
+    .invite-context small { display: block; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; font-size: 8px; margin-bottom: 5px; }
+    .invite-context strong { display: block; overflow-wrap: anywhere; font-size: 12px; }
+    .collection-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 18px 0; }
+    .collection-box { border: 1px solid var(--border-soft); border-radius: 11px; padding: 16px; }
+    .collection-box h3 { font-size: 13px; margin: 0 0 10px; }
+    .collection-box ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 11px; line-height: 1.7; }
+    .collection-box.no h3 { color: var(--accent); }
+    .consent-box { margin-top: 18px; border-top: 1px solid var(--border-soft); padding-top: 18px; display: grid; gap: 12px; }
+    .check-row { display: flex; gap: 10px; align-items: flex-start; color: #c1d0cc; font-size: 12px; line-height: 1.5; }
+    .check-row input { margin-top: 3px; accent-color: var(--accent); }
+    .topology-option { padding: 12px; border: 1px solid var(--border-soft); border-radius: 10px; background: rgba(255,255,255,.012); }
+    .invite-action { width: 100%; justify-content: center; border: 0; min-height: 44px; }
+    .invite-action:disabled { cursor: not-allowed; opacity: .45; }
+    .invite-error { color: var(--danger); font-size: 12px; line-height: 1.5; min-height: 18px; }
+    .loading-state { color: var(--muted); }
+    .command-panel { display: grid; gap: 10px; }
+    .command-panel h2 { margin: 0; font-size: 21px; }
+    .command-panel p { color: var(--muted); line-height: 1.55; font-size: 12px; margin: 0; }
+    .command-box { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: stretch; }
+    .command-box code { display: block; border: 1px solid var(--border); background: #07100f; border-radius: 10px; padding: 13px; color: #cce5dd; font-size: 11px; overflow-x: auto; white-space: nowrap; }
+    .copy-button { border: 1px solid rgba(97,230,184,.45); background: var(--accent-soft); color: var(--accent); border-radius: 9px; padding: 0 14px; font-size: 11px; font-weight: 700; }
+    .success-note { color: var(--accent) !important; }
+    .security-note { text-align: center; color: #617871; font-size: 10px; line-height: 1.5; }
+    @media (max-width: 680px) {
+      body { padding: 16px; }
+      .invite-card { padding: 21px; }
+      .invite-context, .collection-grid { grid-template-columns: 1fr; }
+      .command-box { grid-template-columns: 1fr; }
+      .copy-button { min-height: 40px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="invite-shell">
+    <div class="invite-brand">
+      <span class="brand-mark"><span></span></span>
+      <span>Faultline</span>
+    </div>
+
+    <section class="invite-card" id="loading-card">
+      <span class="section-label">ONE-TIME SUPPORT DIAGNOSTIC</span>
+      <h1>Checking your invitation…</h1>
+      <p class="loading-state">Faultline is validating the short-lived diagnostic invitation.</p>
+    </section>
+
+    <section class="invite-card" id="consent-card" hidden>
+      <span class="section-label">ONE-TIME SUPPORT DIAGNOSTIC</span>
+      <h1>Help diagnose this connection</h1>
+      <p>A support engineer has asked Faultline to collect a short network diagnostic from this Windows computer. Review exactly what will be collected before activating the session.</p>
+
+      <div class="invite-context">
+        <div><small>Support case</small><strong id="invite-title"></strong></div>
+        <div><small>Target</small><strong id="invite-target"></strong></div>
+        <div><small>Customer / label</small><strong id="invite-customer"></strong></div>
+        <div><small>Expires</small><strong id="invite-expires"></strong></div>
+      </div>
+
+      <div class="collection-grid">
+        <div class="collection-box">
+          <h3>Faultline will collect</h3>
+          <ul>
+            <li>gateway latency and packet loss</li>
+            <li>DNS, TCP, HTTP and route test results</li>
+            <li>active network adapter and VPN state</li>
+            <li>Wi-Fi signal and access-point metadata when available</li>
+            <li>local neighbour-table data for the Network Map</li>
+          </ul>
+        </div>
+        <div class="collection-box no">
+          <h3>Faultline will not collect</h3>
+          <ul>
+            <li>packet payload contents</li>
+            <li>browser or search history</li>
+            <li>files or documents</li>
+            <li>passwords or account credentials</li>
+            <li>application messages or call contents</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="consent-box">
+        <label class="check-row topology-option">
+          <input id="include-topology" type="checkbox" checked />
+          <span><strong>Include local Network Map evidence</strong><br />Private IP, MAC/BSSID and neighbour-table metadata may be included so Faultline can infer the local topology. Untick this to run the diagnostic without topology discovery.</span>
+        </label>
+        <label class="check-row">
+          <input id="consent-check" type="checkbox" />
+          <span>I understand what this diagnostic collects and consent to activate this one-time endpoint session.</span>
+        </label>
+        <p class="invite-error" id="invite-error"></p>
+        <button class="primary-button invite-action" id="claim-button" disabled>Activate diagnostic</button>
+      </div>
+    </section>
+
+    <section class="invite-card command-panel" id="command-card" hidden>
+      <span class="section-label">INVITATION ACTIVATED</span>
+      <h2>Run the endpoint diagnostic</h2>
+      <p class="success-note">The one-time invitation has been consumed and cannot be claimed again.</p>
+      <p>The current v0.6 preview uses the Faultline Node.js collector. On a Windows machine with the Faultline repository and Node.js 20+, run this command from the repository directory:</p>
+      <div class="command-box">
+        <code id="agent-command"></code>
+        <button class="copy-button" id="copy-command">Copy</button>
+      </div>
+      <p>When collection finishes, the evidence is attached automatically to the support session. If a registered remote probe was assigned, it can then contribute the independent second vantage point.</p>
+    </section>
+
+    <section class="invite-card" id="error-card" hidden>
+      <span class="section-label">DIAGNOSTIC INVITATION</span>
+      <h1 id="fatal-title">This invitation cannot be used</h1>
+      <p id="fatal-message"></p>
+    </section>
+
+    <p class="security-note">Faultline invitation secrets are short-lived bearer credentials. For remotely hosted deployments, use these links only over HTTPS.</p>
+  </main>
+  <script type="module" src="/diagnose.js"></script>
+</body>
+</html>
