@@ -9,6 +9,8 @@ const linkOutput = document.getElementById("invite-link");
 const copyButton = document.getElementById("invite-copy");
 const probeSelect = document.getElementById("invite-probe");
 
+const AUTO_PROBE = "__auto__";
+
 function adminToken() {
   return sessionStorage.getItem("faultlineAdminToken") || "";
 }
@@ -41,17 +43,23 @@ async function request(path, { method = "GET", body } = {}) {
 
 async function loadProbes() {
   const probes = await request("/api/probes");
-  const current = probeSelect.value;
-  probeSelect.innerHTML = '<option value="">One-off probe / assign later</option>';
+  const current = probeSelect.value || AUTO_PROBE;
+  probeSelect.innerHTML = [
+    '<option value="__auto__">Automatic · best online public probe</option>',
+    '<option value="">One-off probe / assign later</option>'
+  ].join("");
+
   probes
-    .filter(probe => probe.health !== "disabled")
+    .filter(probe => !["disabled", "revoked", "maintenance"].includes(probe.health))
     .forEach(probe => {
       const option = document.createElement("option");
       option.value = probe.id;
-      option.textContent = `${probe.name}${probe.location ? ` · ${probe.location}` : ""} · ${probe.health}`;
+      const scope = probe.scope || "public";
+      option.textContent = `${probe.name}${probe.location ? ` · ${probe.location}` : ""} · ${scope} · ${probe.health}`;
       probeSelect.appendChild(option);
     });
-  if ([...probeSelect.options].some(option => option.value === current)) probeSelect.value = current;
+
+  probeSelect.value = [...probeSelect.options].some(option => option.value === current) ? current : AUTO_PROBE;
 }
 
 openButton.addEventListener("click", async () => {
@@ -85,7 +93,9 @@ form.addEventListener("submit", async event => {
   const title = document.getElementById("invite-case-title").value.trim();
   const customer = document.getElementById("invite-customer").value.trim();
   const ttlMinutes = Number(document.getElementById("invite-ttl").value);
-  const assignedProbeId = probeSelect.value || undefined;
+  const choice = probeSelect.value;
+  const assignedProbeId = choice && choice !== AUTO_PROBE ? choice : undefined;
+  const probeSelector = choice === AUTO_PROBE ? { scope: "public" } : undefined;
 
   try {
     const payload = await request("/api/sessions", {
@@ -96,6 +106,7 @@ form.addEventListener("submit", async event => {
         customer: customer || undefined,
         ttlMinutes,
         assignedProbeId,
+        probeSelector,
         ephemeral: true
       }
     });
@@ -104,7 +115,10 @@ form.addEventListener("submit", async event => {
     const inviteUrl = `${window.location.origin}${payload.invitation.path}`;
     linkOutput.textContent = inviteUrl;
     resultBox.hidden = false;
-    errorBox.textContent = `Session ${payload.session.id} created. The invitation expires ${new Date(payload.session.expiresAt).toLocaleString()}.`;
+    const probeText = payload.session.assignedProbeId
+      ? ` Remote probe ${payload.session.assignedProbeId} assigned ${payload.session.probeSelection?.mode === "automatic" ? "automatically" : "explicitly"}.`
+      : " No registered probe assigned.";
+    errorBox.textContent = `Session ${payload.session.id} created. The invitation expires ${new Date(payload.session.expiresAt).toLocaleString()}.${probeText}`;
   } catch (error) {
     errorBox.textContent = error.message;
   } finally {
