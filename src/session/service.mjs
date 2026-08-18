@@ -126,6 +126,7 @@ export function claimDiagnosticInvitation(session, token, consent, now = Date.no
     endpointTokenHash: hashCredential(endpointToken),
     invitation: {
       ...session.invitation,
+      tokenHash: null,
       claimedAt,
       consentedAt: claimedAt
     }
