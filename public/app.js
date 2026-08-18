@@ -2,15 +2,23 @@ const ids = [
   "incident-list", "fault-domain", "confidence", "confidence-ring", "diagnosis-summary",
   "incident-title", "incident-id", "customer", "target", "location", "connection",
   "metrics", "evidence-list", "action-list", "path", "route-panel", "route-trace",
-  "incident-status", "measured-at"
+  "incident-status", "measured-at", "auth-open", "auth-dialog", "auth-form", "auth-token",
+  "auth-error", "auth-cancel"
 ];
 const els = Object.fromEntries(ids.map(id => [id, document.getElementById(id)]));
 
 let incidents = [];
 let activeIndex = 0;
+let adminToken = sessionStorage.getItem("faultlineAdminToken") || "";
 
 const statusFor = (value, warn, fail) => value >= fail ? "fail" : value >= warn ? "warn" : "pass";
 const displayNumber = (value, suffix = "") => Number.isFinite(Number(value)) ? `${Number(value)}${suffix}` : "Not collected";
+const escapeHtml = value => String(value ?? "")
+  .replaceAll("&", "&amp;")
+  .replaceAll("<", "&lt;")
+  .replaceAll(">", "&gt;")
+  .replaceAll('"', "&quot;")
+  .replaceAll("'", "&#039;");
 
 function sourceLabel(incident) {
   if (incident.source === "correlated") return '<b class="source-live">2 VANTAGES</b>';
@@ -18,11 +26,16 @@ function sourceLabel(incident) {
   return "DEMO";
 }
 
+function applyAuthState() {
+  els["auth-open"].textContent = adminToken ? "Live data unlocked" : "Unlock live data";
+  els["auth-open"].classList.toggle("unlocked", Boolean(adminToken));
+}
+
 function renderIncidentStrip() {
   els["incident-list"].innerHTML = incidents.map((incident, index) => `
     <button class="incident-chip ${index === activeIndex ? "active" : ""}" data-index="${index}">
-      <span>${sourceLabel(incident)} · ${incident.id} · ${incident.diagnosis.faultDomainLabel}</span>
-      <strong>${incident.title}</strong>
+      <span>${sourceLabel(incident)} · ${escapeHtml(incident.id)} · ${escapeHtml(incident.diagnosis.faultDomainLabel)}</span>
+      <strong>${escapeHtml(incident.title)}</strong>
     </button>
   `).join("");
 
@@ -44,9 +57,9 @@ function renderRoute(incident) {
 
   els["route-trace"].innerHTML = hops.map(hop => `
     <div class="route-hop ${hop.timedOut ? "timeout" : ""}">
-      <small>HOP ${hop.hop}</small>
-      <strong>${hop.ip || "No response"}</strong>
-      <span>${hop.averageRttMs == null ? "timeout" : `${hop.averageRttMs} ms`}</span>
+      <small>HOP ${escapeHtml(hop.hop)}</small>
+      <strong>${escapeHtml(hop.ip || "No response")}</strong>
+      <span>${hop.averageRttMs == null ? "timeout" : `${escapeHtml(hop.averageRttMs)} ms`}</span>
     </div>
   `).join("");
 }
@@ -84,7 +97,7 @@ function render() {
     { label: "Target", value: m.targetReachable ? "Reachable" : "Unreachable", status: m.targetReachable ? "pass" : "fail" }
   ];
   els.path.innerHTML = path.map(node => `
-    <div class="path-node ${node.status}"><small>${node.label}</small><strong>${node.value}</strong></div>
+    <div class="path-node ${node.status}"><small>${escapeHtml(node.label)}</small><strong>${escapeHtml(node.value)}</strong></div>
   `).join("");
 
   const metrics = [
@@ -108,27 +121,54 @@ function render() {
   ]);
 
   els.metrics.innerHTML = metrics.map(([label, value, status]) => `
-    <div class="metric ${status}"><span>${label}</span><strong>${value}</strong><em>${status === "pass" ? "healthy" : status === "warn" ? "elevated" : status === "neutral" ? "pending" : "degraded"}</em></div>
+    <div class="metric ${status}"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><em>${status === "pass" ? "healthy" : status === "warn" ? "elevated" : status === "neutral" ? "pending" : "degraded"}</em></div>
   `).join("");
 
   els["evidence-list"].innerHTML = result.evidence.map(item => `
     <div class="evidence-row ${item.status}">
       <span class="evidence-dot"></span>
-      <strong>${item.label}</strong>
-      <p>${item.detail}</p>
-      <span class="evidence-value">${item.value || ""}</span>
+      <strong>${escapeHtml(item.label)}</strong>
+      <p>${escapeHtml(item.detail)}</p>
+      <span class="evidence-value">${escapeHtml(item.value || "")}</span>
     </div>
   `).join("");
 
-  els["action-list"].innerHTML = result.actions.map(action => `<li>${action}</li>`).join("");
+  els["action-list"].innerHTML = result.actions.map(action => `<li>${escapeHtml(action)}</li>`).join("");
   renderRoute(incident);
+}
+
+async function fetchJson(path, token = "") {
+  const response = await fetch(path, {
+    cache: "no-store",
+    headers: token ? { authorization: `Bearer ${token}` } : {}
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(body.error || `HTTP ${response.status}`);
+    error.status = response.status;
+    throw error;
+  }
+  return body;
 }
 
 async function loadIncidents({ initial = false } = {}) {
   const activeId = incidents[activeIndex]?.id;
-  const response = await fetch("/api/incidents", { cache: "no-store" });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-  const next = await response.json();
+  let next;
+
+  if (adminToken) {
+    try {
+      next = await fetchJson("/api/incidents", adminToken);
+    } catch (error) {
+      if (error.status !== 401) throw error;
+      adminToken = "";
+      sessionStorage.removeItem("faultlineAdminToken");
+      applyAuthState();
+      next = await fetchJson("/api/demo-incidents");
+    }
+  } else {
+    next = await fetchJson("/api/demo-incidents");
+  }
+
   const newestLive = next.find(incident => incident.source === "agent" || incident.source === "correlated");
   const isNewLive = newestLive && !incidents.some(incident => incident.id === newestLive.id);
   incidents = next;
@@ -140,12 +180,44 @@ async function loadIncidents({ initial = false } = {}) {
   render();
 }
 
+els["auth-open"].addEventListener("click", () => {
+  els["auth-error"].textContent = "";
+  els["auth-token"].value = "";
+  els["auth-dialog"].showModal();
+  els["auth-token"].focus();
+});
+
+els["auth-cancel"].addEventListener("click", () => els["auth-dialog"].close());
+
+els["auth-form"].addEventListener("submit", async event => {
+  event.preventDefault();
+  const candidate = els["auth-token"].value.trim();
+  if (!candidate) {
+    els["auth-error"].textContent = "Enter the Faultline admin token.";
+    return;
+  }
+
+  els["auth-error"].textContent = "Checking credential…";
+  try {
+    incidents = await fetchJson("/api/incidents", candidate);
+    adminToken = candidate;
+    sessionStorage.setItem("faultlineAdminToken", candidate);
+    activeIndex = 0;
+    applyAuthState();
+    render();
+    els["auth-dialog"].close();
+  } catch (error) {
+    els["auth-error"].textContent = error.status === 401 ? "That admin token was rejected." : error.message;
+  }
+});
+
 async function init() {
   try {
+    applyAuthState();
     await loadIncidents({ initial: true });
     setInterval(() => loadIncidents().catch(() => {}), 4_000);
   } catch (error) {
-    document.body.innerHTML = `<main class="fatal"><h1>Faultline</h1><p>Unable to load diagnostics: ${error.message}</p></main>`;
+    document.body.innerHTML = `<main class="fatal"><h1>Faultline</h1><p>Unable to load diagnostics: ${escapeHtml(error.message)}</p></main>`;
   }
 }
 
