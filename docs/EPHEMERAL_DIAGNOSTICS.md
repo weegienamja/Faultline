@@ -2,7 +2,7 @@
 
 Faultline v0.6 introduces a one-time support workflow for devices that are not already managed by the platform.
 
-The design is intentionally different from permanent endpoint monitoring. A support engineer creates a short-lived diagnostic session, sends one invitation link to the affected user, and the user explicitly activates endpoint access after reviewing the collection scope.
+The design is intentionally different from permanent endpoint monitoring. A support engineer creates a short-lived diagnostic session, sends one invitation link to the affected user, and the user explicitly activates a one-time client handoff after reviewing the collection scope.
 
 ## Workflow
 
@@ -19,11 +19,15 @@ Affected user
       |
       | review + consent
       v
-Invitation exchange
+Browser receives one-use launcher secret
       |
-      | one session-scoped endpoint token
+      | .faultline handoff file
       v
-Windows collector
+Faultline.exe
+      |
+      | exchange launcher once
+      v
+Session-scoped endpoint credential
       |
       | endpoint + topology evidence
       v
@@ -39,12 +43,12 @@ Deterministic correlation
 
 Unlock live data with the administrator credential and choose **New diagnostic**.
 
-The form currently supports:
+The form supports:
 
 - target hostname or HTTP/HTTPS URL
 - case title
 - customer/support label
-- 30 minute, 1 hour, 4 hour or 24 hour expiry
+- diagnostic expiry
 - optional registered-probe assignment
 
 Faultline returns a one-time user link.
@@ -64,21 +68,21 @@ npm run invite -- \
 
 The CLI refuses to create a remote invitation link over plain HTTP. `http://localhost` remains allowed for local development.
 
-## Invitation-secret handling
+## Invitation secret
 
 The raw invitation secret is generated once and stored by the control plane only as a SHA-256 hash.
 
-The support link uses a fragment:
+The support link uses a URL fragment:
 
 ```text
 https://faultline.example.com/diagnose#invite=fl_inv_...
 ```
 
-URL fragments are handled by the browser and are not part of the normal HTTP request path. The browser removes the fragment from the address bar after reading it and uses the secret as a bearer credential only for the invitation API.
+The browser removes the fragment from the visible address after reading it and uses the secret only for invitation preview/claim requests.
 
-The invitation secret cannot submit endpoint evidence directly.
+The invitation cannot submit endpoint evidence.
 
-## Consent and claim
+## Consent and launcher handoff
 
 The `/diagnose` page shows:
 
@@ -88,50 +92,89 @@ The `/diagnose` page shows:
 - evidence Faultline explicitly does not collect
 - an independent control to disable Network Map/topology collection
 
-The endpoint credential does not exist before consent.
+The endpoint upload credential does **not** exist before or during browser consent.
 
 When the user consents:
 
-1. the control plane verifies the invitation secret
-2. verifies that the session is still active
-3. mints a new `fl_ep_...` endpoint credential
-4. stores only its hash
-5. records `claimedAt` and `consentedAt`
-6. removes the invitation-secret hash
-7. returns the raw endpoint credential once
+1. Faultline verifies the invitation and session expiry
+2. records `claimedAt` and `consentedAt`
+3. stores the user's topology choice
+4. invalidates the invitation hash
+5. creates a separate `fl_launch_...` one-use launcher credential
+6. stores only the launcher hash
+7. returns the raw launcher secret once to the browser
 
-The original invitation therefore cannot be claimed again.
+The browser writes a handoff file such as:
 
-## Current collector handoff
-
-The current v0.6 preview returns the authenticated command required to run the existing Node.js Windows collector:
-
-```powershell
-npm run agent -- --session FL-1234567890 --token fl_ep_... --api-base https://faultline.example.com
+```json
+{
+  "version": 1,
+  "sessionId": "FL-...",
+  "apiBase": "https://faultline.example.com",
+  "launchToken": "fl_launch_...",
+  "createdAt": "..."
+}
 ```
 
-If the user disables topology collection on the consent page, the generated command includes:
+The handoff is sensitive until exchanged because it contains a live bearer secret, but it cannot upload evidence directly.
+
+## Windows client exchange
+
+`Faultline.exe` locates the newest matching `.faultline` file in its working directory, executable directory or the user's Downloads directory.
+
+It then sends:
 
 ```text
---no-topology
+POST /api/client/exchange
+Authorization: Bearer fl_launch_...
+
+{
+  "sessionId": "FL-..."
+}
 ```
 
-This is the secure session/invitation foundation, but it is not yet the final zero-install user experience. The affected Windows device currently needs the Faultline repository and Node.js 20+ available.
+On success the control plane:
 
-A later v0.6 step should package the Windows collector so the user can launch the diagnostic without cloning the repository or handling a Node.js environment.
+1. validates that the launcher belongs to that session
+2. verifies session expiry
+3. creates the `fl_ep_...` endpoint credential
+4. stores only its hash
+5. clears the launcher hash
+6. records `exchangedAt`
+7. returns the endpoint credential once to the native client
 
-## API
+The same launcher cannot be exchanged again.
 
-### Preview an invitation
+After exchange the client attempts to delete the `.faultline` file and proceeds with collection/upload.
+
+## Browser/client separation
+
+The browser has enough access to:
+
+- preview the invitation
+- record consent
+- create the one-time launcher handoff
+
+It does **not** receive the endpoint upload credential.
+
+The native client has enough access to:
+
+- exchange the launcher once
+- run native Windows diagnostics
+- upload endpoint evidence for that session
+
+This keeps the browser invitation role, launcher role and endpoint role distinct.
+
+## API summary
+
+### Preview
 
 ```text
 GET /api/invitations
 Authorization: Bearer fl_inv_...
 ```
 
-This returns safe public session metadata and collection flags. It does not return endpoint credentials.
-
-### Claim an invitation
+### Consent / claim
 
 ```text
 POST /api/invitations/claim
@@ -139,15 +182,28 @@ Authorization: Bearer fl_inv_...
 Content-Type: application/json
 
 {
-  "consent": true
+  "consent": true,
+  "includeTopology": true
 }
 ```
 
-A successful response returns the endpoint credential once.
+The response contains the one-use launcher secret, not the endpoint secret.
 
-### Create an ephemeral session
+### Client exchange
 
-Administrators use the existing session endpoint with:
+```text
+POST /api/client/exchange
+Authorization: Bearer fl_launch_...
+Content-Type: application/json
+
+{
+  "sessionId": "FL-..."
+}
+```
+
+### Create session
+
+Administrators use:
 
 ```json
 {
@@ -157,15 +213,18 @@ Administrators use the existing session endpoint with:
 }
 ```
 
-Registered probes can still be assigned through `assignedProbeId`.
+Registered probes can still be assigned with `assignedProbeId`.
 
 ## Threat model and current limits
 
-- invitation and endpoint credentials remain bearer credentials, so hosted deployments require HTTPS
+- all invitation, launcher and endpoint credentials are bearer credentials; hosted deployments require HTTPS
+- the `.faultline` file must be treated as sensitive until exchanged
+- launcher secrets are one-use and stored only as hashes
+- endpoint credentials are minted only inside the native-client exchange
 - there is no platform-wide rate limiting yet
-- this remains a single-administrator prototype
-- an invitation is intentionally single-claim; losing the endpoint token after claim requires a new invitation
-- the support page does not execute native Windows network commands from the browser
-- topology can contain private LAN metadata, so users can disable topology before claiming the session
+- Faultline remains a single-administrator prototype
+- the Windows client is currently unsigned
+- the public client download URL is deployment-configured
+- topology can contain private LAN metadata, so the user can disable it before claim
 
-The core principle is that temporary support access should be narrower than permanent endpoint enrolment: one support case, one expiry window and one role-scoped endpoint credential.
+The core principle remains narrow temporary support access: one support case, one expiry window, explicit consent, one launcher exchange and one role-scoped endpoint credential.
