@@ -8,7 +8,7 @@ import { readFile, readdir, stat, unlink, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
 const execFileAsync = promisify(execFile);
-const CLIENT_VERSION = "0.6-client-preview";
+const CLIENT_VERSION = "0.7-contract-preview";
 
 function pauseOnInteractiveExit() {
   if (!process.stdin.isTTY) return;
@@ -230,6 +230,81 @@ function normaliseTarget(value, requestedPort) {
   return { input, host, port, url: url?.toString() || null };
 }
 
+function resolveContractValue(value, target) {
+  if (value === "$target.host") return target.host;
+  if (value === "$target.port") return target.port;
+  if (value === "$target.url") return target.url;
+  return value;
+}
+
+function evaluateConnectivityContract(contract, target, baseline) {
+  if (!contract?.checks?.length) return null;
+  const checks = contract.checks.map(check => {
+    const host = check.host ? String(resolveContractValue(check.host, target) || "") : null;
+    const port = check.port != null ? Number(resolveContractValue(check.port, target)) : null;
+    const url = check.url ? String(resolveContractValue(check.url, target) || "") : null;
+    let ok = false;
+    let supported = true;
+    let elapsedMs = null;
+    let detail = null;
+
+    if (check.type === "dns") {
+      supported = host === target.host;
+      ok = supported && baseline.dns?.ok === true;
+      elapsedMs = supported ? baseline.dns?.elapsedMs ?? null : null;
+      detail = supported ? (ok ? "Target hostname resolved." : baseline.dns?.error || "Target hostname did not resolve.") : "This preview only evaluates contract DNS checks against the diagnostic target.";
+    } else if (check.type === "tcp") {
+      supported = host === target.host && port === target.port;
+      ok = supported && baseline.tcp?.ok === true;
+      elapsedMs = supported ? baseline.tcp?.elapsedMs ?? null : null;
+      detail = supported ? (ok ? `TCP ${port} accepted a connection.` : baseline.tcp?.error || `TCP ${port} did not accept a connection.`) : "This preview only evaluates contract TCP checks against the diagnostic target.";
+    } else if (check.type === "tls") {
+      supported = host === target.host && port === target.port && Boolean(target.url?.startsWith("https:"));
+      const httpsCompleted = Boolean(baseline.http && baseline.http.status && !baseline.http.error);
+      ok = supported && httpsCompleted;
+      detail = supported
+        ? (ok ? "The HTTPS transaction completed a TLS session before the HTTP response." : "The HTTPS transaction did not establish a usable TLS-backed request.")
+        : "TLS proof requires an HTTPS diagnostic target in this preview.";
+    } else if (check.type === "http") {
+      supported = Boolean(url && target.url && new URL(url).toString() === new URL(target.url).toString());
+      const maxStatus = Number(check.maxStatus ?? 499);
+      ok = supported && Number(baseline.http?.status || 0) > 0 && Number(baseline.http.status) <= maxStatus;
+      elapsedMs = supported ? baseline.http?.elapsedMs ?? null : null;
+      detail = supported
+        ? (baseline.http?.status ? `HTTP ${baseline.http.status} received.` : baseline.http?.error || "No HTTP response received.")
+        : "This preview only evaluates HTTP checks against the diagnostic target URL.";
+    } else {
+      supported = false;
+      detail = `Unsupported contract check type: ${check.type}.`;
+    }
+
+    return {
+      id: check.id,
+      type: check.type,
+      label: check.label || check.type,
+      required: check.required !== false,
+      supported,
+      ok,
+      elapsedMs,
+      detail
+    };
+  });
+
+  const required = checks.filter(check => check.required);
+  const failed = required.filter(check => !check.ok);
+  const passedRequired = required.length - failed.length;
+  return {
+    contract: { id: contract.id, version: contract.version, name: contract.name },
+    requiredChecks: required.length,
+    passedRequired,
+    failedRequired: failed.length,
+    passRate: required.length ? Number(((passedRequired / required.length) * 100).toFixed(1)) : 0,
+    passed: required.length > 0 && failed.length === 0,
+    firstFailureType: failed[0]?.type || null,
+    checks
+  };
+}
+
 function routeMatches(routes, expectedRoute) {
   if (!expectedRoute) return undefined;
   return routes.some(route => String(route.DestinationPrefix || "").toLowerCase() === String(expectedRoute).toLowerCase());
@@ -370,8 +445,14 @@ async function collectDiagnostics(session, includeTopology) {
   ]);
   progress(`Testing ${target.host}:${target.port}`, "ok");
 
-  const targetReachable = Boolean(tcp.ok || http?.ok);
-  const icmpLikelyFiltered = targetPing.lossPct === 100 && targetReachable;
+  const contractRun = evaluateConnectivityContract(session.connectivityContract, target, { dns, tcp, http });
+  if (contractRun) {
+    progress(`Connectivity contract · ${contractRun.contract.name}`, contractRun.passed ? "ok" : "fail");
+  }
+
+  const basicTargetReachable = Boolean(tcp.ok || http?.ok);
+  const targetReachable = contractRun ? contractRun.passed : basicTargetReachable;
+  const icmpLikelyFiltered = targetPing.lossPct === 100 && basicTargetReachable;
   const expectedRoutePresent = routeMatches(networkState.routes, session.expectedRoute);
   const vpnRequired = Boolean(session.vpnRequired || session.expectedRoute);
 
@@ -405,8 +486,15 @@ async function collectDiagnostics(session, includeTopology) {
       upstreamLoss: icmpLikelyFiltered ? 0 : targetPing.lossPct,
       jitterMs: icmpLikelyFiltered ? 0 : targetPing.jitterMs,
       targetReachable,
+      transportReachable: basicTargetReachable,
       targetTcpMs: tcp.elapsedMs,
-      targetHttpMs: http?.elapsedMs ?? null
+      targetHttpMs: http?.elapsedMs ?? null,
+      ...(contractRun ? {
+        contractPassed: contractRun.passed,
+        contractPassRate: contractRun.passRate,
+        contractFailedRequired: contractRun.failedRequired,
+        contractFailureType: contractRun.firstFailureType
+      } : {})
     },
     telemetry: {
       collectedAt: new Date().toISOString(),
@@ -415,6 +503,7 @@ async function collectDiagnostics(session, includeTopology) {
       networkState,
       wifi,
       topology,
+      connectivityContract: contractRun,
       probes: {
         gatewayPing,
         dns,
@@ -505,6 +594,22 @@ async function selfTest() {
     neighbours: [{ ip: "192.168.1.1", mac: "AA-BB-CC-00-00-01", state: "Reachable" }]
   });
   if (topology.kind !== "star") throw new Error("Topology self-test failed.");
+  const contract = evaluateConnectivityContract({
+    id: "self-test",
+    version: 1,
+    name: "Self test",
+    checks: [
+      { id: "dns", type: "dns", required: true, host: "$target.host" },
+      { id: "tcp", type: "tcp", required: true, host: "$target.host", port: "$target.port" },
+      { id: "tls", type: "tls", required: true, host: "$target.host", port: "$target.port" },
+      { id: "http", type: "http", required: true, url: "$target.url", maxStatus: 499 }
+    ]
+  }, { host: "example.com", port: 443, url: "https://example.com/" }, {
+    dns: { ok: true, elapsedMs: 5 },
+    tcp: { ok: true, elapsedMs: 10 },
+    http: { ok: true, status: 200, elapsedMs: 20 }
+  });
+  if (!contract?.passed || contract.passRate !== 100) throw new Error("Connectivity contract self-test failed.");
   console.log(`Faultline Windows ${CLIENT_VERSION} self-test passed.`);
 }
 
@@ -530,6 +635,9 @@ async function main() {
 
   const session = exchange.session;
   const includeTopology = exchange.client?.includeTopology !== false;
+  if (session.connectivityContract) {
+    console.log(`Connectivity contract: ${session.connectivityContract.name} v${session.connectivityContract.version}`);
+  }
   const payload = await collectDiagnostics(session, includeTopology);
 
   progress("Uploading diagnostic evidence");
