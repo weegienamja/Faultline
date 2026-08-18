@@ -90,23 +90,45 @@ Remaining:
 
 Potential later controller integrations include UniFi, Omada/OpenWrt, pfSense/OPNsense and other platforms where supported APIs exist.
 
-## 0.6C - Probe fleet intelligence and safety
+## 0.6C - Probe fleet intelligence and safety ✅ preview
 
-**Next major unfinished v0.6 platform slice.**
+Implemented:
 
-Planned work:
+- explicit `public` and `private` registered-probe scopes
+- country, region and tag scheduling metadata
+- automatic health-aware probe selection
+- least-loaded selection among matching online probes
+- deterministic tie-breaking
+- explicit probe-ID override
+- dashboard diagnostics default to automatic public-probe selection
+- invitation CLI country/region/tag/scope selectors
+- draining and maintenance lifecycle states
+- enable/disable controls
+- registered-probe credential rotation
+- registered-probe credential revocation
+- bounded lifecycle audit events
+- basic registered-probe submission rate limiting
+- public-probe target-port allow-list
+- blocking of loopback, RFC1918/private, link-local, CGNAT/shared, multicast, documentation and reserved address space
+- IPv4-mapped IPv6 and translation-prefix checks
+- validation of all DNS answers immediately before connection
+- TCP pinning to a validated resolved address
+- manual HTTP redirect handling with destination revalidation at every hop
+- response-body discard and bounded connection/redirect behaviour
+- JSON state migration to v3 with audit storage
 
-- select probes by country/region/tag rather than only explicit probe ID
-- health-aware scheduling
-- workload-aware selection
-- probe credential rotation
-- revoke/disable/drain controls
-- probe lifecycle audit events
-- block loopback, link-local, RFC1918/private and cloud-metadata targets from public probes
-- resolve and validate all target addresses immediately before connection
-- validate redirects to stop public-to-private bypasses
-- bounded HTTP response handling
-- job rate/resource/time limits
+The key trust rule is that a public probe does not trust a target merely because the control plane assigned it. The worker independently validates the destination immediately before connecting.
+
+Remaining production hardening:
+
+- distributed scheduler leases/claims for multi-process operation
+- persistent/distributed rate limiting
+- organisation quotas and per-target abuse controls
+- production actor identity in audit events
+- richer capability-aware scheduling
+- carefully managed tenant-specific target policies
+
+See [docs/FLEET_SAFETY.md](docs/FLEET_SAFETY.md).
 
 ## 0.6D - Packaged Windows diagnostic client ✅ preview
 
@@ -164,7 +186,7 @@ Safe remote probe selected
 Evidence correlated into fault domain
 ```
 
-v0.6 is complete when the packaged-client path is hardened and 0.6C fleet scheduling/safety is finished.
+The **core v0.6 workflow is feature-complete as a preview** once the 0.6C implementation passes the full CI pipeline. The remaining v0.6 work is production hardening rather than another major functional slice.
 
 ---
 
@@ -240,7 +262,7 @@ Planned capabilities:
 - PostgreSQL-backed persistence
 - organisations/users/workspaces
 - production authentication and roles
-- rate limiting and audit records
+- distributed rate limiting and audit records
 - retention controls
 - production credential lifecycle
 - reliable job delivery
