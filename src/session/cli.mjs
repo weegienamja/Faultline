@@ -1,7 +1,15 @@
 #!/usr/bin/env node
 
 function help() {
-  console.log(`Faultline Session CLI v0.4\n\nUsage:\n  npm run session -- --target <hostname|IP|URL> [options]\n\nOptions:\n  --target <value>          Diagnostic target (required)\n  --port <number>           Target TCP port (default: 443)\n  --api-base <url>          Faultline control-plane base URL\n                           (default: http://localhost:3000)\n  --admin-token <token>     Admin bearer token (or FAULTLINE_ADMIN_TOKEN)\n  --ttl <minutes>           Session lifetime, 5-1440 minutes (default: 60)\n  --title <value>           Incident title\n  --customer <value>        Customer or case label\n  --vpn-required            Mark target as VPN-dependent\n  --expected-route <CIDR>   Expected IPv4 route for endpoint validation\n  --json                    Print the full creation response\n  --help                    Show this help\n\nExample:\n  npm run session -- --target microsoft.com --admin-token <admin-token>\n`);
+  console.log(`Faultline Session CLI v0.4\n\nUsage:\n  npm run session -- --target <hostname|IP|URL> [options]\n\nOptions:\n  --target <value>          Diagnostic target (required)\n  --port <number>           Target TCP port (default inferred from target)\n  --api-base <url>          Faultline control-plane base URL\n                           (default: http://localhost:3000)\n  --admin-token <token>     Admin bearer token (or FAULTLINE_ADMIN_TOKEN)\n  --ttl <minutes>           Session lifetime, 5-1440 minutes (default: 60)\n  --title <value>           Incident title\n  --customer <value>        Customer or case label\n  --vpn-required            Mark target as VPN-dependent\n  --expected-route <CIDR>   Expected IPv4 route for endpoint validation\n  --json                    Print the full creation response\n  --help                    Show this help\n\nExample:\n  npm run session -- --target microsoft.com --admin-token <admin-token>\n`);
+}
+
+function parseNumber(value, label, { min, max, integer = false }) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || (integer && !Number.isInteger(parsed)) || parsed < min || parsed > max) {
+    throw new Error(`${label} must be ${integer ? "an integer" : "a number"} between ${min} and ${max}.`);
+  }
+  return parsed;
 }
 
 function parseArgs(argv) {
@@ -16,10 +24,10 @@ function parseArgs(argv) {
       if (!value || value.startsWith("--")) throw new Error(`${arg} requires a value.`);
       index += 1;
       if (arg === "--target") options.target = value;
-      if (arg === "--port") options.port = Number(value);
+      if (arg === "--port") options.port = parseNumber(value, "--port", { min: 1, max: 65535, integer: true });
       if (arg === "--api-base") options.apiBase = value.replace(/\/+$/, "");
       if (arg === "--admin-token") options.adminToken = value;
-      if (arg === "--ttl") options.ttlMinutes = Number(value);
+      if (arg === "--ttl") options.ttlMinutes = parseNumber(value, "--ttl", { min: 5, max: 1440 });
       if (arg === "--title") options.title = value;
       if (arg === "--customer") options.customer = value;
       if (arg === "--expected-route") options.expectedRoute = value;
