@@ -11,6 +11,10 @@ const handoffName = document.getElementById("handoff-name");
 const downloadClient = document.getElementById("download-client");
 const clientUnavailable = document.getElementById("client-unavailable");
 const clientWarning = document.getElementById("client-warning");
+const contractDisclosure = document.getElementById("contract-disclosure");
+const contractName = document.getElementById("contract-name");
+const contractDescription = document.getElementById("contract-description");
+const contractChecks = document.getElementById("contract-checks");
 
 let invitationToken = "";
 let invitationSession = null;
@@ -59,12 +63,29 @@ async function request(path, { method = "GET", body } = {}) {
   return payload;
 }
 
+function renderContract(contract) {
+  if (!contract?.checks?.length) {
+    contractDisclosure.hidden = true;
+    return;
+  }
+  contractName.textContent = `${contract.name} · v${contract.version}`;
+  contractDescription.textContent = contract.description || "Application connectivity conditions selected by the support engineer.";
+  contractChecks.replaceChildren(...contract.checks.map(check => {
+    const item = document.createElement("span");
+    item.className = `contract-check ${check.required !== false ? "required" : ""}`;
+    item.textContent = `${check.label || check.type}${check.required !== false ? " · required" : " · optional"}`;
+    return item;
+  }));
+  contractDisclosure.hidden = false;
+}
+
 function renderInvitation(session) {
   invitationSession = session;
   document.getElementById("invite-title").textContent = session.title;
   document.getElementById("invite-target").textContent = `${session.target.input}:${session.target.port}`;
   document.getElementById("invite-customer").textContent = session.customer;
   document.getElementById("invite-expires").textContent = new Date(session.expiresAt).toLocaleString();
+  renderContract(session.connectivityContract);
   loadingCard.hidden = true;
   consentCard.hidden = false;
 }
