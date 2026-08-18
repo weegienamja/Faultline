@@ -12,7 +12,7 @@ function policyError(message) {
 
 export function normaliseProbeScope(value) {
   const scope = String(value || "public").trim().toLowerCase();
-  if (!['public', 'private'].includes(scope)) {
+  if (!["public", "private"].includes(scope)) {
     throw new Error("Probe scope must be either public or private.");
   }
   return scope;
@@ -56,26 +56,44 @@ function classifyIpv4(address) {
   return { public: true, reason: "globally routable IPv4" };
 }
 
+function canonicalIpv6(address) {
+  const clean = String(address).toLowerCase().split("%")[0];
+  try {
+    const hostname = new URL(`http://[${clean}]/`).hostname;
+    return hostname.replace(/^\[|\]$/g, "").toLowerCase();
+  } catch {
+    return clean;
+  }
+}
+
 function mappedIpv4(address) {
-  const lower = String(address).toLowerCase();
-  const match = lower.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/);
-  return match?.[1] || null;
+  const lower = canonicalIpv6(address);
+  const dotted = lower.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/);
+  if (dotted) return dotted[1];
+
+  const hex = lower.match(/^::ffff:([0-9a-f]{1,4}):([0-9a-f]{1,4})$/);
+  if (!hex) return null;
+  const high = Number.parseInt(hex[1], 16);
+  const low = Number.parseInt(hex[2], 16);
+  return `${high >>> 8}.${high & 255}.${low >>> 8}.${low & 255}`;
 }
 
 function classifyIpv6(address) {
-  const lower = String(address).toLowerCase().split("%")[0];
+  const lower = canonicalIpv6(address);
   const mapped = mappedIpv4(lower);
   if (mapped) {
     const result = classifyIpv4(mapped);
     return { ...result, reason: `IPv4-mapped ${result.reason}` };
   }
 
-  if (lower === "::" || lower === "0:0:0:0:0:0:0:0") return { public: false, reason: "unspecified IPv6" };
-  if (lower === "::1" || lower === "0:0:0:0:0:0:0:1") return { public: false, reason: "loopback IPv6" };
+  if (lower === "::") return { public: false, reason: "unspecified IPv6" };
+  if (lower === "::1") return { public: false, reason: "loopback IPv6" };
   if (/^(fc|fd)/.test(lower)) return { public: false, reason: "unique-local IPv6" };
   if (/^fe[89ab]/.test(lower)) return { public: false, reason: "link-local IPv6" };
+  if (/^fe[c-f]/.test(lower)) return { public: false, reason: "site-local/reserved IPv6" };
   if (/^ff/.test(lower)) return { public: false, reason: "multicast IPv6" };
   if (/^2001:db8(?::|$)/.test(lower)) return { public: false, reason: "documentation IPv6" };
+  if (/^64:ff9b(?::|$)/.test(lower)) return { public: false, reason: "IPv4 translation IPv6 prefix" };
 
   return { public: true, reason: "globally routable IPv6" };
 }
@@ -84,7 +102,7 @@ export function classifyAddress(address) {
   const value = String(address || "").trim().replace(/^\[|\]$/g, "");
   const family = net.isIP(value);
   if (family === 4) return { address: value, family, ...classifyIpv4(value) };
-  if (family === 6) return { address: value, family, ...classifyIpv6(value) };
+  if (family === 6) return { address: canonicalIpv6(value), family, ...classifyIpv6(value) };
   return { address: value, family: 0, public: false, reason: "not an IP address" };
 }
 
