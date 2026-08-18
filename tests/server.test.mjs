@@ -28,7 +28,7 @@ function startServer(port, dataFile) {
 
     const onData = chunk => {
       output += chunk.toString();
-      if (output.includes("Faultline v0.4 listening")) {
+      if (output.includes("Faultline v0.5 listening")) {
         clearTimeout(timer);
         child.stdout.off("data", onData);
         resolve(child);
@@ -38,7 +38,7 @@ function startServer(port, dataFile) {
     child.stdout.on("data", onData);
     child.stderr.on("data", chunk => { output += chunk.toString(); });
     child.once("exit", code => {
-      if (code !== null && !output.includes("Faultline v0.4 listening")) {
+      if (code !== null && !output.includes("Faultline v0.5 listening")) {
         clearTimeout(timer);
         reject(new Error(`Faultline server exited with ${code}. Output: ${output}`));
       }
