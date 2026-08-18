@@ -12,10 +12,10 @@ The collector uses `Get-NetRoute`, `Get-NetAdapter`, `netsh`, `ping` and `tracer
 
 ## Authenticated use
 
-Create a diagnostic session first:
+Create a diagnostic session first. In v0.5 that session can optionally be assigned to a registered remote probe:
 
 ```powershell
-npm run session -- --target microsoft.com --admin-token $env:FAULTLINE_ADMIN_TOKEN
+npm run session -- --target microsoft.com --probe PRB-8A1B2C3D4E --admin-token $env:FAULTLINE_ADMIN_TOKEN
 ```
 
 Faultline prints an endpoint command containing a session ID and a short-lived endpoint credential:
@@ -24,9 +24,9 @@ Faultline prints an endpoint command containing a session ID and a short-lived e
 npm run agent -- --session FL-6A1B2C3D4E --token fl_ep_... --api-base http://localhost:3000
 ```
 
-The agent uses the endpoint credential to retrieve safe session metadata, so the diagnostic target, port and VPN requirements come from the session rather than being independently guessed by the endpoint.
+The agent uses the endpoint credential to retrieve safe session metadata, so target, port, VPN requirements and registered-probe assignment come from the session rather than being guessed by the endpoint.
 
-It then submits evidence to:
+It submits evidence to:
 
 ```text
 POST /api/agent-runs
@@ -34,15 +34,17 @@ POST /api/agent-runs
 
 The control plane verifies that the credential belongs to the **endpoint role** for that session before accepting the payload.
 
+If the session has `assignedProbeId`, the accepted endpoint evidence makes the session eligible for that registered probe's private job queue.
+
 ## Standalone dry run
 
-You can still inspect endpoint collection without uploading anything:
+Inspect endpoint collection without uploading:
 
 ```powershell
 npm run agent -- --target microsoft.com --dry-run --json
 ```
 
-An unauthenticated `--target` run cannot upload to v0.4. This is deliberate.
+An unauthenticated `--target` run cannot upload. This is deliberate.
 
 ## Options
 
@@ -101,7 +103,7 @@ If the VPN is connected but the expected route is missing, the deterministic dia
 
 ## Session security
 
-Each diagnostic session has a dedicated endpoint token that is separate from the probe token.
+Each diagnostic session has a dedicated endpoint token.
 
 The endpoint token:
 
@@ -111,17 +113,19 @@ The endpoint token:
 - expires with the session
 - is stored only as a hash by the control plane
 
-The raw endpoint credential is shown when the session is created. Treat it as a temporary secret.
+A registered remote probe does not share this token. It authenticates using its own durable `fl_probe_...` credential and sees a session only after the administrator explicitly assigns that probe and endpoint evidence is ready.
 
-When a remote Faultline server is used, send the token only over HTTPS.
+When a remote Faultline server is used, send bearer credentials only over HTTPS.
 
 ## Two-vantage workflow
 
-After endpoint evidence is accepted, the persistent incident appears as **ENDPOINT ONLY**.
+After endpoint evidence is accepted, the incident appears as **ENDPOINT ONLY**.
 
-Run the probe command that was printed during session creation from another machine or network. When that independent result arrives, the same session becomes **2 VANTAGES** and Faultline recalculates the diagnosis.
+If a registered probe was assigned, its worker discovers the job automatically and contributes the second vantage. If no registered probe was assigned, use the one-off probe command printed during session creation.
 
-See [REMOTE_PROBE.md](REMOTE_PROBE.md).
+When remote evidence arrives, the same session becomes **2 VANTAGES** and Faultline recalculates the diagnosis.
+
+See [PROBE_FLEET.md](PROBE_FLEET.md) and [REMOTE_PROBE.md](REMOTE_PROBE.md).
 
 ## Interpretation caveats
 
