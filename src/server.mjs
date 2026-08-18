@@ -208,8 +208,9 @@ async function pendingProbeJobs(probeId) {
     const run = await store.getRun(session.id);
     if (!run?.endpointMetrics || run.remoteProbe) continue;
     jobs.push({
-      ...publicSession(session),
-      endpointReady: true
+      id: session.id,
+      target: session.target,
+      expiresAt: session.expiresAt
     });
   }
 
