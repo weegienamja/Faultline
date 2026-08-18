@@ -2,15 +2,16 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 function emptyState() {
-  return { version: 1, sessions: [], runs: [] };
+  return { version: 2, sessions: [], runs: [], probes: [] };
 }
 
 function normaliseState(value) {
   if (!value || typeof value !== "object") return emptyState();
   return {
-    version: 1,
+    version: 2,
     sessions: Array.isArray(value.sessions) ? value.sessions : [],
-    runs: Array.isArray(value.runs) ? value.runs : []
+    runs: Array.isArray(value.runs) ? value.runs : [],
+    probes: Array.isArray(value.probes) ? value.probes : []
   };
 }
 
@@ -85,6 +86,26 @@ export function createStore(filePath) {
         if (index >= 0) current.runs[index] = run;
         else current.runs.unshift(run);
         return run;
+      });
+    },
+
+    async getProbe(id) {
+      await load();
+      return state.probes.find(probe => probe.id === id) || null;
+    },
+
+    async listProbes() {
+      await load();
+      return [...state.probes]
+        .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+    },
+
+    putProbe(probe) {
+      return mutate(current => {
+        const index = current.probes.findIndex(item => item.id === probe.id);
+        if (index >= 0) current.probes[index] = probe;
+        else current.probes.unshift(probe);
+        return probe;
       });
     }
   };
