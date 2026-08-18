@@ -7,8 +7,18 @@ const MAX_TTL_MINUTES = 24 * 60;
 export function normaliseSessionInput(input = {}, now = Date.now()) {
   const target = String(input.target || "").trim();
   if (!target) throw new Error("Diagnostic session requires a target.");
+  if (target.length > 512) throw new Error("Diagnostic target is too long.");
+  if (target.includes("://") && !/^https?:\/\//i.test(target)) {
+    throw new Error("Only HTTP and HTTPS URLs are supported as URL targets.");
+  }
 
-  const port = Number(input.port || 443);
+  let inferredPort = 443;
+  if (/^https?:\/\//i.test(target)) {
+    const parsed = new URL(target);
+    inferredPort = Number(parsed.port || (parsed.protocol === "http:" ? 80 : 443));
+  }
+
+  const port = Number(input.port ?? inferredPort);
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     throw new Error("Session port must be an integer between 1 and 65535.");
   }
@@ -21,14 +31,17 @@ export function normaliseSessionInput(input = {}, now = Date.now()) {
   const ttlMinutes = Math.round(requestedTtl);
   const createdAt = new Date(now).toISOString();
   const expiresAt = new Date(now + ttlMinutes * 60_000).toISOString();
+  const title = String(input.title || `Diagnostic · ${target}`).trim();
+  const customer = String(input.customer || "Diagnostic session").trim();
+  if (title.length > 180 || customer.length > 180) throw new Error("Session title and customer labels must be 180 characters or fewer.");
 
   return {
     target: {
       input: target,
       port
     },
-    title: String(input.title || `Diagnostic · ${target}`).trim(),
-    customer: String(input.customer || "Diagnostic session").trim(),
+    title,
+    customer,
     vpnRequired: Boolean(input.vpnRequired || input.expectedRoute),
     expectedRoute: input.expectedRoute ? String(input.expectedRoute).trim() : null,
     ttlMinutes,
