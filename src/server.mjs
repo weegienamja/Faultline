@@ -6,7 +6,7 @@ import { diagnose } from "./engine/diagnose.mjs";
 import { correlateAgentRun } from "./engine/correlate.mjs";
 import { incidents } from "./engine/incidents.mjs";
 import { bearerToken, generateCredential, hashCredential, isSessionExpired, verifyCredential, verifySessionRole } from "./security/auth.mjs";
-import { createDiagnosticSession, publicSession } from "./session/service.mjs";
+import { claimDiagnosticInvitation, createDiagnosticSession, findSessionByInvitationToken, publicSession } from "./session/service.mjs";
 import { createRegisteredProbe, publicProbe, touchProbe, verifyProbeCredential } from "./probe/registry.mjs";
 import { createStore } from "./storage/store.mjs";
 
@@ -112,6 +112,30 @@ async function requireSession(req, id, role = null) {
     throw error;
   }
   return session;
+}
+
+async function requireInvitation(req) {
+  const token = bearerToken(req);
+  if (!token) {
+    const error = new Error("Diagnostic invitation credential required.");
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const session = findSessionByInvitationToken(await store.listSessions(), token);
+  if (!session) {
+    const error = new Error("Diagnostic invitation is invalid.");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (isSessionExpired(session)) {
+    const error = new Error("Diagnostic invitation has expired.");
+    error.statusCode = 410;
+    throw error;
+  }
+
+  return { session, token };
 }
 
 function demoIncidents() {
@@ -222,7 +246,14 @@ const server = createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
 
     if (req.method === "GET" && url.pathname === "/api/health") {
-      return json(res, 200, { ok: true, version: "0.5.0", persistence: true, registeredProbeFleet: true });
+      return json(res, 200, {
+        ok: true,
+        version: "0.5.0",
+        persistence: true,
+        registeredProbeFleet: true,
+        topologyPreview: true,
+        ephemeralInvitations: true
+      });
     }
 
     if (req.method === "GET" && url.pathname === "/api/demo-incidents") {
@@ -280,6 +311,30 @@ const server = createServer(async (req, res) => {
       return json(res, 200, publicProbe(probe));
     }
 
+    if (req.method === "GET" && url.pathname === "/api/invitations") {
+      const { session } = await requireInvitation(req);
+      return json(res, 200, {
+        session: publicSession(session),
+        collection: {
+          topology: true,
+          packetPayloads: false,
+          browserHistory: false,
+          applicationContent: false
+        }
+      });
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/invitations/claim") {
+      const { session, token } = await requireInvitation(req);
+      const payload = await bodyFrom(req);
+      const claimed = claimDiagnosticInvitation(session, token, payload.consent === true);
+      await store.putSession(claimed.session);
+      return json(res, 200, {
+        session: publicSession(claimed.session),
+        credentials: { endpointToken: claimed.endpointToken }
+      });
+    }
+
     if (req.method === "POST" && url.pathname === "/api/sessions") {
       requireAdmin(req);
       const payload = await bodyFrom(req);
@@ -295,7 +350,10 @@ const server = createServer(async (req, res) => {
       await store.putSession(created.session);
       return json(res, 201, {
         session: publicSession(created.session),
-        credentials: created.credentials
+        credentials: created.credentials,
+        invitation: created.credentials.invitationToken ? {
+          path: `/diagnose#invite=${encodeURIComponent(created.credentials.invitationToken)}`
+        } : null
       });
     }
 
@@ -373,7 +431,11 @@ const server = createServer(async (req, res) => {
       return json(res, 200, diagnose(payload));
     }
 
-    const relative = url.pathname === "/" ? "index.html" : url.pathname.replace(/^\/+/, "");
+    const relative = url.pathname === "/"
+      ? "index.html"
+      : url.pathname === "/diagnose" || url.pathname === "/diagnose/"
+        ? "diagnose.html"
+        : url.pathname.replace(/^\/+/, "");
     const safePath = normalize(relative).replace(/^(\.\.(\/|\\|$))+/, "");
     const filePath = join(root, safePath);
 
