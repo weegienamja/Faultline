@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="Faultline isolates where network problems begin using evidence from multiple fault domains." />
+  <meta name="description" content="Faultline isolates where network problems begin using correlated evidence from endpoint and remote vantage points." />
   <title>Faultline · Network fault isolation</title>
   <link rel="stylesheet" href="/styles.css" />
 </head>
@@ -24,9 +24,9 @@
 
       <div class="sidebar-bottom">
         <div class="probe-card">
-          <div class="probe-status"><span class="pulse"></span> Agent ingestion ready</div>
-          <strong>Windows collector · v0.2</strong>
-          <span>Cloud probe planned for next stage</span>
+          <div class="probe-status"><span class="pulse"></span> Multi-vantage ready</div>
+          <strong>Endpoint + remote probe · v0.3</strong>
+          <span>Correlate independent paths by live run ID</span>
         </div>
         <div class="profile">
           <div class="avatar">JB</div>
@@ -46,7 +46,7 @@
             <button class="active">Engineer</button>
             <button>Customer</button>
           </div>
-          <a class="primary-button" href="https://github.com/weegienamja/Faultline#run-a-live-diagnostic">Run endpoint diagnostic</a>
+          <a class="primary-button" href="https://github.com/weegienamja/Faultline#run-a-two-vantage-diagnostic">Run diagnostic</a>
         </div>
       </header>
 
@@ -84,7 +84,7 @@
             <div><dt>Location</dt><dd id="location"></dd></div>
             <div><dt>Connection</dt><dd id="connection"></dd></div>
           </dl>
-          <div class="timestamp">Last measured <strong id="measured-at">just now</strong></div>
+          <div class="timestamp">Last evidence <strong id="measured-at">just now</strong></div>
         </article>
       </section>
 
@@ -134,7 +134,7 @@
       </section>
 
       <footer>
-        <span>Faultline v0.2</span>
+        <span>Faultline v0.3</span>
         <span>Evidence before escalation.</span>
       </footer>
     </main>
