@@ -411,15 +411,19 @@ Faultline is still a single-instance prototype rather than a production multi-te
 - remote probes currently collect DNS/TCP/HTTP evidence rather than full remote traceroute and ICMP path telemetry
 - Windows endpoint collector still needs broader real-world testing across adapters and VPN clients
 
-## Product direction
+## Roadmap
 
-The next meaningful platform work is likely to be one of:
+The full product and engineering roadmap is tracked in [ROADMAP.md](ROADMAP.md).
 
-1. probe credential rotation, disable/revoke controls and audit events
-2. probe selection based on geography/tags rather than explicit probe IDs
-3. richer remote traceroute/loss/jitter measurements
-4. database-backed multi-instance control plane
-5. portable evidence-report export for support escalation
+The planned **v0.6** milestone now combines three connected areas:
+
+1. **ephemeral support diagnostics** so an engineer can send a one-time link/code to a device that is not already managed by Faultline
+2. **interactive inferred network topology** with device icons, star/mesh/tree/mixed classification, confidence-labelled relationships and diagnostic health overlays
+3. **probe fleet intelligence and safety** including geography/tag-based selection, credential lifecycle controls and restrictions that prevent public probes being abused as arbitrary network scanners
+
+The topology view is intended to be a diagnostic surface, not merely a visualisation. Faultline should show which relationships are directly observed, which are inferred, and where the current fault evidence sits on the affected path.
+
+Later milestones cover Connectivity Contracts, deeper remote path evidence, cases and signed evidence packages, cross-party troubleshooting, hosted SaaS architecture, support integrations and multi-vantage incident analysis.
 
 None of those requires an AI API for the core diagnosis.
 
