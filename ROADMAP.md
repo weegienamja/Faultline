@@ -8,306 +8,171 @@ The diagnostic path remains deterministic and does not depend on an AI or LLM AP
 
 1. **Incident-first, not monitoring-first.** Faultline should be useful when a support engineer encounters a device or network they do not already manage.
 2. **Evidence before blame.** Fault-domain conclusions must be backed by explicit observations from known vantage points.
-3. **Cross-boundary support.** The product should make it easier for customers, MSPs, ISPs and SaaS vendors to contribute or consume evidence without sharing full administrative access.
+3. **Cross-boundary support.** Customers, MSPs, ISPs and SaaS vendors should be able to contribute or consume evidence without sharing full administrative access.
 4. **No false certainty.** Inferred topology, traceroute ownership and diagnosis confidence must distinguish observed facts from heuristics.
-5. **Privacy by default.** Collect the minimum network metadata needed to diagnose the issue and make redaction possible before wider sharing.
+5. **Privacy by default.** Collect the minimum network metadata needed to diagnose the issue.
 6. **No AI dependency in the diagnosis path.** The same measurements should produce the same result.
 
 ---
 
 ## v0.1 - Diagnosis prototype ✅
 
-**Goal:** prove that structured network evidence can be converted into an explainable fault domain.
+Implemented deterministic fault-domain rules, evidence, confidence, recommended actions and demo incidents.
 
-Implemented:
-
-- deterministic diagnosis engine
-- explicit evidence rules
-- fault domains for local network, DNS, VPN/routing, ISP/upstream, endpoint path/policy and target service
-- confidence and recommended actions
-- demo incident dashboard
-
-**Milestone:** Faultline can explain *why* it believes a fault sits in a particular domain.
-
----
+**Milestone:** Faultline can explain why evidence supports a particular fault domain.
 
 ## v0.2 - Real endpoint telemetry ✅
 
-**Goal:** replace demo-only metrics with observations from a real Windows endpoint.
+Implemented Windows gateway, DNS, Wi-Fi, VPN, route, TCP/HTTP, loss/jitter and traceroute collection.
 
-Implemented:
-
-- Windows endpoint collector
-- gateway latency and packet loss
-- DNS resolution and timing
-- Wi-Fi signal when available
-- VPN adapter discovery
-- expected-route validation
-- TCP and HTTP reachability
-- loss and jitter measurements
-- bounded traceroute observations
-
-**Milestone:** Faultline can diagnose evidence collected from an actual affected machine.
-
----
+**Milestone:** Faultline can diagnose evidence from an actual affected Windows machine.
 
 ## v0.3 - Two-vantage correlation ✅
 
-**Goal:** compare the affected endpoint with an independent network vantage.
+Implemented portable remote probes and endpoint + independent-vantage correlation.
 
-Implemented:
-
-- portable remote probe
-- endpoint + remote correlation
-- explicit endpoint-only and two-vantage states
-- endpoint-path/policy diagnosis when endpoint access fails but an independent probe succeeds
-
-**Milestone:** Faultline can distinguish some endpoint/path problems from target-service problems using independent evidence.
-
----
+**Milestone:** Faultline can distinguish some endpoint/access-path problems from target-service problems.
 
 ## v0.4 - Persistent authenticated control plane ✅
 
-**Goal:** make diagnostics durable and safe enough to host as a controlled prototype.
+Implemented persistent sessions, role-scoped credentials, hashes at rest, expiry, admin-protected live telemetry and Docker deployment.
 
-Implemented:
-
-- persistent diagnostic sessions
-- short-lived endpoint and one-off probe credentials
-- role-scoped bearer authentication
-- credential hashes at rest
-- session expiry
-- admin-protected live data
-- Docker deployment
-- persistent incident storage
-
-**Milestone:** diagnostic sessions survive restarts and can be used across separate machines without exposing an unauthenticated ingestion API.
-
----
+**Milestone:** diagnostic sessions survive restarts and work across separate machines without unauthenticated ingestion.
 
 ## v0.5 - Registered probe fleet ✅
 
-**Goal:** replace anonymous one-shot remote probes with persistent managed vantage points.
+Implemented durable `PRB-...` identities, probe credentials, heartbeat health, per-probe job queues, registered workers and fleet UI.
+
+**Milestone:** a remote VPS can remain online as a known Faultline vantage and pick up assigned diagnostics.
+
+---
+
+# v0.6 - Real support workflow
+
+**Goal:** make Faultline usable during an actual support ticket rather than only as a collection of engineering commands.
+
+## 0.6A - Ephemeral support diagnostics ✅ preview
 
 Implemented:
 
-- durable `PRB-...` identities
-- hashed long-lived probe credentials
-- authenticated heartbeats
-- online / stale / offline / disabled health
-- per-probe private job queues
-- assigned diagnostic sessions
-- long-running probe worker
-- probe-fleet dashboard
-- persisted probe registry
+- dashboard and CLI diagnostic creation
+- one-time `fl_inv_...` invitation links
+- explicit consent screen
+- session expiry
+- Network Map opt-out
+- automatic case/session association
+- invitation invalidation after claim
 
-**Milestone:** a remote VPS can remain online as a known Faultline vantage and automatically pick up diagnostics assigned to it.
+Remaining:
 
----
+- optional evidence preview/redaction before upload
+- broader UX and accessibility testing
 
-# v0.6 - Ephemeral diagnostics, topology and fleet safety
+## 0.6B - Interactive inferred network topology ✅ preview
 
-**Goal:** make Faultline dramatically easier to use during a real support ticket while giving engineers a visual understanding of the affected local network.
+Implemented:
 
-v0.6 should be the point where Faultline stops feeling like a collection of diagnostic commands and starts feeling like a support product.
+- passive Windows neighbour discovery
+- endpoint/default-gateway/Wi-Fi evidence
+- star / tree / mesh / unknown inference
+- observed vs inferred links
+- draggable topology canvas
+- device glyphs and confidence markers
+- diagnosis-aware affected-path overlays
 
-## 0.6A - Ephemeral support diagnostics
+Remaining:
 
-A support engineer should be able to create a case and send a one-time link or code to a user whose machine is not already managed by Faultline.
+- OUI/vendor enrichment
+- stronger device classification
+- zoom/pan and filtering
+- bounded consented discovery where justified
+- router/controller integrations for authoritative topology
 
-Target workflow:
-
-```text
-Support ticket
-     |
-     v
-Create diagnostic
-     |
-     v
-One-time link / code
-     |
-     v
-Affected user runs lightweight collector
-     |
-     v
-Endpoint evidence + remote probe
-     |
-     v
-Faultline diagnosis
-```
-
-Planned work:
-
-- one-time diagnostic invitation links/codes
-- clear consent screen describing exactly what will be collected
-- short-lived endpoint enrolment
-- automatic session association
-- minimal install/run workflow
-- expiry after the support case or configured TTL
-- optional preview of evidence before upload
-
-## 0.6B - Interactive inferred network topology
-
-Faultline should build a best-effort local network map from endpoint evidence and present it as an interactive floating topology.
-
-Example:
-
-```text
-                         Internet
-                            |
-                        ISP Router
-                      /      |      \
-                     /       |       \
-              Work Laptop  Mesh A   Printer
-                              |
-                           Mesh B
-                          /      \
-                    Smart TV    Phone
-```
-
-The topology is a **diagnostic aid**, not decorative UI.
-
-### Discovery inputs
-
-Initial topology discovery should use safe local observations such as:
-
-- endpoint IP and subnet
-- default gateway
-- ARP / neighbour table
-- active interface and connection type
-- Wi-Fi SSID/BSSID and signal
-- reachable local devices where explicitly permitted
-- reverse DNS / mDNS hints where available
-- MAC OUI/vendor identification
-- conservative service/port fingerprints
-- known router, AP and mesh vendor patterns
-
-### Device classification
-
-Nodes should use small visual device types such as:
-
-- Windows PC / laptop
-- phone / tablet
-- router / gateway
-- firewall
-- Ethernet switch
-- wireless access point
-- mesh node / extender
-- printer
-- NAS / server
-- smart TV / media device
-- games console
-- unknown device
-- Internet / ISP boundary
-
-Every classification should carry a confidence level rather than pretending heuristic identification is certain.
-
-Example:
-
-```text
-Bedroom Deco
-Type: Mesh node
-Confidence: Medium
-Reason: TP-Link OUI + same LAN + matching mesh vendor pattern
-```
-
-### Topology inference
-
-Faultline should attempt to classify the local topology as one of:
-
-- star
-- mesh
-- tree / hierarchical
-- mixed
-- unknown
-
-Relationships should be labelled by evidence quality:
-
-```text
-solid edge    observed / high confidence
-dashed edge   likely wireless or inferred parent
-dotted edge   weak heuristic relationship
-```
-
-If the endpoint cannot prove that two devices are directly connected, the UI must say so.
-
-### Interactive graph
-
-The Network Map should support:
-
-- force-directed floating layout
-- drag/reposition nodes
-- zoom and pan
-- device icons
-- click/tap device details
-- health status overlays
-- highlight the affected endpoint
-- highlight the path relevant to the current diagnosis
-- filter unknown or low-confidence devices
-- switch between simplified and engineer detail views
-
-### Diagnostic overlays
-
-The network map becomes substantially more useful when diagnosis is rendered directly on the topology.
-
-Example local fault:
-
-```text
-Laptop ---- Mesh Node ---- Router ---- ISP
-  red         amber         green      green
-```
-
-Example upstream fault:
-
-```text
-Laptop ---- Router ---- ISP ---- Transit ---- Service
- green       green       red       red        green
-```
-
-The topology should expose measurements such as Wi-Fi signal, gateway latency, packet loss and route observations where relevant.
-
-### Mesh detection
-
-Initial mesh detection should be heuristic and confidence-labelled. Later router/controller integrations can make it authoritative.
-
-Potential later integrations include:
-
-- UniFi
-- TP-Link Omada / Deco where APIs permit
-- OpenWrt
-- pfSense / OPNsense
-- supported ASUS / mesh platforms
-
-Controller integrations should be additive. Faultline must remain useful without router credentials.
+Potential later controller integrations include UniFi, Omada/OpenWrt, pfSense/OPNsense and other platforms where supported APIs exist.
 
 ## 0.6C - Probe fleet intelligence and safety
 
-Before the probe fleet grows, v0.6 should also harden how probes are selected and what they are allowed to test.
+**Next major unfinished v0.6 platform slice.**
 
 Planned work:
 
-- choose probes by country/region/tag rather than only explicit probe ID
-- health-aware probe scheduling
-- basic workload-aware selection
+- select probes by country/region/tag rather than only explicit probe ID
+- health-aware scheduling
+- workload-aware selection
 - probe credential rotation
-- explicit revoke/disable/drain controls
-- audit events for probe lifecycle operations
-- prevent remote probe jobs from targeting loopback, link-local, RFC1918/private or cloud-metadata addresses unless an explicitly trusted private-probe mode is introduced
-- re-resolve redirects and DNS results to prevent public-to-private target bypasses
+- revoke/disable/drain controls
+- probe lifecycle audit events
+- block loopback, link-local, RFC1918/private and cloud-metadata targets from public probes
+- resolve and validate all target addresses immediately before connection
+- validate redirects to stop public-to-private bypasses
 - bounded HTTP response handling
-- resource/time limits per job
+- job rate/resource/time limits
 
-**v0.6 milestone:** a support engineer can launch a one-time diagnostic, see an interactive inferred map of the affected network, and have Faultline safely select an appropriate remote vantage.
+## 0.6D - Packaged Windows diagnostic client ✅ preview
+
+Implemented:
+
+- standalone `Faultline.exe` source
+- Node Single Executable Application build configuration
+- Windows CI build and packaged-binary self-test
+- GitHub Actions executable artifact
+- browser consent no longer receives endpoint upload credentials
+- one-use `fl_launch_...` launcher credential
+- `.faultline` browser-to-client handoff
+- automatic handoff discovery from Downloads/executable directory
+- one-time launcher → endpoint credential exchange
+- best-effort handoff deletion after exchange
+- automatic native Windows collection and evidence upload
+- three-attempt upload retry
+- token-free recovery payload on final upload failure
+- deployment-configured Windows-client download URL
+
+Remaining before production readiness:
+
+- Authenticode code signing
+- stable signed release/download channel
+- real-world Windows 10/11 testing
+- enterprise endpoint-control/SmartScreen testing
+- graphical client shell if required
+- custom URI/file-association flow for a cleaner one-click launch
+- recovery-upload workflow
+
+### v0.6 exit criteria
+
+```text
+Engineer creates diagnostic
+        |
+        v
+User receives one link
+        |
+        v
+User understands + consents
+        |
+        v
+No developer tooling required on affected PC
+        |
+        v
+Faultline.exe collects + uploads
+        |
+        v
+Interactive topology appears
+        |
+        v
+Safe remote probe selected
+        |
+        v
+Evidence correlated into fault domain
+```
+
+v0.6 is complete when the packaged-client path is hardened and 0.6C fleet scheduling/safety is finished.
 
 ---
 
-# v0.7 - Connectivity Contracts and deeper remote diagnostics
+# v0.7 - Connectivity Contracts and deeper diagnostics
 
 **Goal:** make Faultline understand what a specific application actually requires from the network.
 
-## Connectivity Contracts
-
-Introduce an open machine-readable service profile, for example:
+Introduce an open machine-readable profile such as:
 
 ```yaml
 service: Example SaaS
@@ -320,57 +185,28 @@ checks:
   - websocket: wss://realtime.example.com
 ```
 
-Initial profiles should target common support scenarios such as:
+Initial profiles should cover generic web/API tests and common support scenarios such as Microsoft 365, Webex and Slack.
 
-- generic website/API
-- Microsoft 365
-- Webex
-- Slack
+Expand remote evidence with carefully interpreted ICMP, jitter, traceroute, IPv4/IPv6 comparison, TLS timing, HTTP TTFB, path-MTU tests and public ASN/network-owner enrichment.
 
-The goal is not to duplicate vendor documentation. Faultline should turn published connectivity requirements into repeatable tests.
-
-## Deeper remote evidence
-
-Expand registered probes beyond DNS/TCP/HTTP with carefully interpreted:
-
-- ICMP latency/loss
-- jitter
-- traceroute
-- IPv4 vs IPv6 comparison
-- TLS handshake timing
-- HTTP TTFB
-- path-MTU checks where practical
-- ASN/network-owner enrichment for public path hops
-
-**Milestone:** Faultline can answer both "where is the fault?" and "which required application connectivity condition is failing?"
+**Milestone:** Faultline can answer both where a fault begins and which application connectivity condition is failing.
 
 ---
 
 # v0.8 - Cases and evidence packages
 
-**Goal:** convert diagnostics into support artefacts that can actually be used during escalation.
+**Goal:** convert diagnostics into support artefacts that can be used during escalation.
 
 Planned work:
 
-- persistent support cases around one or more diagnostic sessions
-- incident timeline
-- case notes/status
-- multiple endpoint or probe runs within a case
-- before/after evidence comparisons
-- exportable evidence report
-- JSON export
-- shareable read-only evidence link
-- cryptographic hash/signature for exported evidence
-- clear observed vs inferred distinction in reports
-
-A report should answer:
-
-- what failed?
-- from which vantage points?
-- when was it measured?
-- what remained healthy?
-- where does the combined evidence place the fault?
-- what should the receiving team verify next?
+- persistent support cases
+- incident timeline and notes/status
+- multiple runs per case
+- before/after evidence comparison
+- exportable PDF/JSON evidence packages
+- read-only evidence sharing
+- cryptographic hashes/signatures
+- explicit observed vs inferred evidence markers
 
 **Milestone:** an engineer can attach a Faultline evidence package to an ISP, SaaS or internal escalation ticket.
 
@@ -378,44 +214,19 @@ A report should answer:
 
 # v0.9 - Cross-party troubleshooting
 
-**Goal:** let separate organisations contribute scoped evidence to the same case without giving each other full platform access.
+**Goal:** let separate organisations contribute scoped evidence to the same case.
 
-Potential participants:
-
-- affected customer
-- customer IT
-- MSP
-- ISP
-- SaaS vendor
-- Faultline independent probes
+Potential participants include customer IT, MSP, ISP, SaaS vendor and Faultline independent probes.
 
 Planned work:
 
-- scoped external participant invitations
-- participant-specific permissions
+- scoped participant invitations
+- participant permissions
 - evidence provenance
 - comments/challenges attached to evidence
 - requested counter-tests
 - immutable event/audit timeline
-- diagnostic re-evaluation when new evidence is contributed
-
-Potential workflow:
-
-```text
-Faultline: likely ISP/upstream fault
-       |
-       v
-ISP challenges conclusion
-       |
-       v
-Faultline requests defined counter-test
-       |
-       v
-ISP/customer contributes new evidence
-       |
-       v
-Deterministic diagnosis recalculated
-```
+- deterministic re-evaluation when new evidence arrives
 
 **Milestone:** Faultline becomes a shared incident-evidence workspace rather than merely a diagnostic dashboard.
 
@@ -423,147 +234,56 @@ Deterministic diagnosis recalculated
 
 # v1.0 - Hosted commercial MVP
 
-**Goal:** make Faultline usable by a real support team without repository access or command-line administration.
-
-Planned platform capabilities:
+Planned capabilities:
 
 - hosted control plane
-- PostgreSQL-backed storage
-- organisations and users
-- customer/workspace separation
-- engineer/admin/read-only roles
-- production authentication
-- rate limiting
-- audit records
+- PostgreSQL-backed persistence
+- organisations/users/workspaces
+- production authentication and roles
+- rate limiting and audit records
 - retention controls
-- proper secrets/credential lifecycle
-- production probe scheduler
+- production credential lifecycle
 - reliable job delivery
-- stable ephemeral diagnostic client flow
-- Network Map integrated into live cases
-- case/evidence workflow
-- baseline service profiles
+- stable signed endpoint client
+- production probe scheduler
+- cases/evidence workflow
+- baseline Connectivity Contracts
 
-**Milestone:** first real pilot organisations and first paying customer.
+**Milestone:** pilot organisations and first paying customer.
 
 ---
 
-# v1.1 - Service-profile ecosystem
-
-**Goal:** make Connectivity Contracts reusable and extensible.
-
-Planned work:
+# v1.1 - Connectivity profile ecosystem
 
 - versioned profile schema
-- community/vendor profiles
 - profile validation tooling
-- custom organisation profiles
-- private/internal application profiles
+- community/vendor profiles
+- organisation/private profiles
 - profile test history
-
-Potential longer-term direction: vendors publish a `faultline.yaml` describing what healthy connectivity to their application requires.
-
----
+- potential `faultline.yaml` vendor convention
 
 # v1.2 - Embedded support diagnostics
 
-**Goal:** let another product or helpdesk launch Faultline directly from its own support workflow.
-
-Planned work:
-
-- API/SDK for diagnostic creation
+- diagnostic creation API/SDK
 - embeddable "Run connection diagnostic" experience
 - support-ticket correlation IDs
 - webhook/event delivery
-- scoped diagnostic links
-
-This creates a path for SaaS vendors and MSPs to make Faultline part of their own support experience.
-
----
 
 # v1.3 - Support integrations
 
-Potential integrations:
+Potential targets include ServiceNow, Jira Service Management, Zendesk, Freshservice, HaloPSA, ConnectWise, Teams and Slack.
 
-- ServiceNow
-- Jira Service Management
-- Zendesk
-- Freshservice
-- HaloPSA
-- ConnectWise
-- Microsoft Teams
-- Slack
-
-The important integration is not generic alert spam. It should let an engineer launch a diagnostic and attach the resulting evidence to an existing case/ticket.
-
----
+The useful integration is launching a diagnostic and attaching evidence to an existing case, not generic alert forwarding.
 
 # v1.5 - Network change assurance
 
-**Goal:** extend Faultline from reactive fault isolation into functional network validation.
-
-Workflow:
-
-```text
-Capture baseline
-      |
-Network/firewall/VPN/SD-WAN change
-      |
-Repeat identical Connectivity Contracts
-      |
-Compare functional differences
-```
-
-Use cases:
-
-- firewall changes
-- VPN changes
-- DNS migrations
-- SD-WAN changes
-- proxy/TLS inspection changes
-- ISP migrations
-
-**Milestone:** Faultline can show which required service behaviours changed after a network modification.
-
----
+Capture a functional baseline, run a firewall/VPN/SD-WAN/DNS/proxy change, repeat the same Connectivity Contracts and show exactly which required behaviours changed.
 
 # v2.0 - Multi-vantage incident platform
 
-**Goal:** correlate patterns across many affected endpoints and independent vantage points.
+Correlate multiple affected endpoints and multiple independent probes, identify regional/global patterns, represent ownership/demarcation boundaries and support organisation-owned private probes and provider-side evidence.
 
-Example:
-
-```text
-Glasgow endpoint A     FAIL
-Glasgow endpoint B     FAIL
-Edinburgh endpoint     FAIL
-London public probe    PASS
-Frankfurt public probe PASS
-```
-
-Compared with:
-
-```text
-All endpoints          FAIL
-London public probe    FAIL
-Frankfurt public probe FAIL
-New York public probe  FAIL
-```
-
-The system should use these patterns to increase or decrease support for regional access-path, ISP/transit, policy and global service hypotheses.
-
-Longer-term capabilities:
-
-- multiple endpoints per incident
-- multiple probes per incident
-- regional fault patterns
-- explicit network ownership/demarcation boundaries
-- organisation-owned private probes
-- richer topology/controller integrations
-- service-provider or SaaS-side evidence contributions
-- functional SLA/SLO evidence
-
-**Milestone:** Faultline becomes a network support and fault-arbitration platform rather than a single-session diagnostic utility.
+**Milestone:** Faultline becomes a broader network support and fault-arbitration platform.
 
 ---
 
