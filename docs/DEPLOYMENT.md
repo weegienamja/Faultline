@@ -36,7 +36,9 @@ Then start the service:
 docker compose up -d --build
 ```
 
-The Compose file mounts a named volume at `/data`, so diagnostic sessions and live runs survive container restarts.
+The supplied Compose file binds Faultline to `127.0.0.1:3000` on the host rather than exposing port 3000 on every interface. This is intentional: place the HTTPS reverse proxy on the same host and proxy its TLS-protected public hostname to `http://127.0.0.1:3000`.
+
+The Compose file also mounts a named volume at `/data`, so diagnostic sessions and live runs survive container restarts.
 
 Check the local health endpoint:
 
