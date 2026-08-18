@@ -2,7 +2,7 @@
 import { collectWindowsDiagnostics } from "./network.mjs";
 
 function help() {
-  console.log(`Faultline Agent v0.2\n\nUsage:\n  npm run agent -- --target <hostname|IP|URL> [options]\n\nOptions:\n  --target <value>          Target hostname, IP or URL (required)\n  --port <number>           TCP port when target is not a URL (default: 443)\n  --api <url>               Faultline ingestion endpoint\n                            (default: http://localhost:3000/api/agent-runs)\n  --expected-route <CIDR>   Require an exact IPv4 route, e.g. 10.40.0.0/16\n  --vpn-required            Mark the target as requiring a VPN\n  --no-trace                Skip traceroute collection\n  --dry-run                 Collect and print telemetry without uploading\n  --json                    Print the full JSON payload\n  --help                    Show this help\n\nExamples:\n  npm run agent -- --target microsoft.com\n  npm run agent -- --target https://example.com/health\n  npm run agent -- --target 10.40.12.25 --port 443 --vpn-required --expected-route 10.40.0.0/16\n`);
+  console.log(`Faultline Agent v0.3\n\nUsage:\n  npm run agent -- --target <hostname|IP|URL> [options]\n\nOptions:\n  --target <value>          Target hostname, IP or URL (required)\n  --port <number>           TCP port when target is not a URL (default: 443)\n  --api-base <url>          Faultline server base URL\n                            (default: http://localhost:3000)\n  --api <url>               Override the full agent ingestion endpoint\n  --expected-route <CIDR>   Require an exact IPv4 route, e.g. 10.40.0.0/16\n  --vpn-required            Mark the target as requiring a VPN\n  --no-trace                Skip traceroute collection\n  --dry-run                 Collect and print telemetry without uploading\n  --json                    Print the full JSON payload\n  --help                    Show this help\n\nExamples:\n  npm run agent -- --target microsoft.com\n  npm run agent -- --target https://example.com/health\n  npm run agent -- --target 10.40.12.25 --port 443 --vpn-required --expected-route 10.40.0.0/16\n`);
 }
 
 function parseArgs(argv) {
@@ -14,13 +14,14 @@ function parseArgs(argv) {
     else if (arg === "--no-trace") options.trace = false;
     else if (arg === "--dry-run") options.dryRun = true;
     else if (arg === "--json") options.json = true;
-    else if (["--target", "--port", "--api", "--expected-route"].includes(arg)) {
+    else if (["--target", "--port", "--api", "--api-base", "--expected-route"].includes(arg)) {
       const value = argv[index + 1];
       if (!value || value.startsWith("--")) throw new Error(`${arg} requires a value.`);
       index += 1;
       if (arg === "--target") options.target = value;
       if (arg === "--port") options.port = Number(value);
       if (arg === "--api") options.api = value;
+      if (arg === "--api-base") options.apiBase = value.replace(/\/+$/, "");
       if (arg === "--expected-route") options.expectedRoute = value;
     } else {
       throw new Error(`Unknown option: ${arg}`);
@@ -64,7 +65,8 @@ async function main() {
     return;
   }
 
-  const endpoint = options.api || "http://localhost:3000/api/agent-runs";
+  const apiBase = options.apiBase || "http://localhost:3000";
+  const endpoint = options.api || `${apiBase}/api/agent-runs`;
   console.log(`Faultline: collecting endpoint evidence for ${options.target}...`);
 
   try {
@@ -86,9 +88,14 @@ async function main() {
     }
 
     const run = await upload(endpoint, payload);
-    console.log(`\nDiagnosis: ${run.diagnosis.faultDomainLabel} (${run.diagnosis.confidence}% confidence)`);
+    console.log(`\nEndpoint-only diagnosis: ${run.diagnosis.faultDomainLabel} (${run.diagnosis.confidence}% confidence)`);
     console.log(run.diagnosis.summary);
     console.log(`Run ${run.id} is now available in the Faultline dashboard.`);
+
+    if (!options.api && apiBase) {
+      console.log("\nAdd an independent vantage point with:");
+      console.log(`  npm run probe -- --run ${run.id} --api-base ${apiBase}`);
+    }
   } catch (error) {
     console.error(`Faultline agent failed: ${error.message}`);
     process.exitCode = 1;
