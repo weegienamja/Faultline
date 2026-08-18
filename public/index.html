@@ -6,6 +6,21 @@
   <meta name="description" content="Faultline isolates where network problems begin using correlated evidence from endpoint and remote vantage points." />
   <title>Faultline · Network fault isolation</title>
   <link rel="stylesheet" href="/styles.css" />
+  <style>
+    .auth-button { border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--muted); padding: 10px 13px; font-size: 12px; }
+    .auth-button.unlocked { border-color: rgba(97,230,184,.42); color: var(--accent); background: var(--accent-soft); }
+    .auth-dialog { width: min(460px, calc(100vw - 32px)); border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--text); padding: 0; box-shadow: var(--shadow); }
+    .auth-dialog::backdrop { background: rgba(0, 7, 6, .76); backdrop-filter: blur(5px); }
+    .auth-form { padding: 24px; display: grid; gap: 15px; }
+    .auth-form h3 { margin: 0; }
+    .auth-form p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
+    .auth-form label { display: grid; gap: 7px; color: var(--muted); font-size: 11px; }
+    .auth-form input { width: 100%; border: 1px solid var(--border); border-radius: 9px; background: var(--bg); color: var(--text); padding: 11px 12px; font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; outline: none; }
+    .auth-form input:focus { border-color: rgba(97,230,184,.5); }
+    .auth-actions { display: flex; justify-content: flex-end; gap: 9px; }
+    .auth-error { min-height: 18px; color: var(--danger) !important; }
+    .secondary-button { border: 1px solid var(--border); border-radius: 9px; background: transparent; color: var(--muted); padding: 9px 12px; }
+  </style>
 </head>
 <body>
   <div class="app-shell">
@@ -24,9 +39,9 @@
 
       <div class="sidebar-bottom">
         <div class="probe-card">
-          <div class="probe-status"><span class="pulse"></span> Multi-vantage ready</div>
-          <strong>Endpoint + remote probe · v0.3</strong>
-          <span>Correlate independent paths by live run ID</span>
+          <div class="probe-status"><span class="pulse"></span> Persistent control plane</div>
+          <strong>Authenticated sessions · v0.4</strong>
+          <span>Scoped endpoint + remote-probe credentials</span>
         </div>
         <div class="profile">
           <div class="avatar">JB</div>
@@ -42,11 +57,8 @@
           <h1>Incident overview</h1>
         </div>
         <div class="top-actions">
-          <div class="view-toggle" role="group" aria-label="View mode">
-            <button class="active">Engineer</button>
-            <button>Customer</button>
-          </div>
-          <a class="primary-button" href="https://github.com/weegienamja/Faultline#run-a-two-vantage-diagnostic">Run diagnostic</a>
+          <button class="auth-button" id="auth-open">Unlock live data</button>
+          <a class="primary-button" href="https://github.com/weegienamja/Faultline#run-an-authenticated-two-vantage-diagnostic">Run diagnostic</a>
         </div>
       </header>
 
@@ -134,11 +146,31 @@
       </section>
 
       <footer>
-        <span>Faultline v0.3</span>
+        <span>Faultline v0.4</span>
         <span>Evidence before escalation.</span>
       </footer>
     </main>
   </div>
+
+  <dialog class="auth-dialog" id="auth-dialog">
+    <form class="auth-form" id="auth-form">
+      <div>
+        <span class="section-label">CONTROL PLANE</span>
+        <h3>Unlock live diagnostics</h3>
+      </div>
+      <p>Demo incidents stay public. Live endpoint and probe telemetry requires the Faultline admin credential and is kept only in this browser tab.</p>
+      <label>
+        Admin token
+        <input id="auth-token" type="password" autocomplete="off" spellcheck="false" placeholder="fl_admin_…" />
+      </label>
+      <p class="auth-error" id="auth-error"></p>
+      <div class="auth-actions">
+        <button class="secondary-button" type="button" id="auth-cancel">Cancel</button>
+        <button class="primary-button" type="submit">Unlock</button>
+      </div>
+    </form>
+  </dialog>
+
   <script type="module" src="/app.js"></script>
 </body>
 </html>
