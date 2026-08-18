@@ -24,9 +24,9 @@
 
       <div class="sidebar-bottom">
         <div class="probe-card">
-          <div class="probe-status"><span class="pulse"></span> Cloud probe online</div>
-          <strong>London · eu-west</strong>
-          <span>17 ms control latency</span>
+          <div class="probe-status"><span class="pulse"></span> Agent ingestion ready</div>
+          <strong>Windows collector · v0.2</strong>
+          <span>Cloud probe planned for next stage</span>
         </div>
         <div class="profile">
           <div class="avatar">JB</div>
@@ -46,11 +46,11 @@
             <button class="active">Engineer</button>
             <button>Customer</button>
           </div>
-          <button class="primary-button">+ New diagnostic</button>
+          <a class="primary-button" href="https://github.com/weegienamja/Faultline#run-a-live-diagnostic">Run endpoint diagnostic</a>
         </div>
       </header>
 
-      <section class="incident-strip" id="incident-list" aria-label="Demo incidents"></section>
+      <section class="incident-strip" id="incident-list" aria-label="Diagnostic incidents"></section>
 
       <section class="hero-grid" id="overview">
         <article class="panel diagnosis-panel">
@@ -76,7 +76,7 @@
               <h3 id="incident-title">Loading…</h3>
               <span id="incident-id"></span>
             </div>
-            <span class="status-pill">Investigating</span>
+            <span class="status-pill" id="incident-status">Loading</span>
           </div>
           <dl class="context-list">
             <div><dt>Customer</dt><dd id="customer"></dd></div>
@@ -84,7 +84,7 @@
             <div><dt>Location</dt><dd id="location"></dd></div>
             <div><dt>Connection</dt><dd id="connection"></dd></div>
           </dl>
-          <div class="timestamp">Last measured <strong>just now</strong></div>
+          <div class="timestamp">Last measured <strong id="measured-at">just now</strong></div>
         </article>
       </section>
 
@@ -94,9 +94,20 @@
             <span class="section-label">FAULT ISOLATION</span>
             <h3>Path health</h3>
           </div>
-          <span class="live-badge"><span></span> Live evidence</span>
+          <span class="live-badge"><span></span> Evidence feed</span>
         </div>
         <div class="metric-grid" id="metrics"></div>
+      </section>
+
+      <section class="panel route-panel" id="route-panel" hidden>
+        <div class="panel-heading compact">
+          <div>
+            <span class="section-label">ENDPOINT OBSERVATION</span>
+            <h3>Observed route</h3>
+          </div>
+          <span class="route-note">ICMP responses only · not ownership proof</span>
+        </div>
+        <div class="route-trace" id="route-trace"></div>
       </section>
 
       <section class="lower-grid">
@@ -123,7 +134,7 @@
       </section>
 
       <footer>
-        <span>Faultline v0.1</span>
+        <span>Faultline v0.2</span>
         <span>Evidence before escalation.</span>
       </footer>
     </main>
