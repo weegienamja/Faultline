@@ -1,0 +1,16 @@
+{
+  "name": "faultline",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Evidence-based network fault isolation across endpoints, networks, ISPs and services.",
+  "scripts": {
+    "dev": "node --watch src/server.mjs",
+    "start": "node src/server.mjs",
+    "test": "node --test",
+    "check": "node --check src/server.mjs && node --check src/engine/diagnose.mjs && node --check public/app.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
