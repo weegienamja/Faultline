@@ -32,20 +32,25 @@
     .invite-action:disabled { cursor: not-allowed; opacity: .45; }
     .invite-error { color: var(--danger); font-size: 12px; line-height: 1.5; min-height: 18px; }
     .loading-state { color: var(--muted); }
-    .command-panel { display: grid; gap: 10px; }
-    .command-panel h2 { margin: 0; font-size: 21px; }
-    .command-panel p { color: var(--muted); line-height: 1.55; font-size: 12px; margin: 0; }
-    .command-box { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: stretch; }
-    .command-box code { display: block; border: 1px solid var(--border); background: #07100f; border-radius: 10px; padding: 13px; color: #cce5dd; font-size: 11px; overflow-x: auto; white-space: nowrap; }
-    .copy-button { border: 1px solid rgba(97,230,184,.45); background: var(--accent-soft); color: var(--accent); border-radius: 9px; padding: 0 14px; font-size: 11px; font-weight: 700; }
+    .client-panel { display: grid; gap: 15px; }
+    .client-panel h2 { margin: 0; font-size: 21px; }
+    .client-panel p { color: var(--muted); line-height: 1.55; font-size: 12px; margin: 0; }
     .success-note { color: var(--accent) !important; }
+    .client-steps { display: grid; gap: 9px; counter-reset: step; }
+    .client-step { display: grid; grid-template-columns: 28px 1fr; gap: 11px; align-items: start; border: 1px solid var(--border-soft); border-radius: 11px; padding: 13px; background: rgba(255,255,255,.012); }
+    .client-step::before { counter-increment: step; content: counter(step); width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 800; border: 1px solid rgba(97,230,184,.2); }
+    .client-step strong { display: block; font-size: 12px; margin-bottom: 4px; }
+    .client-step span { color: var(--muted); font-size: 11px; line-height: 1.45; }
+    .client-actions { display: flex; gap: 9px; flex-wrap: wrap; }
+    .client-actions a, .client-actions button { min-height: 42px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+    .client-actions .secondary-button[disabled] { opacity: .4; cursor: not-allowed; }
+    .client-warning { border: 1px solid rgba(241,184,91,.26); background: rgba(241,184,91,.06); border-radius: 10px; padding: 12px; color: #c9b07d !important; }
     .security-note { text-align: center; color: #617871; font-size: 10px; line-height: 1.5; }
     @media (max-width: 680px) {
       body { padding: 16px; }
       .invite-card { padding: 21px; }
       .invite-context, .collection-grid { grid-template-columns: 1fr; }
-      .command-box { grid-template-columns: 1fr; }
-      .copy-button { min-height: 40px; }
+      .client-actions { display: grid; }
     }
   </style>
 </head>
@@ -111,16 +116,24 @@
       </div>
     </section>
 
-    <section class="invite-card command-panel" id="command-card" hidden>
+    <section class="invite-card client-panel" id="client-card" hidden>
       <span class="section-label">INVITATION ACTIVATED</span>
-      <h2>Run the endpoint diagnostic</h2>
-      <p class="success-note">The one-time invitation has been consumed and cannot be claimed again.</p>
-      <p>The current v0.6 preview uses the Faultline Node.js collector. On a Windows machine with the Faultline repository and Node.js 20+, run this command from the repository directory:</p>
-      <div class="command-box">
-        <code id="agent-command"></code>
-        <button class="copy-button" id="copy-command">Copy</button>
+      <h2>Run Faultline on this Windows PC</h2>
+      <p class="success-note">The original invitation is now consumed. Your handoff file contains a separate one-use launcher credential, not the endpoint upload credential.</p>
+
+      <div class="client-steps">
+        <div class="client-step"><div><strong>Keep the handoff file in Downloads</strong><span id="handoff-name">Faultline diagnostic handoff</span></div></div>
+        <div class="client-step"><div><strong>Download Faultline.exe</strong><span>The packaged client contains its own Node.js runtime. Node, npm and the Faultline repository are not required on this PC.</span></div></div>
+        <div class="client-step"><div><strong>Double-click Faultline.exe</strong><span>The client automatically finds the newest Faultline handoff in Downloads, exchanges it once, deletes it where possible, runs the tests and uploads the evidence.</span></div></div>
       </div>
-      <p>When collection finishes, the evidence is attached automatically to the support session. If a registered remote probe was assigned, it can then contribute the independent second vantage point.</p>
+
+      <div class="client-actions">
+        <button class="secondary-button" id="save-handoff" type="button">Save handoff again</button>
+        <a class="primary-button" id="download-client" href="#" hidden>Download Faultline.exe</a>
+        <button class="secondary-button" id="client-unavailable" type="button" disabled hidden>Windows client download not configured</button>
+      </div>
+      <p class="client-warning" id="client-warning" hidden>The control plane has not configured a public Windows-client download URL yet. The support engineer can provide the Faultline.exe build artifact separately; the downloaded handoff file will still work with it.</p>
+      <p>Once the client finishes, the diagnostic appears automatically in the engineer dashboard. An assigned registered probe can then add the independent second vantage point.</p>
     </section>
 
     <section class="invite-card" id="error-card" hidden>
@@ -129,7 +142,7 @@
       <p id="fatal-message"></p>
     </section>
 
-    <p class="security-note">Faultline invitation secrets are short-lived bearer credentials. For remotely hosted deployments, use these links only over HTTPS.</p>
+    <p class="security-note">Faultline invitation and launcher secrets are short-lived bearer credentials. For remotely hosted deployments, use these links and downloads only over HTTPS.</p>
   </main>
   <script type="module" src="/diagnose.js"></script>
 </body>
