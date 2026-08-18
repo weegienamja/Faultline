@@ -19,6 +19,12 @@
     .invite-context div { border: 1px solid var(--border-soft); background: rgba(255,255,255,.012); border-radius: 10px; padding: 12px; min-width: 0; }
     .invite-context small { display: block; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; font-size: 8px; margin-bottom: 5px; }
     .invite-context strong { display: block; overflow-wrap: anywhere; font-size: 12px; }
+    .contract-disclosure { margin: -8px 0 18px; border: 1px solid rgba(97,230,184,.22); background: rgba(97,230,184,.045); border-radius: 11px; padding: 15px; }
+    .contract-disclosure h3 { margin: 0 0 5px; font-size: 13px; }
+    .contract-disclosure p { margin: 0 0 10px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .contract-checks { display: flex; gap: 7px; flex-wrap: wrap; }
+    .contract-check { border: 1px solid var(--border-soft); border-radius: 999px; padding: 5px 8px; color: #c1d0cc; font-size: 9px; }
+    .contract-check.required { border-color: rgba(97,230,184,.25); color: var(--accent); }
     .collection-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 18px 0; }
     .collection-box { border: 1px solid var(--border-soft); border-radius: 11px; padding: 16px; }
     .collection-box h3 { font-size: 13px; margin: 0 0 10px; }
@@ -79,12 +85,20 @@
         <div><small>Expires</small><strong id="invite-expires"></strong></div>
       </div>
 
+      <div class="contract-disclosure" id="contract-disclosure" hidden>
+        <span class="section-label">CONNECTIVITY CONTRACT</span>
+        <h3 id="contract-name"></h3>
+        <p id="contract-description"></p>
+        <div class="contract-checks" id="contract-checks"></div>
+      </div>
+
       <div class="collection-grid">
         <div class="collection-box">
           <h3>Faultline will collect</h3>
           <ul>
             <li>gateway latency and packet loss</li>
             <li>DNS, TCP, HTTP and route test results</li>
+            <li>application connectivity-condition results when a Connectivity Contract is attached</li>
             <li>active network adapter and VPN state</li>
             <li>Wi-Fi signal and access-point metadata when available</li>
             <li>local neighbour-table data for the Network Map</li>
