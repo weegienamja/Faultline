@@ -20,3 +20,24 @@ jobs:
       - run: npm run check
       - run: npm test
       - run: docker build -t faultline:test .
+
+  windows-client:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+      - name: Build standalone Faultline.exe
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          node --build-sea build/windows/sea-config.json
+      - name: Run packaged client self-test
+        shell: pwsh
+        run: .\dist\Faultline.exe --self-test
+      - uses: actions/upload-artifact@v4
+        with:
+          name: faultline-windows-client
+          path: dist/Faultline.exe
+          if-no-files-found: error

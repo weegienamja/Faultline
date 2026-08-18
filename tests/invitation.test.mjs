@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   claimDiagnosticInvitation,
   createDiagnosticSession,
+  exchangeClientLaunch,
   findSessionByInvitationToken,
   publicSession
 } from "../src/session/service.mjs";
@@ -31,38 +32,59 @@ test("finds an invitation only with the correct high-entropy secret", () => {
   assert.equal(findSessionByInvitationToken([created.session], created.credentials.invitationToken)?.id, created.session.id);
 });
 
-test("requires explicit consent before minting the endpoint credential", () => {
+test("requires explicit consent before creating client launch access", () => {
   const created = createDiagnosticSession({ target: "example.com", ephemeral: true }, NOW);
-
   assert.throws(
-    () => claimDiagnosticInvitation(created.session, created.credentials.invitationToken, false, NOW + 1_000),
+    () => claimDiagnosticInvitation(created.session, created.credentials.invitationToken, { consent: false }, NOW + 1_000),
     /Explicit consent is required/
   );
   assert.equal(created.session.endpointTokenHash, null);
 });
 
-test("claiming consumes the invitation and creates role-scoped endpoint access", () => {
+test("claiming consumes invitation but still does not mint endpoint access", () => {
   const created = createDiagnosticSession({ target: "example.com", ephemeral: true }, NOW);
   const claimed = claimDiagnosticInvitation(
     created.session,
     created.credentials.invitationToken,
-    true,
+    { consent: true, includeTopology: false },
     NOW + 5_000
   );
 
-  assert.equal(claimed.endpointToken.startsWith("fl_ep_"), true);
+  assert.equal(claimed.clientLaunchToken.startsWith("fl_launch_"), true);
+  assert.equal(claimed.session.endpointTokenHash, null);
   assert.equal(claimed.session.invitation.tokenHash, null);
+  assert.equal(claimed.session.invitation.includeTopology, false);
   assert.equal(claimed.session.invitation.claimedAt, "2026-08-18T20:00:05.000Z");
-  assert.equal(verifySessionRole(claimed.session, claimed.endpointToken, "endpoint"), true);
-  assert.equal(verifySessionRole(claimed.session, created.credentials.probeToken, "endpoint"), false);
   assert.equal(findSessionByInvitationToken([claimed.session], created.credentials.invitationToken), null);
-  assert.equal(publicSession(claimed.session, NOW + 5_000).invitation.status, "claimed");
+  assert.equal(publicSession(claimed.session, NOW + 5_000).invitation.clientLaunchStatus, "available");
+});
+
+test("Windows client exchange mints endpoint credential once and consumes launcher", () => {
+  const created = createDiagnosticSession({ target: "example.com", ephemeral: true }, NOW);
+  const claimed = claimDiagnosticInvitation(
+    created.session,
+    created.credentials.invitationToken,
+    { consent: true, includeTopology: true },
+    NOW + 5_000
+  );
+  const exchanged = exchangeClientLaunch(claimed.session, claimed.clientLaunchToken, NOW + 8_000);
+
+  assert.equal(exchanged.endpointToken.startsWith("fl_ep_"), true);
+  assert.equal(exchanged.includeTopology, true);
+  assert.equal(verifySessionRole(exchanged.session, exchanged.endpointToken, "endpoint"), true);
+  assert.equal(exchanged.session.invitation.clientLaunch.tokenHash, null);
+  assert.equal(exchanged.session.invitation.clientLaunch.exchangedAt, "2026-08-18T20:00:08.000Z");
+  assert.equal(publicSession(exchanged.session, NOW + 8_000).invitation.clientLaunchStatus, "exchanged");
+  assert.throws(
+    () => exchangeClientLaunch(exchanged.session, claimed.clientLaunchToken, NOW + 9_000),
+    /invalid or already used/
+  );
 });
 
 test("expired invitations cannot be claimed", () => {
   const created = createDiagnosticSession({ target: "example.com", ttlMinutes: 5, ephemeral: true }, NOW);
   assert.throws(
-    () => claimDiagnosticInvitation(created.session, created.credentials.invitationToken, true, NOW + 5 * 60_000),
+    () => claimDiagnosticInvitation(created.session, created.credentials.invitationToken, { consent: true }, NOW + 5 * 60_000),
     /expired/
   );
 });

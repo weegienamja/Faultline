@@ -1,0 +1,9 @@
+{
+  "main": "src/client/windows-client.mjs",
+  "mainFormat": "module",
+  "output": "dist/Faultline.exe",
+  "disableExperimentalSEAWarning": true,
+  "useSnapshot": false,
+  "useCodeCache": false,
+  "execArgvExtension": "none"
+}
