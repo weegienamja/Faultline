@@ -1,0 +1,36 @@
+[
+  {
+    "id": "basic-reachability",
+    "version": 1,
+    "name": "Basic reachability",
+    "description": "Confirms that the diagnostic target resolves and accepts the requested TCP connection.",
+    "checks": [
+      { "id": "dns", "type": "dns", "label": "DNS resolution", "required": true, "host": "$target.host" },
+      { "id": "tcp", "type": "tcp", "label": "TCP connection", "required": true, "host": "$target.host", "port": "$target.port" }
+    ]
+  },
+  {
+    "id": "secure-web",
+    "version": 1,
+    "name": "Secure web service",
+    "description": "Checks the DNS, TCP, TLS and HTTP conditions required to reach a conventional HTTPS service.",
+    "checks": [
+      { "id": "dns", "type": "dns", "label": "DNS resolution", "required": true, "host": "$target.host" },
+      { "id": "tcp", "type": "tcp", "label": "TCP connection", "required": true, "host": "$target.host", "port": "$target.port" },
+      { "id": "tls", "type": "tls", "label": "TLS handshake", "required": true, "host": "$target.host", "port": "$target.port" },
+      { "id": "http", "type": "http", "label": "HTTP response", "required": true, "url": "$target.url", "maxStatus": 499 }
+    ]
+  },
+  {
+    "id": "web-api",
+    "version": 1,
+    "name": "Web API",
+    "description": "Checks a typical HTTPS API path while treating authentication and client errors as proof that the service path is reachable.",
+    "checks": [
+      { "id": "dns", "type": "dns", "label": "API DNS", "required": true, "host": "$target.host" },
+      { "id": "tcp", "type": "tcp", "label": "API TCP", "required": true, "host": "$target.host", "port": "$target.port" },
+      { "id": "tls", "type": "tls", "label": "API TLS", "required": true, "host": "$target.host", "port": "$target.port" },
+      { "id": "http", "type": "http", "label": "API HTTP", "required": true, "url": "$target.url", "maxStatus": 499 }
+    ]
+  }
+]

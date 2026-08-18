@@ -10,6 +10,8 @@ const copyButton = document.getElementById("invite-copy");
 const probeSelect = document.getElementById("invite-probe");
 
 const AUTO_PROBE = "__auto__";
+let contracts = [];
+let contractSelect = null;
 
 function adminToken() {
   return sessionStorage.getItem("faultlineAdminToken") || "";
@@ -39,6 +41,35 @@ async function request(path, { method = "GET", body } = {}) {
     throw error;
   }
   return payload;
+}
+
+function ensureContractControl() {
+  if (contractSelect) return contractSelect;
+  const grid = form.querySelector(".invite-grid");
+  const probeLabel = probeSelect.closest("label");
+  const label = document.createElement("label");
+  label.textContent = "Connectivity Contract";
+  contractSelect = document.createElement("select");
+  contractSelect.id = "invite-contract";
+  label.appendChild(contractSelect);
+  grid.insertBefore(label, probeLabel);
+  return contractSelect;
+}
+
+async function loadContracts() {
+  const response = await fetch("/contracts.json", { cache: "no-store" });
+  if (!response.ok) throw new Error("Faultline could not load Connectivity Contracts.");
+  contracts = await response.json();
+  const select = ensureContractControl();
+  const current = select.value || "basic-reachability";
+  select.innerHTML = '<option value="">No contract · generic target checks only</option>';
+  for (const contract of contracts) {
+    const option = document.createElement("option");
+    option.value = contract.id;
+    option.textContent = `${contract.name} · ${contract.checks.filter(check => check.required !== false).length} required checks`;
+    select.appendChild(option);
+  }
+  select.value = [...select.options].some(option => option.value === current) ? current : "basic-reachability";
 }
 
 async function loadProbes() {
@@ -72,7 +103,7 @@ openButton.addEventListener("click", async () => {
   }
 
   try {
-    await loadProbes();
+    await Promise.all([loadProbes(), loadContracts()]);
     dialog.showModal();
     document.getElementById("invite-target").focus();
   } catch (error) {
@@ -96,6 +127,8 @@ form.addEventListener("submit", async event => {
   const choice = probeSelect.value;
   const assignedProbeId = choice && choice !== AUTO_PROBE ? choice : undefined;
   const probeSelector = choice === AUTO_PROBE ? { scope: "public" } : undefined;
+  const contractId = contractSelect?.value || "";
+  const connectivityContract = contracts.find(contract => contract.id === contractId) || undefined;
 
   try {
     const payload = await request("/api/sessions", {
@@ -107,6 +140,7 @@ form.addEventListener("submit", async event => {
         ttlMinutes,
         assignedProbeId,
         probeSelector,
+        connectivityContract,
         ephemeral: true
       }
     });
@@ -118,7 +152,10 @@ form.addEventListener("submit", async event => {
     const probeText = payload.session.assignedProbeId
       ? ` Remote probe ${payload.session.assignedProbeId} assigned ${payload.session.probeSelection?.mode === "automatic" ? "automatically" : "explicitly"}.`
       : " No registered probe assigned.";
-    errorBox.textContent = `Session ${payload.session.id} created. The invitation expires ${new Date(payload.session.expiresAt).toLocaleString()}.${probeText}`;
+    const contractText = payload.session.connectivityContract
+      ? ` Contract: ${payload.session.connectivityContract.name} v${payload.session.connectivityContract.version}.`
+      : "";
+    errorBox.textContent = `Session ${payload.session.id} created. The invitation expires ${new Date(payload.session.expiresAt).toLocaleString()}.${probeText}${contractText}`;
   } catch (error) {
     errorBox.textContent = error.message;
   } finally {

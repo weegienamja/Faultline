@@ -89,6 +89,19 @@ export function diagnose(input) {
     evidence.push(finding("Jitter", "pass", "Latency variation is within the expected range.", `${jitterMs.toFixed(0)} ms`));
   }
 
+  if (typeof input.contractPassed === "boolean") {
+    const rate = Number(input.contractPassRate ?? 0);
+    const failure = input.contractFailureType ? String(input.contractFailureType).toUpperCase() : null;
+    evidence.push(finding(
+      "Connectivity contract",
+      input.contractPassed ? "pass" : "fail",
+      input.contractPassed
+        ? "All required application connectivity checks passed on the affected endpoint."
+        : `One or more required application connectivity checks failed${failure ? `; the first failing condition was ${failure}` : ""}.`,
+      `${rate.toFixed(0)}%`
+    ));
+  }
+
   if (!externalProbePresent) {
     evidence.push(finding("Remote probe", "neutral", "No independent probe has joined this diagnostic run yet."));
   } else if (input.externalProbeHealthy === true) {

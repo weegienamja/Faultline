@@ -1,7 +1,8 @@
 #!/usr/bin/env node
+import { getConnectivityContract, listConnectivityContracts } from "../contracts/registry.mjs";
 
 function help() {
-  console.log(`Faultline Invitation CLI v0.6 preview\n\nUsage:\n  npm run invite -- --target <hostname|IP|URL> [options]\n\nOptions:\n  --target <value>          Diagnostic target (required)\n  --port <number>           Target TCP port (default inferred from target)\n  --api-base <url>          Public Faultline base URL\n                            (default: http://localhost:3000)\n  --admin-token <token>     Admin bearer token (or FAULTLINE_ADMIN_TOKEN)\n  --probe <id>              Explicitly assign a registered probe\n  --one-off-probe           Do not auto-select a registered probe\n  --probe-country <value>   Auto-selection country label\n  --probe-region <value>    Auto-selection region label\n  --probe-tags <csv>        Required auto-selection tags\n  --probe-scope <value>     public or private (default: public)\n  --ttl <minutes>           Invitation/session lifetime, 5-1440 minutes\n  --title <value>           Incident title shown to the user\n  --customer <value>        Customer or support-case label\n  --vpn-required            Mark target as VPN-dependent\n  --expected-route <CIDR>   Expected IPv4 route for endpoint validation\n  --json                    Print the full creation response\n  --help                    Show this help\n\nBy default Faultline chooses the least-loaded matching online public probe.\n`);
+  console.log(`Faultline Invitation CLI v0.7 preview\n\nUsage:\n  npm run invite -- --target <hostname|IP|URL> [options]\n\nOptions:\n  --target <value>          Diagnostic target (required)\n  --port <number>           Target TCP port (default inferred from target)\n  --contract <id>           Attach a versioned Connectivity Contract\n  --list-contracts          List built-in Connectivity Contracts\n  --api-base <url>          Public Faultline base URL\n                            (default: http://localhost:3000)\n  --admin-token <token>     Admin bearer token (or FAULTLINE_ADMIN_TOKEN)\n  --probe <id>              Explicitly assign a registered probe\n  --one-off-probe           Do not auto-select a registered probe\n  --probe-country <value>   Auto-selection country label\n  --probe-region <value>    Auto-selection region label\n  --probe-tags <csv>        Required auto-selection tags\n  --probe-scope <value>     public or private (default: public)\n  --ttl <minutes>           Invitation/session lifetime, 5-1440 minutes\n  --title <value>           Incident title shown to the user\n  --customer <value>        Customer or support-case label\n  --vpn-required            Mark target as VPN-dependent\n  --expected-route <CIDR>   Expected IPv4 route for endpoint validation\n  --json                    Print the full creation response\n  --help                    Show this help\n\nBy default Faultline chooses the least-loaded matching online public probe.\n`);
 }
 
 function parseNumber(value, label, { min, max, integer = false }) {
@@ -17,15 +18,17 @@ function parseArgs(argv) {
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--help" || arg === "-h") options.help = true;
+    else if (arg === "--list-contracts") options.listContracts = true;
     else if (arg === "--vpn-required") options.vpnRequired = true;
     else if (arg === "--one-off-probe") options.autoProbe = false;
     else if (arg === "--json") options.json = true;
-    else if (["--target", "--port", "--api-base", "--admin-token", "--probe", "--probe-country", "--probe-region", "--probe-tags", "--probe-scope", "--ttl", "--title", "--customer", "--expected-route"].includes(arg)) {
+    else if (["--target", "--port", "--contract", "--api-base", "--admin-token", "--probe", "--probe-country", "--probe-region", "--probe-tags", "--probe-scope", "--ttl", "--title", "--customer", "--expected-route"].includes(arg)) {
       const value = argv[index + 1];
       if (!value || value.startsWith("--")) throw new Error(`${arg} requires a value.`);
       index += 1;
       if (arg === "--target") options.target = value;
       if (arg === "--port") options.port = parseNumber(value, "--port", { min: 1, max: 65535, integer: true });
+      if (arg === "--contract") options.contractId = value;
       if (arg === "--api-base") options.apiBase = value.replace(/\/+$/, "");
       if (arg === "--admin-token") options.adminToken = value;
       if (arg === "--probe") { options.assignedProbeId = value; options.autoProbe = false; }
@@ -53,6 +56,16 @@ function validatePublicBase(value) {
   return value.replace(/\/+$/, "");
 }
 
+function printContracts() {
+  console.log("Faultline Connectivity Contracts:\n");
+  for (const contract of listConnectivityContracts()) {
+    console.log(`${contract.id} · ${contract.name} v${contract.version}`);
+    console.log(`  ${contract.description}`);
+    console.log(`  ${contract.checks.map(check => `${check.type}${check.required ? "*" : ""}`).join(", ")}\n`);
+  }
+  console.log("* required check");
+}
+
 async function main() {
   let options;
   try {
@@ -65,6 +78,7 @@ async function main() {
   }
 
   if (options.help) return help();
+  if (options.listContracts) return printContracts();
   if (!options.target) {
     console.error("Error: --target is required.\n");
     help();
@@ -72,6 +86,7 @@ async function main() {
     return;
   }
 
+  const connectivityContract = options.contractId ? getConnectivityContract(options.contractId) : null;
   const adminToken = options.adminToken || process.env.FAULTLINE_ADMIN_TOKEN;
   if (!adminToken) {
     console.error("Error: provide --admin-token or set FAULTLINE_ADMIN_TOKEN.");
@@ -103,6 +118,7 @@ async function main() {
       expectedRoute: options.expectedRoute,
       assignedProbeId: options.assignedProbeId,
       probeSelector,
+      connectivityContract,
       ephemeral: true
     })
   });
@@ -122,6 +138,7 @@ async function main() {
   console.log(`Faultline support diagnostic ${session.id} created.`);
   console.log(`Target: ${session.target.input}:${session.target.port}`);
   console.log(`Expires: ${session.expiresAt}`);
+  if (session.connectivityContract) console.log(`Connectivity contract: ${session.connectivityContract.name} v${session.connectivityContract.version}`);
   if (session.assignedProbeId) {
     console.log(`Registered probe: ${session.assignedProbeId} (${session.probeSelection?.mode || "explicit"})`);
   }
