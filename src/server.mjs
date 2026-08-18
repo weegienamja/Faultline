@@ -196,7 +196,7 @@ const server = createServer(async (req, res) => {
     if (req.method === "GET" && url.pathname === "/api/sessions") {
       requireAdmin(req);
       const sessions = await store.listSessions();
-      return json(res, 200, sessions.map(publicSession));
+      return json(res, 200, sessions.map(session => publicSession(session)));
     }
 
     if (req.method === "GET" && url.pathname.startsWith("/api/sessions/")) {
