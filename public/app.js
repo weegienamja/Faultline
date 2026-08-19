@@ -1,3 +1,5 @@
+import { buildLivePathTopology, normaliseTopology } from "./topology-view.js";
+
 const ids = [
   "incident-list", "fault-domain", "confidence", "confidence-ring", "diagnosis-summary",
   "incident-title", "incident-id", "customer", "target", "location", "connection",
@@ -32,6 +34,15 @@ function applyAuthState() {
   els["auth-open"].textContent = adminToken ? "Live data unlocked" : "Unlock live data";
   els["auth-open"].classList.toggle("unlocked", Boolean(adminToken));
   els["probe-fleet-panel"].hidden = !adminToken;
+}
+
+// Panels rendered by other modules (case workspaces) refresh on this event.
+function setAdminToken(value) {
+  adminToken = value || "";
+  if (adminToken) sessionStorage.setItem("faultlineAdminToken", adminToken);
+  else sessionStorage.removeItem("faultlineAdminToken");
+  applyAuthState();
+  window.dispatchEvent(new CustomEvent("faultline-auth-changed"));
 }
 
 function renderIncidentStrip() {
@@ -93,9 +104,13 @@ function renderProbeFleet() {
 function topologyGlyph(type) {
   return {
     laptop: "▰",
+    endpoint: "▰",
     router: "⌁",
+    gateway: "⌁",
     "access-point": "◉",
+    access_point: "◉",
     "mesh-node": "◈",
+    mesh: "◈",
     switch: "▦",
     printer: "▤",
     server: "▥",
@@ -103,11 +118,19 @@ function topologyGlyph(type) {
     phone: "▯",
     tablet: "▭",
     internet: "◎",
+    boundary: "◎",
+    transit: "⇄",
+    service: "▣",
     unknown: "◇"
   }[type] || "◇";
 }
 
 function topologyNodeSubtitle(node) {
+  if (node.role === "transit" || node.role === "target") {
+    const owner = node.asn != null ? `AS${node.asn}` : null;
+    const rtt = typeof node.rttMs === "number" ? `${node.rttMs} ms` : null;
+    return [owner, node.ip, rtt].filter(Boolean).join(" · ") || "public network";
+  }
   if (node.role === "boundary") return "External network boundary";
   if (node.ip) return node.ip;
   if (node.ssid) return node.ssid;
@@ -122,6 +145,9 @@ function topologyTooltip(node) {
     node.ip ? `IP: ${node.ip}` : null,
     node.mac ? `MAC: ${node.mac}` : null,
     node.connection ? `Connection: ${node.connection}` : null,
+    node.evidence ? `Evidence: ${node.evidence}` : null,
+    node.ownerEvidence === "routing-metadata" ? "Owner label: public routing metadata, not proof of fault ownership" : null,
+    node.prefix ? `Prefix: ${node.prefix}` : null,
     node.inferenceReason || null
   ].filter(Boolean).join("\n");
 }
@@ -149,10 +175,20 @@ function topologyPositions(topology, width, height) {
   const clampX = value => Math.max(75, Math.min(width - 75, value));
   const clampY = value => Math.max(55, Math.min(height - 55, value));
 
-  positions.set("endpoint", { x: clampX(width * .12), y: clampY(height * .43) });
-  positions.set("wireless-access", { x: clampX(width * .34), y: clampY(height * .43) });
-  positions.set("gateway", { x: clampX(width * .57), y: clampY(height * .43) });
-  positions.set("internet", { x: clampX(width * .86), y: clampY(height * .43) });
+  // Lay the primary path out by role so both collector schemas position correctly.
+  for (const [role, fraction] of [["endpoint", .10], ["access", .26], ["gateway", .42], ["boundary", .58]]) {
+    const node = topology.nodes.find(item => item.role === role);
+    if (node) positions.set(node.id, { x: clampX(width * fraction), y: clampY(height * .43) });
+  }
+
+  // Public path segments and the target service continue along the same lane.
+  const transit = topology.nodes.filter(node => node.role === "transit");
+  const targetNode = topology.nodes.find(node => node.role === "target");
+  const tail = [...transit, ...(targetNode ? [targetNode] : [])];
+  tail.forEach((node, index) => {
+    const fraction = .62 + ((index + 1) / (tail.length + 1)) * .34;
+    positions.set(node.id, { x: clampX(width * fraction), y: clampY(height * .43) });
+  });
 
   const neighbours = topology.nodes.filter(node => node.role === "neighbour");
   neighbours.forEach((node, index) => {
@@ -178,18 +214,47 @@ function topologyPositions(topology, width, height) {
   return positions;
 }
 
+// A completed live diagnostic takes over the map with the real measured path.
+let liveTopology = null;
+let liveFaultDomain = null;
+
+window.addEventListener("faultline-live-result", event => {
+  try {
+    const built = buildLivePathTopology(event.detail);
+    if (built?.nodes?.length) {
+      liveTopology = built;
+      liveFaultDomain = event.detail?.deterministic?.diagnosis?.faultDomain || null;
+      drawTopology(liveTopology, liveFaultDomain, true);
+    }
+  } catch {
+    liveTopology = null;
+  }
+});
+
 function renderTopology(incident) {
-  const topology = incident.telemetry?.topology;
-  els["topology-panel"].hidden = !topology?.nodes?.length;
-  if (!topology?.nodes?.length) {
+  // Once a live diagnostic has produced a real path, keep showing it rather
+  // than reverting to a demo incident's synthetic topology.
+  if (liveTopology) {
+    drawTopology(liveTopology, liveFaultDomain, true);
+    return;
+  }
+  const collected = incident.telemetry?.topology;
+  els["topology-panel"].hidden = !collected?.nodes?.length;
+  if (!collected?.nodes?.length) {
     els["topology-canvas"].replaceChildren();
     return;
   }
+  drawTopology(normaliseTopology(collected), incident.diagnosis.faultDomain, false);
+}
 
+function drawTopology(topology, faultDomain, isLive) {
+  els["topology-panel"].hidden = false;
   els["topology-kind"].textContent = topology.kind || "unknown";
-  els["topology-confidence"].textContent = `${topology.confidence || "low"} confidence`;
-  els["topology-confidence"].className = `topology-pill ${topology.confidence || "low"}`;
-  els["topology-summary"].textContent = `${topology.summary || "Topology evidence collected."} Passive discovery only; dashed links are inferred.`;
+  els["topology-confidence"].textContent = isLive ? "live measured path" : `${topology.confidence || "low"} confidence`;
+  els["topology-confidence"].className = `topology-pill ${isLive ? "" : (topology.confidence || "low")}`;
+  els["topology-summary"].textContent = isLive
+    ? `${topology.summary || "Live path collected."} Solid links are OBSERVED hops; dashed links are INFERRED; owner labels are public routing metadata.`
+    : `${topology.summary || "Topology evidence collected."} Passive discovery only; dashed links are inferred.`;
 
   const canvas = els["topology-canvas"];
   canvas.replaceChildren();
@@ -210,7 +275,7 @@ function renderTopology(incident) {
   const lineById = new Map();
   for (const link of topology.links || []) {
     const line = document.createElementNS(ns, "line");
-    const affected = isAffectedTopologyLink(link, topology, incident.diagnosis.faultDomain);
+    const affected = isAffectedTopologyLink(link, topology, faultDomain);
     line.setAttribute("class", `topology-link ${link.observed ? "" : "inferred"} ${affected}`.trim());
     line.dataset.source = link.source;
     line.dataset.target = link.target;
@@ -225,7 +290,7 @@ function renderTopology(incident) {
   for (const node of topology.nodes) {
     const element = document.createElement("button");
     element.type = "button";
-    element.className = `topology-node ${node.role || ""}${topologyNodeFault(node, incident.diagnosis.faultDomain) ? " local-fault" : ""}`;
+    element.className = `topology-node ${node.role || ""}${topologyNodeFault(node, faultDomain) ? " local-fault" : ""}`;
     element.title = topologyTooltip(node);
 
     const icon = document.createElement("span");
@@ -410,10 +475,8 @@ async function loadIncidents({ initial = false } = {}) {
       ]);
     } catch (error) {
       if (error.status !== 401) throw error;
-      adminToken = "";
       probes = [];
-      sessionStorage.removeItem("faultlineAdminToken");
-      applyAuthState();
+      setAdminToken("");
       next = await fetchJson("/api/demo-incidents");
     }
   } else {
@@ -455,10 +518,8 @@ els["auth-form"].addEventListener("submit", async event => {
       fetchJson("/api/incidents", candidate),
       fetchJson("/api/probes", candidate)
     ]);
-    adminToken = candidate;
-    sessionStorage.setItem("faultlineAdminToken", candidate);
     activeIndex = 0;
-    applyAuthState();
+    setAdminToken(candidate);
     render();
     els["auth-dialog"].close();
   } catch (error) {

@@ -20,6 +20,10 @@ import {
 import { normaliseProbeSelector, selectProbe } from "./probe/scheduler.mjs";
 import { createStore } from "./storage/store.mjs";
 import { createPlatformRouter } from "./platform/routes.mjs";
+import { createLiveRouter } from "./live/routes.mjs";
+
+const PRODUCT_VERSION = "v1.1";
+const PRODUCT_MILESTONE = "Connectivity Contract ecosystem";
 
 const root = fileURLToPath(new URL("../public/", import.meta.url));
 const port = Number(process.env.PORT || 3000);
@@ -47,11 +51,18 @@ function json(res, status, payload) {
 function bodyFrom(req) {
   return new Promise((resolveBody, reject) => {
     let body = "";
+    let oversize = false;
     req.on("data", chunk => {
+      if (oversize) return;
       body += chunk;
-      if (body.length > 1_000_000) reject(new Error("Request body too large"));
+      if (body.length > 1_000_000) {
+        oversize = true;
+        body = "";
+        reject(new Error("Request body too large"));
+      }
     });
     req.on("end", () => {
+      if (oversize) return;
       try {
         resolveBody(body ? JSON.parse(body) : {});
       } catch {
@@ -371,16 +382,20 @@ const platform = createPlatformRouter({
   publicSession
 });
 
+const handleLive = createLiveRouter({ requireAdmin, bodyFrom, json, store, publicProbe });
+
 const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
 
     if (await platform.handle(req, res, url)) return;
+    if (await handleLive(req, res, url)) return;
 
     if (req.method === "GET" && url.pathname === "/api/health") {
       return json(res, 200, {
         ok: true,
-        version: "0.8-preview",
+        version: `${PRODUCT_VERSION}-preview`,
+        milestone: PRODUCT_MILESTONE,
         persistence: true,
         registeredProbeFleet: true,
         probeScheduling: true,
@@ -389,7 +404,10 @@ const server = createServer(async (req, res) => {
         ephemeralInvitations: true,
         windowsClientPreview: true,
         caseWorkspaces: true,
-        evidencePackages: true
+        evidencePackages: true,
+        crossPartyRooms: true,
+        multiTenancy: true,
+        contractCatalog: true
       });
     }
 
@@ -624,6 +642,11 @@ const server = createServer(async (req, res) => {
       return json(res, 200, diagnose(payload));
     }
 
+    // Unmatched API paths must not fall through to the SPA HTML fallback.
+    if (url.pathname === "/api" || url.pathname.startsWith("/api/")) {
+      return json(res, 404, { error: `No Faultline API route matches ${req.method} ${url.pathname}.` });
+    }
+
     const relative = url.pathname === "/"
       ? "index.html"
       : url.pathname === "/diagnose" || url.pathname === "/diagnose/"
@@ -650,8 +673,8 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(port, () => {
-  console.log(`Faultline v0.6 preview listening on http://localhost:${port}`);
-  console.log("Current product milestone: v0.8 preview");
+  console.log(`Faultline ${PRODUCT_VERSION} preview listening on http://localhost:${port}`);
+  console.log(`Current product milestone: ${PRODUCT_VERSION} preview · ${PRODUCT_MILESTONE}`);
   console.log(`Persistent store: ${dataFile}`);
   if (!configuredAdminToken) {
     console.log("No FAULTLINE_ADMIN_TOKEN was configured. Generated a development admin credential:");

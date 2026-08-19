@@ -59,6 +59,9 @@
     .topology-node.endpoint { border-color: rgba(97,230,184,.55); }
     .topology-node.gateway { border-color: rgba(97,230,184,.34); }
     .topology-node.boundary { border-color: rgba(139,160,154,.28); }
+    .topology-node.transit { border-color: rgba(122,170,255,.42); }
+    .topology-node.target { border-color: rgba(97,230,184,.5); }
+    .topology-link.observed-path { stroke: #61e6b8; stroke-width: 2.5; opacity: .9; }
     .topology-node.local-fault { border-color: rgba(255,122,104,.72); box-shadow: 0 0 0 1px rgba(255,122,104,.08), 0 10px 35px rgba(0,0,0,.24); }
     .topology-icon { width: 31px; height: 31px; border-radius: 9px; display: grid; place-items: center; background: rgba(97,230,184,.09); color: var(--accent); font-size: 16px; border: 1px solid rgba(97,230,184,.16); }
     .topology-node strong { display: block; font-size: 10px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -98,7 +101,7 @@
       <div class="sidebar-bottom">
         <div class="probe-card">
           <div class="probe-status"><span class="pulse"></span> Registered probe fleet</div>
-          <strong>Persistent identities · v0.5</strong>
+          <strong>Persistent identities · v1.1</strong>
           <span>Heartbeat health + assigned diagnostic jobs</span>
         </div>
         <div class="profile">
@@ -117,11 +120,12 @@
         <div class="top-actions">
           <button class="auth-button" id="auth-open">Unlock live data</button>
           <button class="primary-button" id="invite-open" type="button">New diagnostic</button>
-          <a class="primary-button" href="https://github.com/weegienamja/Faultline#registered-probe-fleet">Probe fleet</a>
+          <a class="primary-button" href="https://github.com/weegienamja/Faultline/blob/main/docs/PROBE_FLEET.md">Probe fleet</a>
         </div>
       </header>
 
-      <section class="incident-strip" id="incident-list" aria-label="Diagnostic incidents"></section>
+      <div class="strip-label"><span class="section-label">DEMO SCENARIOS</span><span>Synthetic incidents retained to demonstrate known failure types. Real measurements appear in the live panel above.</span></div>
+      <section class="incident-strip" id="incident-list" aria-label="Demo diagnostic incidents"></section>
 
       <section class="hero-grid" id="overview">
         <article class="panel diagnosis-panel">
@@ -187,6 +191,7 @@
           <span><i class="legend-line"></i> observed relationship</span>
           <span><i class="legend-line inferred"></i> inferred relationship</span>
           <span><i class="legend-line fault"></i> likely affected segment</span>
+          <span><i class="legend-line" style="border-color:#61e6b8"></i> observed public hop</span>
           <span>Drag nodes to rearrange the map</span>
         </div>
       </section>
@@ -232,12 +237,11 @@
             </div>
           </div>
           <ol class="action-list" id="action-list"></ol>
-          <button class="report-button">Export evidence report ↗</button>
         </article>
       </section>
 
       <footer>
-        <span>Faultline v0.5 · v0.6 topology + invitation preview</span>
+        <span>Faultline v1.1 preview · Connectivity Contract ecosystem</span>
         <span>Evidence before escalation.</span>
       </footer>
     </main>
@@ -306,6 +310,7 @@
     </form>
   </dialog>
 
+  <script type="module" src="/live-panel.js"></script>
   <script type="module" src="/app.js"></script>
   <script type="module" src="/invite-admin.js"></script>
 </body>

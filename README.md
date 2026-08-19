@@ -23,7 +23,36 @@ Faultline collects scoped evidence from affected endpoints and independent vanta
 - **v1.4:** dual-stack, explicit TLS, HTTP stage timing and bounded Windows path-MTU evidence
 - **v1.5:** named change windows, pinned baseline/post-change runs, regression detection and integrity-tagged assurance packages
 
+- **Live data:** real DNS/TCP/TLS/HTTP/ICMP/path measurement plus public routing, outage and network-ownership context
+
 Faultline does **not** use an AI/LLM API in diagnosis or Incident Intelligence.
+
+## Live network and Internet data
+
+Open <http://localhost:3000>, unlock live data, and run a diagnostic against a real
+target (`example.com`, `1.1.1.1`, `https://example.com/health`). Faultline measures
+DNS across four resolvers, TCP, TLS (version/cipher/certificate), HTTP TTFB, ICMP
+and the network path from this machine, then adds public Internet context:
+
+```text
+LOCAL        DNS, TCP, TLS, HTTP, ICMP, traceroute, adapter/Wi-Fi/VPN/DNS state
+GLOBALPING   live ping from public vantage points          no credential
+RIPESTAT     prefix, origin ASN, holder, RPKI, RIS, BGP    no credential
+RIPE ATLAS   connected public probes near the network      no credential
+IODA         outage/anomaly signals                        no credential
+PEERINGDB    self-published network metadata               no credential
+CF RADAR     outage annotations                            optional token
+```
+
+Only Cloudflare Radar needs a credential (`FAULTLINE_CLOUDFLARE_RADAR_TOKEN`); it is
+disabled and shows "Not configured" without one. Public enrichment only ever
+transmits a globally routable IP or an ASN derived from it — private addresses,
+local hostnames, MACs, SSIDs and VPN routes are never sent anywhere.
+
+External context is **supporting evidence**. The deterministic engine remains the
+only thing that decides a fault domain.
+
+See [Live Internet Data](docs/LIVE_INTERNET_DATA.md).
 
 ## v1.5 Network Change Assurance
 
@@ -113,7 +142,13 @@ Platform / tenant control plane
 - [Cross-Party Incident Rooms](docs/CROSS_PARTY_ROOMS.md)
 - [Incident Intelligence](docs/INCIDENT_INTELLIGENCE.md)
 - [Multi-Tenancy](docs/MULTI_TENANCY.md)
+- [Live Internet Data](docs/LIVE_INTERNET_DATA.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Deployment](docs/DEPLOYMENT.md)
+- [Ephemeral diagnostics](docs/EPHEMERAL_DIAGNOSTICS.md)
 - [Windows client](docs/WINDOWS_CLIENT.md)
+- [Endpoint agent](docs/AGENT.md)
+- [Remote probe](docs/REMOTE_PROBE.md)
 - [Probe fleet](docs/PROBE_FLEET.md)
 - [Fleet safety](docs/FLEET_SAFETY.md)
 - [Topology](docs/TOPOLOGY.md)
@@ -166,6 +201,7 @@ v1.2  Embedded Diagnostics API + SDK        complete preview
 v1.3  Service Desk Integrations             complete preview
 v1.4  Deeper Network / Protocol Diagnostics complete preview
 v1.5  Network Change Assurance              current preview
+      Live Internet data + BYO environment  merged
 v1.6  Incident Intelligence v2              next
 ```
 

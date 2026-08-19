@@ -38,6 +38,7 @@ The deterministic diagnosis path remains separate from statistical/ML analysis. 
 | v1.3 | Service-desk correlation and provenance-preserving update envelopes | ✅ preview |
 | v1.4 | Dual-stack, TLS, HTTP-stage and path-MTU diagnostics | ✅ preview |
 | v1.5 | Network Change Assurance | ✅ preview |
+| Live data | Real local measurement, public Internet intelligence and bring-your-own-network | ✅ preview |
 
 ---
 
@@ -83,6 +84,35 @@ Assurance package
 Current limitation: a regression is an evidence difference, not proof that the change caused it.
 
 See [docs/CHANGE_ASSURANCE.md](docs/CHANGE_ASSURANCE.md).
+
+---
+
+# Live Internet data and bring-your-own-network ✅ preview
+
+**Goal:** let Faultline demonstrate its reasoning against real networks rather than
+only synthetic demo scenarios, without adding an AI dependency or a paid API.
+
+## Delivered
+
+- real local measurement: DNS across the system resolver plus three public resolvers
+  with agreement detection, TCP, TLS (version/cipher/certificate/chain), HTTP
+  status/TTFB/redirect chain, ICMP latency/jitter/loss, traceroute, and
+  adapter/Wi-Fi/VPN/route/DNS-server state
+- explicit `unknown` / `not-measured` / `unsupported` states instead of invented values
+- public Internet context from RIPEstat, Globalping, RIPE Atlas, IODA and PeeringDB,
+  all credential-free; Cloudflare Radar optional behind a token
+- Network Map extended past the local gateway with traceroute-proven public segments,
+  labelled OBSERVED versus PUBLIC ROUTING METADATA
+- Network Manifest import with preview, and enforcement that private targets require
+  an authorised private probe
+- privacy boundary: only globally routable addresses ever leave the control plane
+
+## Boundary
+
+Only observed measurements reach the deterministic engine. Globalping is wired to the
+existing independent-vantage input because it is a genuine measurement; RIPEstat,
+IODA, PeeringDB, RIPE Atlas and Cloudflare Radar are context and can never move a
+fault domain.
 
 ---
 

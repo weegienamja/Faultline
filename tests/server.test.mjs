@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 const ADMIN_TOKEN = "test-admin-token";
-const STARTED = "Faultline v0.6 preview listening";
+const STARTED = "preview listening on http://localhost:";
 
 function startServer(port, dataFile) {
   const child = spawn(process.execPath, ["src/server.mjs"], {
@@ -83,9 +83,16 @@ test("persists and authenticates a complete two-vantage diagnostic", { timeout: 
   try {
     server = await startServer(port, dataFile);
 
-    assert.equal((await request(base, "/api/health")).status, 200);
+    const health = await request(base, "/api/health");
+    assert.equal(health.status, 200);
+    assert.equal(health.body.contractCatalog, true);
     assert.equal((await request(base, "/api/demo-incidents")).status, 200);
     assert.equal((await request(base, "/api/incidents")).status, 401);
+
+    // Unmatched API routes must return JSON 404, not the SPA HTML fallback.
+    const unmatched = await request(base, "/api/definitely-not-a-route");
+    assert.equal(unmatched.status, 404);
+    assert.match(unmatched.body.error, /No Faultline API route matches/);
 
     const created = await request(base, "/api/sessions", {
       method: "POST",
