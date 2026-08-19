@@ -36,6 +36,11 @@ export function normaliseSessionInput(input = {}, now = Date.now()) {
   const customer = String(input.customer || "Diagnostic session").trim();
   if (title.length > 180 || customer.length > 180) throw new Error("Session title and customer labels must be 180 characters or fewer.");
 
+  const caseId = input.caseId ? String(input.caseId).trim() : null;
+  if (caseId && (caseId.length > 120 || !/^CASE-[A-Z0-9-]+$/i.test(caseId))) {
+    throw new Error("Session caseId is invalid.");
+  }
+
   const probeSelection = input.probeSelection && typeof input.probeSelection === "object"
     ? {
         mode: String(input.probeSelection.mode || "explicit"),
@@ -54,6 +59,7 @@ export function normaliseSessionInput(input = {}, now = Date.now()) {
     target: { input: target, port },
     title,
     customer,
+    caseId,
     vpnRequired: Boolean(input.vpnRequired || input.expectedRoute),
     expectedRoute: input.expectedRoute ? String(input.expectedRoute).trim() : null,
     assignedProbeId: input.assignedProbeId ? String(input.assignedProbeId).trim() : null,
@@ -223,6 +229,7 @@ export function publicSession(session, now = Date.now()) {
     target: session.target,
     title: session.title,
     customer: session.customer,
+    caseId: session.caseId || null,
     mode,
     vpnRequired: Boolean(session.vpnRequired),
     expectedRoute: session.expectedRoute || null,
