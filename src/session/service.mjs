@@ -110,11 +110,6 @@ export function findSessionByInvitationToken(sessions, token) {
   return sessions.find(session => verifyCredential(token, session?.invitation?.tokenHash)) || null;
 }
 
-export function findSessionByClientLaunchToken(sessions, token) {
-  if (!token || !Array.isArray(sessions)) return null;
-  return sessions.find(session => verifyCredential(token, session?.invitation?.clientLaunch?.tokenHash)) || null;
-}
-
 export function claimDiagnosticInvitation(session, token, options = {}, now = Date.now()) {
   if (!session || session.mode !== "ephemeral" || !session.invitation?.tokenHash) {
     const error = new Error("Diagnostic invitation is invalid.");

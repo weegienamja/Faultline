@@ -4,7 +4,7 @@ Faultline is designed around one principle: **diagnosis should come from explici
 
 The project deliberately has no AI API dependency. Inputs are structured measurements and the diagnosis engine is deterministic, testable and explainable.
 
-## v0.5 control plane
+## Control plane
 
 ```text
                                Administrator
@@ -47,7 +47,7 @@ The project deliberately has no AI API dependency. Inputs are structured measure
 
 ## Credential scopes
 
-v0.5 has three primary trust scopes.
+The control plane has three primary endpoint/worker trust scopes below the platform administrator, plus the tenant, case-room and invitation scopes described in the linked design notes.
 
 ### Administrator
 
@@ -264,11 +264,15 @@ There is no LLM in this path. The same telemetry should produce the same diagnos
 
 ## Persistence
 
-v0.5 state format version 2 stores:
+State format version 5 stores:
 
 - sessions
 - diagnostic runs
 - registered probes
+- audit events
+- support cases (including case-room participants and contributions)
+- organizations
+- projects (including the project Connectivity Contract catalog)
 
 Default direct-Node path:
 
@@ -282,7 +286,7 @@ Container path:
 /data/faultline.json
 ```
 
-Existing v0.4 state is normalized by adding an empty probe registry on read.
+Older state files are normalized on read by adding any missing collections, so an earlier store keeps working after an upgrade.
 
 Writes still use a temporary file followed by rename. The store remains intentionally single-process and is not a substitute for a transactional database.
 
@@ -302,29 +306,35 @@ The Node service expects TLS termination at a reverse proxy, load balancer or ho
 
 ## Current trust limitations
 
-v0.5 introduces durable probe identity but remains prototype-grade.
+Durable probe identity, credential lifecycle, tenancy and audit events now exist, but the platform remains prototype-grade.
 
-Not yet implemented:
+Still not implemented:
 
-- registered-probe credential rotation
-- immediate probe-token revocation API
-- organisation/user identity
-- audit logging
-- rate limiting
-- push-based job delivery
-- automatic probe selection by location/tag
+- named-user identity, SSO or RBAC (tenant access is credential-based)
+- push-based job delivery (workers poll)
 - database-backed multi-instance concurrency
-- configurable retention/redaction policies
+- platform-wide rate limiting (only registered-probe submissions are limited)
+- configurable retention policies
 - automatic TLS termination
+- Authenticode-signed Windows client
+
+Implemented since this document was first written:
+
+- registered-probe credential rotation and revocation (`POST /api/probes/:id/rotate`, `POST /api/probes/:id/revoke`)
+- audit logging (`GET /api/audit`)
+- automatic probe selection by scope/country/region/tag and health
+- organisation and project tenancy with scoped credentials
+- support cases, evidence packages and cross-party case rooms
+- project-scoped Connectivity Contract catalog
 
 ## Next architecture choices
 
 The strongest next directions are:
 
-1. probe disable/revoke/rotate controls with audit events
-2. scheduler-driven probe selection by region/tag and health
-3. richer remote path measurements
-4. database-backed multi-instance control plane
-5. portable evidence-report export
+1. database-backed multi-instance control plane
+2. richer remote path measurements (remote traceroute / ICMP path evidence)
+3. named-user identity and RBAC above the current tenant credentials
+4. push-based job delivery instead of worker polling
+5. signed Windows client distribution
 
 None requires an AI dependency for core network diagnosis.

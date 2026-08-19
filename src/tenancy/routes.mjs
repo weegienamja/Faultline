@@ -1,6 +1,6 @@
 import { createSupportCase, publicCase } from "../cases/service.mjs";
 import { createOrganization, createProject, findOrganizationAccess, publicOrganization, publicProject, rotateOrganizationCredential, revokeOrganizationCredential, scopeCaseToTenant, assertTenantCase } from "./service.mjs";
-import { createProjectContract, listProjectContracts, publishProjectContract, deprecateProjectContract, cloneProjectContractVersion, getPublishedProjectContract } from "../contracts/catalog.mjs";
+import { assertCatalogStatus, createProjectContract, listProjectContracts, publishProjectContract, deprecateProjectContract, cloneProjectContractVersion, getPublishedProjectContract } from "../contracts/catalog.mjs";
 
 function bearer(req){const match=String(req.headers.authorization||"").match(/^Bearer\s+(.+)$/i);return match?match[1].trim():"";}
 function fail(message,statusCode){const e=new Error(message);e.statusCode=statusCode;throw e;}
@@ -23,7 +23,7 @@ export function createTenantRouter({store,requireAdmin,bodyFrom,json,caseContext
 
     const contractsMatch=url.pathname.match(/^\/api\/tenant\/projects\/([^/]+)\/contracts(?:\/([^/]+)\/(publish|deprecate|clone))?$/);
     if(contractsMatch){const project=await ownedProject(org,decodeURIComponent(contractsMatch[1]));const entryId=contractsMatch[2]?decodeURIComponent(contractsMatch[2]):null;const action=contractsMatch[3]||null;
-      if(req.method==="GET"&&!entryId){const status=url.searchParams.get("status");return json(res,200,listProjectContracts(project,{status})),true;}
+      if(req.method==="GET"&&!entryId){const raw=url.searchParams.get("status");const status=raw?assertCatalogStatus(raw):null;return json(res,200,listProjectContracts(project,{status})),true;}
       if(req.method==="POST"&&!entryId){const result=createProjectContract(project,await bodyFrom(req));await store.putProject(result.project);return json(res,201,result.entry),true;}
       if(req.method==="POST"&&action==="publish"){const result=publishProjectContract(project,entryId);await store.putProject(result.project);return json(res,200,result.entry),true;}
       if(req.method==="POST"&&action==="deprecate"){const result=deprecateProjectContract(project,entryId);await store.putProject(result.project);return json(res,200,result.entry),true;}

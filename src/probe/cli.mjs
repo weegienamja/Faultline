@@ -3,7 +3,7 @@ import { hostname, platform } from "node:os";
 import { collectRemoteProbe } from "./network.mjs";
 
 function help() {
-  console.log(`Faultline Remote Probe v0.6\n\nRegistered worker:\n  npm run probe -- --probe <probe-id> --token <probe-token> [--watch]\n\nOne-off session probe:\n  npm run probe -- --session <session-id> --token <session-probe-token>\n\nOptions:\n  --probe <id>              Registered probe ID\n  --session <id>            Legacy one-off diagnostic session ID\n  --token <value>           Probe credential (or FAULTLINE_PROBE_TOKEN)\n  --api-base <url>          Faultline control-plane base URL\n                            (default: http://localhost:3000)\n  --name <value>            Friendly name used by one-off probes\n  --watch                   Keep registered probe online and poll for jobs\n  --interval <seconds>      Worker poll interval, 15-300 seconds (default: 30)\n  --dry-run                 Collect and print telemetry without uploading\n  --json                    Print full payloads\n  --help                    Show this help\n\nRegistered probe scope is controlled by the server. Public probes enforce public-target safety on every DNS resolution, TCP connection and HTTP redirect.\n`);
+  console.log(`Faultline Remote Probe v1.1\n\nRegistered worker:\n  npm run probe -- --probe <probe-id> --token <probe-token> [--watch]\n\nOne-off session probe:\n  npm run probe -- --session <session-id> --token <session-probe-token>\n\nOptions:\n  --probe <id>              Registered probe ID\n  --session <id>            Legacy one-off diagnostic session ID\n  --token <value>           Probe credential (or FAULTLINE_PROBE_TOKEN)\n  --api-base <url>          Faultline control-plane base URL\n                            (default: http://localhost:3000)\n  --name <value>            Friendly name used by one-off probes\n  --watch                   Keep registered probe online and poll for jobs\n  --interval <seconds>      Worker poll interval, 15-300 seconds (default: 30)\n  --dry-run                 Collect and print telemetry without uploading\n  --json                    Print full payloads\n  --help                    Show this help\n\nRegistered probe scope is controlled by the server. Public probes enforce public-target safety on every DNS resolution, TCP connection and HTTP redirect.\n`);
 }
 
 function parseInterval(value) {
@@ -56,7 +56,7 @@ async function api(base, path, token, { method = "GET", body } = {}) {
 
 function runtime() {
   return {
-    version: "0.6-fleet-safety",
+    version: "1.1-preview",
     platform: platform(),
     hostname: hostname(),
     node: process.version

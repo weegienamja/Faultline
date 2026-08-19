@@ -87,9 +87,13 @@ function requestHttpOnce(url, address, family, timeoutMs) {
 
     const request = transport.request(target, {
       method: "GET",
-      headers: { "user-agent": "Faultline-Remote-Probe/0.6" },
+      headers: { "user-agent": "Faultline-Remote-Probe/1.1" },
       servername: target.hostname,
-      lookup: (_hostname, _options, callback) => callback(null, address, family)
+      // Node passes { all: true } on some paths; the array callback form is
+      // required there or the request fails with ERR_INVALID_IP_ADDRESS.
+      lookup: (_hostname, options, callback) => (options && options.all
+        ? callback(null, [{ address, family }])
+        : callback(null, address, family))
     }, response => {
       const status = Number(response.statusCode || 0);
       const location = response.headers.location || null;
@@ -175,7 +179,7 @@ export async function collectRemoteProbe(options) {
     sessionId: options.sessionId,
     probe: {
       name: options.name || hostname(),
-      version: "0.6-fleet-safety",
+      version: "1.1-preview",
       platform: platform(),
       hostname: hostname(),
       scope

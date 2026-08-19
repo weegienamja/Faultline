@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createProjectContract, publishProjectContract, deprecateProjectContract, cloneProjectContractVersion, getPublishedProjectContract, listProjectContracts } from "../src/contracts/catalog.mjs";
+import { assertCatalogStatus, createProjectContract, publishProjectContract, deprecateProjectContract, cloneProjectContractVersion, getPublishedProjectContract, listProjectContracts } from "../src/contracts/catalog.mjs";
 
 const project={id:"PRJ-1",organizationId:"ORG-1",name:"Support",contractCatalog:[]};
 const contract={id:"voice-web",name:"Voice web path",description:"Generic HTTPS voice-service path.",checks:[{id:"dns",type:"dns",host:"$target.host",required:true},{id:"tcp",type:"tcp",host:"$target.host",port:"$target.port",required:true}]};
@@ -30,4 +30,9 @@ test("version lifecycle supports clone publish and deprecate",()=>{
 test("rejects duplicate explicit versions",()=>{
  const first=createProjectContract(project,{contract:{...contract,version:1}});
  assert.throws(()=>createProjectContract(first.project,{contract:{...contract,version:1}}),/already exists/);
+});
+
+test("rejects an unsupported catalog status filter",()=>{
+ assert.equal(assertCatalogStatus("published"),"published");
+ assert.throws(()=>assertCatalogStatus("archived"),/Unsupported contract catalog status/);
 });

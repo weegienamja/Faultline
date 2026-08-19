@@ -23,7 +23,7 @@ function startServer(port, dataFile) {
     }, 5_000);
     const onData = chunk => {
       output += chunk.toString();
-      if (output.includes("Faultline v0.6 preview listening")) {
+      if (output.includes("preview listening on http://localhost:")) {
         clearTimeout(timer);
         child.stdout.off("data", onData);
         resolve(child);

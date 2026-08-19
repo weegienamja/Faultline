@@ -177,8 +177,11 @@ export function publicCase(caseRecord, { sessions = [], runs = [] } = {}) {
   const sessionIds = caseRecord.sessionIds || [];
   const runBySession = new Map(runs.map(run => [run.sessionId || run.id, run]));
   const completedRuns = sessionIds.filter(id => runBySession.has(id)).length;
+  // participantInvitations hold case-room credential hashes. Callers that need
+  // participant data expose it through publicParticipant() instead.
+  const { participantInvitations, ...safeRecord } = structuredClone(caseRecord);
   return {
-    ...structuredClone(caseRecord),
+    ...safeRecord,
     diagnosticCount: sessionIds.length,
     completedDiagnosticCount: completedRuns,
     sessions: sessions.map(session => ({

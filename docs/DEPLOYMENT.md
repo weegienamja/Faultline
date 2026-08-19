@@ -59,7 +59,7 @@ A named volume is mounted at `/data`, so sessions, runs and registered-probe ide
 curl http://127.0.0.1:3000/api/health
 ```
 
-Current responses include feature flags for registered probes, topology, ephemeral invitations and the Windows-client preview.
+Current responses include the product version and feature flags for registered probes, topology, ephemeral invitations, the Windows-client preview, case workspaces, evidence packages, cross-party rooms, multi-tenancy and the contract catalog.
 
 ## Direct Node control plane
 
@@ -172,6 +172,12 @@ State currently includes:
 - registered probe identities
 - hashed registered-probe credentials
 - heartbeat/runtime metadata
+- audit events
+- support cases, notes, timelines and contributions
+- hashed case-room participant credentials
+- organizations and projects
+- hashed organization credentials
+- project Connectivity Contract catalogs
 
 Raw bearer credentials are not persisted.
 
@@ -183,18 +189,15 @@ Known limits:
 
 - JSON-file storage instead of a transactional database
 - one server process / one writer assumption
-- one administrator security domain
-- no platform-wide rate limiting
-- no registered-probe credential rotation/revocation API yet
-- no organisation/user accounts
-- no audit log
+- organisations are credential-based tenants, not named-user accounts with SSO/RBAC
+- rate limiting covers registered-probe submissions only, not the platform as a whole
 - polling rather than push-based work delivery
 - no automatic TLS termination
 - unsigned Windows client preview
 - Windows-client download hosting is external/deployment-managed
 - no database-level retention policy
 
-A larger hosted architecture should move state to a database, add organisation boundaries, audit events, credential lifecycle controls and signed client distribution.
+Registered-probe credential rotation/revocation, audit events and organisation/project boundaries are implemented. A larger hosted architecture should still move state to a database and add named-user identity, retention policy and signed client distribution.
 
 ## No AI dependency
 

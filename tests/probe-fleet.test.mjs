@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 const ADMIN_TOKEN = "fleet-admin-token";
-const STARTED = "Faultline v0.6 preview listening";
+const STARTED = "preview listening on http://localhost:";
 
 function startServer(port, dataFile) {
   const child = spawn(process.execPath, ["src/server.mjs"], {

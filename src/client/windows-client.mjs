@@ -8,7 +8,7 @@ import { readFile, readdir, stat, unlink, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
 const execFileAsync = promisify(execFile);
-const CLIENT_VERSION = "0.7-contract-preview";
+const CLIENT_VERSION = "1.1-preview";
 
 function pauseOnInteractiveExit() {
   if (!process.stdin.isTTY) return;
@@ -645,7 +645,7 @@ async function main() {
     const result = await retryUpload(handoff.apiBase.replace(/\/+$/, ""), endpointToken, payload);
     progress("Uploading diagnostic evidence", "ok");
     console.log(`\nDiagnostic complete. Reference: ${session.id}`);
-    console.log(`Fault domain: ${result.diagnosis?.label || result.diagnosis?.faultDomain || "pending correlation"}`);
+    console.log(`Fault domain: ${result.diagnosis?.faultDomainLabel || result.diagnosis?.faultDomain || "pending correlation"}`);
     console.log("You may now close this window. Your support engineer can view the submitted evidence.");
   } catch (error) {
     const recovery = join(dirname(handoffPath), `Faultline-${session.id}-results.json`);

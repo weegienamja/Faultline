@@ -4,9 +4,11 @@ import {
   addCaseNote,
   attachSessionToCase,
   createSupportCase,
+  publicCase,
   recordCaseEvent,
   updateSupportCase
 } from "../src/cases/service.mjs";
+import { createCaseParticipantInvitation } from "../src/cases/participants.mjs";
 
 test("creates a support case with explicit evidence timeline metadata", () => {
   const created = createSupportCase({
@@ -58,4 +60,15 @@ test("rejects unsupported case states and overlong notes", () => {
   const record = createSupportCase({ title: "Test" });
   assert.throws(() => updateSupportCase(record, { status: "waiting-on-magic" }), /not supported/);
   assert.throws(() => addCaseNote(record, { body: "x".repeat(2001) }), /2000 characters/);
+});
+
+test("public case representation never exposes participant credential hashes", () => {
+  const base = createSupportCase({ title: "Provider escalation" });
+  const invited = createCaseParticipantInvitation(base, { name: "Alex", organization: "Example ISP", role: "contributor" });
+  const exposed = JSON.stringify(publicCase(invited.caseRecord));
+
+  assert.doesNotMatch(exposed, /tokenHash/);
+  assert.equal(exposed.includes(invited.caseRecord.participantInvitations[0].tokenHash), false);
+  assert.equal(exposed.includes(invited.token), false);
+  assert.equal(JSON.parse(exposed).title, "Provider escalation");
 });

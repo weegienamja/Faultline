@@ -105,7 +105,7 @@ const diagnosticDialog = createDiagnosticDialog();
 const panel = document.createElement("section");
 panel.className = "panel cases-panel";
 panel.id = "case-workspaces";
-panel.innerHTML = `<div class="cases-head"><div><span class="section-label">v0.8 · SUPPORT CASES</span><h3 style="margin:4px 0 0">Cases & evidence packages</h3></div><div class="cases-actions"><button class="secondary-button" id="case-refresh">Refresh</button><button class="primary-button" id="case-new">New case</button></div></div><p class="cases-muted" id="case-summary">Unlock live data to manage support cases.</p><div class="case-layout"><div class="case-list" id="case-list"></div><article class="case-detail" id="case-detail"><p class="cases-muted">Select a case to inspect its diagnostics and evidence timeline.</p></article></div>`;
+panel.innerHTML = `<div class="cases-head"><div><span class="section-label">SUPPORT CASES</span><h3 style="margin:4px 0 0">Cases & evidence packages</h3></div><div class="cases-actions"><button class="secondary-button" id="case-refresh">Refresh</button><button class="primary-button" id="case-new">New case</button></div></div><p class="cases-muted" id="case-summary">Unlock live data to manage support cases.</p><div class="case-layout"><div class="case-list" id="case-list"></div><article class="case-detail" id="case-detail"><p class="cases-muted">Select a case to inspect its diagnostics and evidence timeline.</p></article></div>`;
 lowerGrid?.parentNode?.insertBefore(panel, lowerGrid);
 
 const summary = panel.querySelector("#case-summary");
