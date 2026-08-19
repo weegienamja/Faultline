@@ -1,14 +1,115 @@
 # Faultline
 
-**Evidence-based network fault isolation across endpoints, networks, ISPs and services.**
+**Find the network condition that breaks a connection, without reconfiguring anything.**
 
-Faultline is an incident-first portfolio/research prototype for connectivity failures that cross ownership boundaries and leave no single team with the complete evidence path.
-
-```text
-endpoint -> LAN/Wi-Fi -> VPN/firewall -> ISP/Internet -> application/service
+```bash
+git clone https://github.com/weegienamja/Faultline.git
+cd Faultline && npm install
+npm run bisect -- github.com
 ```
 
-Faultline collects scoped evidence from affected endpoints and independent vantages, applies deterministic fault-domain reasoning, preserves evidence in support cases, identifies statistically similar incidents, supports controlled sharing across organisations and can compare network behaviour before and after a planned change.
+No account. No API key. No server. No Docker. Every line of output is a real
+connection made from your machine.
+
+---
+
+## The problem
+
+When something "doesn't work on this network", isolation is manual and
+disruptive:
+
+```text
+turn Wi-Fi off and on        try your phone hotspot
+disconnect the VPN           change your DNS to 8.8.8.8
+disable IPv6                 try from another machine
+```
+
+Every step reconfigures the machine, often needs admin rights, interrupts
+everything else, and is undone before anyone records what happened. On a managed
+endpoint most are impossible. And when one appears to help, nobody re-tests to
+check whether the network simply recovered on its own.
+
+## What Faultline does instead
+
+`git bisect` finds the commit that broke a build. **Network Bisect** finds the
+network *condition* that breaks a connection — by varying one condition at a
+time **per connection**, leaving the operating system untouched.
+
+```text
+  CONDITION                     VARIANT                           RESULT n     DETAIL
+  ----------------------------------------------------------------------------------
+  baseline                      baseline (system defaults)        PASS  2/2   HTTP 200
+  IP address family             IPv4 only                         PASS  2/2   HTTP 200
+  IP address family             IPv6 only                         FAIL  0/2   tcp: ENETUNREACH
+  DNS resolver                  resolver 1.1.1.1                  PASS  2/2   HTTP 200
+  Specific resolved address     address 2606:4700:10::6814:179a   FAIL  0/2   tcp: ENETUNREACH
+  Local source interface        via Ethernet (192.168.0.95)       PASS  2/2   HTTP 200
+  Local source interface        via Ethernet 2 (192.168.56.1)     FAIL  0/2   tcp: ENETUNREACH
+  TLS version                   TLS 1.2 only                      PASS  2/2   HTTP 200
+
+  CONDITION ISOLATED
+  IP address family: IPv6 only flips PASS to FAIL
+
+  Evidence supports: the failure is reproducibly associated with
+  ip address family = IPv6 only.
+
+  Interleaved confirmation (A=baseline, B=IPv6 only): A+ B- A+ B-
+  Difference held under alternation.
+```
+
+Eight condition axes are varied per connection, so nothing on the machine
+changes: **address family**, **DNS resolver**, **specific resolved address**,
+**local source interface** (VPN vs direct, without disconnecting the VPN),
+**TLS version**, **ALPN**, **SNI** and **port**.
+
+## Why this isn't just ping and traceroute
+
+`ping`, `traceroute` and `mtr` tell you *that* a path is bad. They cannot tell
+you *which condition* makes the difference, and they will happily mislead you
+when a fault is intermittent. Network Bisect is built around that problem:
+
+- **Reproducibility gating** — every condition runs N times and only a unanimous
+  result counts. If the baseline itself is unstable, bisection is **refused**
+  rather than blaming whichever variant ran during a good patch.
+- **Interleaved paired confirmation** — the winner is re-tested `A B A B` so a
+  network that recovers mid-run shows up as *unconfirmed* instead of as a cure.
+- **Duplicate collapsing** — conditions that produce an identical connection are
+  reported once, attributed to the most general axis.
+- **Honest classification** — `github.com` publishing no AAAA record is reported
+  as a property of the target, never as "your IPv6 is broken". Omitting SNI
+  breaking a name-based host is flagged as expected, not as a fault.
+
+Read the design: **[Network Bisect](docs/NETWORK_BISECT.md)**.
+
+## Exit codes
+
+```text
+0  no fault reproduced          2  failure was not condition-specific
+1  a condition was isolated     3  evidence insufficient (intermittent/unconfirmed)
+```
+
+## The rest of Faultline
+
+Bisect is the fastest way in. Behind it is an evidence-based fault-isolation
+control plane: run `npm start` and open <http://localhost:3000>.
+
+```bash
+npm start                          # dashboard on :3000
+npm run bisect -- example.com      # condition isolation, no server needed
+```
+
+It also does real live measurement (DNS across four resolvers, TCP, TLS
+certificate and cipher, HTTP TTFB, ICMP, traceroute with public-hop ASN
+enrichment), deterministic fault-domain diagnosis, support cases with portable
+evidence packages, cross-party incident rooms, Connectivity Contracts, and
+public Internet context from RIPEstat, Globalping, RIPE Atlas, IODA and
+PeeringDB — all credential-free.
+
+**Faultline does not use an AI/LLM API anywhere in diagnosis.** Every conclusion
+is produced by deterministic rules over observed measurements and is traceable
+to the evidence that produced it.
+
+---
 
 ## Implemented previews
 
@@ -24,6 +125,7 @@ Faultline collects scoped evidence from affected endpoints and independent vanta
 - **v1.5:** named change windows, pinned baseline/post-change runs, regression detection and integrity-tagged assurance packages
 
 - **Live data:** real DNS/TCP/TLS/HTTP/ICMP/path measurement plus public routing, outage and network-ownership context
+- **Network Bisect:** controlled per-connection condition isolation with reproducibility gating and paired confirmation
 
 Faultline does **not** use an AI/LLM API in diagnosis or Incident Intelligence.
 
@@ -142,6 +244,7 @@ Platform / tenant control plane
 - [Cross-Party Incident Rooms](docs/CROSS_PARTY_ROOMS.md)
 - [Incident Intelligence](docs/INCIDENT_INTELLIGENCE.md)
 - [Multi-Tenancy](docs/MULTI_TENANCY.md)
+- [Network Bisect](docs/NETWORK_BISECT.md)
 - [Live Internet Data](docs/LIVE_INTERNET_DATA.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Deployment](docs/DEPLOYMENT.md)

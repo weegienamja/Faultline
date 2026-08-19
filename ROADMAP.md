@@ -39,6 +39,7 @@ The deterministic diagnosis path remains separate from statistical/ML analysis. 
 | v1.4 | Dual-stack, TLS, HTTP-stage and path-MTU diagnostics | ✅ preview |
 | v1.5 | Network Change Assurance | ✅ preview |
 | Live data | Real local measurement, public Internet intelligence and bring-your-own-network | ✅ preview |
+| Network Bisect | Per-connection condition isolation with reproducibility gating and paired confirmation | ✅ |
 
 ---
 
@@ -116,195 +117,117 @@ fault domain.
 
 ---
 
-# v1.6 - Incident Intelligence v2
+# Direction
 
-**Goal:** evolve the current small visible-set clustering demo into historical incident-pattern analysis.
+The version-numbered plan below v1.5 has been delivered. What follows is
+organised by **capability**, not by release number, because the useful question
+for an open-source network tool is "what can it isolate that I cannot isolate
+easily today", not "what version is it".
 
-Planned:
-
-- historical feature store with schema versions;
-- per-contract condition vectors;
-- provider/ASN and geographic features where reliable;
-- time-window features;
-- comparison of DBSCAN and hierarchical clustering;
-- cohesion/stability/drift evaluation;
-- emerging-pattern detection across unrelated cases;
-- engineer-confirmed resolutions for evaluation/retrieval only, never silent replacement of deterministic diagnosis.
-
-**Exit:** Faultline can surface recurring and emerging evidence patterns across historical cases while clearly separating association from root cause.
+Each theme states the problem it exists to solve. None of them require a hosted
+product to be valuable.
 
 ---
 
-# v1.7 - Multi-Vantage Orchestration
+## Intermittent faults
 
-**Goal:** reason across more than one endpoint plus one remote probe.
+**Problem:** the fault clears before anyone can look at it. Continuous graphs
+show *that* something happened; they rarely show *what changed*.
 
-Planned:
+- bounded local ring buffer of network metadata (gateway, Wi-Fi, DNS, route,
+  VPN state, loss, jitter, target reachability, path fingerprint)
+- trigger on threshold breach, contract failure or an explicit hotkey
+- freeze BEFORE / DURING / AFTER into one incident
+- flake-rate measurement as a first-class result, not a footnote
 
-- several simultaneous public probes;
-- region/capability-aware scheduling;
-- customer/private and provider-side probes;
-- per-vantage Connectivity Contract execution;
-- evidence comparison matrix;
-- path-asymmetry awareness;
-- cautious quorum/consensus summaries.
+Network Bisect already refuses to draw conclusions from an unstable baseline
+and reports the flake rate instead. Capturing the unstable window is the next
+step.
 
-Example:
+## Condition isolation
 
-```text
-Affected endpoint       FAIL
-Customer site probe     FAIL
-London public probe     PASS
-Frankfurt public probe  PASS
-Service-side probe      PASS
-```
+**Problem:** "works on my machine" and "try your hotspot" are guesswork.
 
-**Exit:** distinguish endpoint-local, site-wide, provider/regional and globally visible failures using independent measurements.
+Delivered as **Network Bisect**: per-connection variation of address family,
+resolver, resolved address, source interface, TLS version, ALPN, SNI and port,
+with reproducibility gating, interleaved paired confirmation and duplicate
+collapsing.
 
----
+Worth extending:
 
-# v1.8 - Authoritative Topology and Ownership Boundaries
+- MTU / DF-bit as a bisect axis, so black holes surface as a condition
+- proxy vs direct where a proxy is configured
+- combination search when no single factor explains the difference
+- bisecting from a registered private probe as well as the local machine
 
-**Goal:** combine endpoint inference with trusted infrastructure data supplied by the customer.
+## Path reasoning
 
-Potential integrations:
+**Problem:** several traceroutes are not an analysis.
 
-- UniFi;
-- TP-Link Omada;
-- OpenWrt;
-- pfSense / OPNsense;
-- selected enterprise controllers.
+- determine where working and failing paths meaningfully diverge
+- attribute divergence to a shared network rather than a shared hop address
+- distinguish OBSERVED hops from PUBLIC ROUTING METADATA (already enforced in
+  the Network Map)
+- treat a shared AS across failing paths as an escalation signal, never as proof
 
-Planned evidence sources:
+## Portable evidence
 
-- controller topology;
-- LLDP/CDP-derived relationships where authorised;
-- VLAN/subnet context;
-- WAN/gateway identity;
-- administrative ownership and demarcation metadata.
+**Problem:** evidence dies inside whoever ran the tool.
 
-Network Map should be able to show boundaries such as:
+- single-file incident capsule containing measurements, timeline, path
+  fingerprints, deterministic conclusion, contract results and an integrity
+  manifest
+- offline viewer so a recipient needs no access to the originating control plane
+- evidence packages and integrity digests already exist; portability is the gap
 
-```text
-Customer endpoint
-      |
-Customer LAN
-      |
-Customer firewall
------- demarcation ------
-ISP/access provider
-      |
-Transit
------- service edge -----
-Application
-```
+## Private and multi-platform collection
 
-**Exit:** show both where degradation appears and which administrative/commercial boundary that segment belongs to.
+**Problem:** the interesting faults are inside networks the tool cannot reach,
+on machines that are not Windows.
 
----
+- Linux and macOS local collectors at parity with the Windows collector
+- private-probe bisect and contract execution inside a customer network
+- the packaged client currently carries its own self-contained collector rather
+  than the modular one; converging them is outstanding
 
-# v1.9 - Enterprise Readiness
+## Deterministic reasoning quality
 
-**Goal:** make the architecture credible for larger organisations and formal security review.
+**Problem:** confident wrong answers are worse than no answer.
 
-Planned:
-
-- OIDC/SAML SSO;
-- granular RBAC and service accounts;
-- SCIM where justified;
-- comprehensive audit export and retention controls;
-- managed secret encryption;
-- signed client releases;
-- SBOM/build provenance;
-- hardened deployment defaults;
-- HA control plane and resilient queues;
-- backup/restore and DR validation;
-- hosted/private deployment evaluation.
-
-**Exit:** credible enterprise pilot/security-review posture rather than development-only deployment assumptions.
+- keep every conclusion traceable to the measurement that produced it
+- keep OBSERVED, INFERRED, CORRELATED, EXTERNAL CONTEXT and DETERMINISTIC
+  CONCLUSION distinct in the data model, not only in the wording
+- continue to say "evidence supports", never "this caused the fault"
+- no LLM in the diagnosis path, ever
 
 ---
 
-# v2.0 - Cross-Boundary Network Incident Platform
+# At a glance
 
-**Goal:** bring the entire project together around the shared network incident case.
+**Delivered**
 
-A v2 case can combine:
-
-```text
-Affected endpoints
-Customer/private probes
-Managed public probes
-Provider/service evidence
-Connectivity Contracts
-Topology + ownership boundaries
-Historical related incidents
-Network change history
-Participant discussion
-Evidence packages
-```
-
-Core capabilities:
-
-- multi-organisation incident rooms;
-- evidence provenance/chain of custody;
-- ownership/demarcation model;
-- multi-vantage correlation;
-- application Connectivity Contracts;
-- regional/historical Incident Intelligence;
-- support-system integrations;
-- API/SDK ecosystem;
-- network change assurance;
-- shareable integrity-tagged evidence packages;
-- enterprise identity/audit/retention controls.
-
-The differentiator remains:
-
-> **Collect scoped evidence from independent sides of a network problem, determine which fault boundary the combined evidence supports, and give the parties a neutral case record they can act on.**
-
-## v2.0 exit flow
-
-```text
-User reports failure
-        |
-Support opens case
-        |
-Affected endpoint + independent vantages + contract checks
-        |
-Fault boundary isolated
-        |
-Responsible party invited
-        |
-Counter-evidence contributed
-        |
-Conclusion re-evaluated
-        |
-Evidence package attached to escalation
-        |
-Resolution recorded
-        |
-Pattern becomes available to future cases
-```
-
----
-
-# Roadmap at a glance
-
-| Version | Outcome |
+| Capability | Outcome |
 |---|---|
-| **v0.8** | Cases + evidence packages ✅ |
-| **v0.9** | Cross-party incident rooms ✅ |
-| **v1.0** | Multi-tenant hosted architecture preview ✅ |
-| **v1.1** | Connectivity Contract ecosystem ✅ |
-| **v1.2** | Embedded API + SDK ✅ |
-| **v1.3** | Service-desk integration layer ✅ |
-| **v1.4** | Deeper protocol diagnostics ✅ |
-| **v1.5** | Network Change Assurance ✅ |
-| **v1.6** | Historical/emerging Incident Intelligence |
-| **v1.7** | Multi-vantage orchestration |
-| **v1.8** | Authoritative topology + ownership boundaries |
-| **v1.9** | Enterprise readiness |
-| **v2.0** | Full cross-boundary incident evidence platform |
+| Deterministic diagnosis | Fault-domain reasoning from observed measurements, no model in the path |
+| Endpoint + remote vantage | Windows telemetry, registered public/private probe fleet, correlation |
+| Connectivity Contracts | Versioned, project-scoped application connectivity requirements |
+| Cases and evidence | Multi-run cases, provenance, redaction, integrity-tagged export packages |
+| Cross-party rooms | Scoped external contribution without control-plane access |
+| Deeper diagnostics | Dual-stack, TLS, HTTP stage timing, bounded path-MTU |
+| Change assurance | Named change windows, pinned baseline/post-change comparison |
+| Live Internet data | Real local measurement plus RIPEstat, Globalping, RIPE Atlas, IODA, PeeringDB |
+| **Network Bisect** | **Per-connection condition isolation with reproducibility gating** |
+
+**Next, by capability rather than release number**
+
+| Theme | The question it answers |
+|---|---|
+| Intermittent faults | What was happening in the seconds before it broke? |
+| Condition isolation | Which single condition makes the difference? (extending Bisect) |
+| Path reasoning | Where do working and failing paths actually diverge? |
+| Portable evidence | Can someone else inspect this without my server? |
+| Private / multi-platform | Can it run inside the network that is actually broken, on any OS? |
+| Deterministic quality | Is every conclusion still traceable to a measurement? |
 
 ## What Faultline should not become
 

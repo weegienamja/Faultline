@@ -21,6 +21,7 @@ import { normaliseProbeSelector, selectProbe } from "./probe/scheduler.mjs";
 import { createStore } from "./storage/store.mjs";
 import { createPlatformRouter } from "./platform/routes.mjs";
 import { createLiveRouter } from "./live/routes.mjs";
+import { createBisectRouter } from "./bisect/routes.mjs";
 
 const PRODUCT_VERSION = "v1.5";
 const PRODUCT_MILESTONE = "Network change assurance + live Internet data";
@@ -383,6 +384,7 @@ const platform = createPlatformRouter({
 });
 
 const handleLive = createLiveRouter({ requireAdmin, bodyFrom, json, store, publicProbe });
+const handleBisect = createBisectRouter({ requireAdmin, bodyFrom, json });
 
 const server = createServer(async (req, res) => {
   try {
@@ -390,6 +392,7 @@ const server = createServer(async (req, res) => {
 
     if (await platform.handle(req, res, url)) return;
     if (await handleLive(req, res, url)) return;
+    if (await handleBisect(req, res, url)) return;
 
     if (req.method === "GET" && url.pathname === "/api/health") {
       return json(res, 200, {
@@ -412,7 +415,8 @@ const server = createServer(async (req, res) => {
         serviceDeskIntegrations: true,
         deepDiagnostics: true,
         changeAssurance: true,
-        liveInternetData: true
+        liveInternetData: true,
+        networkBisect: true
       });
     }
 
