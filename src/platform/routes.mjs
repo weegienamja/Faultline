@@ -17,6 +17,7 @@ import {
   touchParticipant
 } from "../cases/participants.mjs";
 import { createTenantRouter } from "../tenancy/routes.mjs";
+import { createDeveloperRouter } from "../developer/routes.mjs";
 
 function notFound(message) { const error = new Error(message); error.statusCode = 404; throw error; }
 function unauthorized(message = "Case-room participant credential required.") { const error = new Error(message); error.statusCode = 401; throw error; }
@@ -30,6 +31,7 @@ export function createPlatformRouter({ store, requireAdmin, bodyFrom, json, crea
   async function createCaseDiagnostic(caseRecord, payload) { const created = await createSession({ ...payload, caseId: caseRecord.id, customer: payload.customer || caseRecord.customer, title: payload.title || `${caseRecord.title} · diagnostic`, ephemeral: payload.ephemeral !== false }); const updatedCase = attachSessionToCase(caseRecord, created.session.id); await store.putCase(updatedCase); return { created, caseRecord: updatedCase }; }
 
   const handleTenant = createTenantRouter({ store, requireAdmin, bodyFrom, json, caseContext, evidenceFor, createCaseDiagnostic });
+  const developer = createDeveloperRouter({ store, requireAdmin, bodyFrom, json, createSession, publicSession, evidenceFor });
 
   async function participantContext(req) {
     const access = findParticipantAccess(await store.listCases(), bearer(req));
@@ -50,6 +52,7 @@ export function createPlatformRouter({ store, requireAdmin, bodyFrom, json, crea
 
   async function handle(req, res, url) {
     if (await handleParticipantRoom(req, res, url)) return true;
+    if (await developer.handle(req, res, url)) return true;
     if (await handleTenant(req, res, url)) return true;
     if (!url.pathname.startsWith("/api/cases")) return false;
     requireAdmin(req);
