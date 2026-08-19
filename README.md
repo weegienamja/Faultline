@@ -430,20 +430,29 @@ Faultline is a portfolio/research prototype, not a production multi-tenant SaaS 
 
 # Roadmap
 
-The core portfolio story now demonstrates:
+The completed foundation now covers deterministic diagnosis, real endpoint telemetry, multi-vantage correlation, the remote-probe fleet, one-time Windows diagnostics, inferred topology, Connectivity Contracts and the first Incident Intelligence model.
+
+The redesigned forward roadmap is:
 
 ```text
-market/support gap
-      -> multi-vantage diagnostic workflow
-      -> deterministic fault isolation
-      -> Connectivity Contracts
-      -> structured network evidence
-      -> unsupervised incident-pattern discovery
+v0.8  Cases + Evidence Packages
+v0.9  Cross-Party Incident Rooms
+v1.0  Hosted Commercial MVP
+v1.1  Connectivity Contract Ecosystem
+v1.2  Embedded Diagnostics API + SDK
+v1.3  Service Desk Integrations
+v1.4  Deeper Network / Protocol Diagnostics
+v1.5  Network Change Assurance
+v1.6  Incident Intelligence v2
+v1.7  Multi-Vantage Orchestration
+v1.8  Authoritative Topology + Ownership Boundaries
+v1.9  Enterprise Readiness
+v2.0  Cross-Boundary Network Incident Platform
 ```
 
-Future work should prioritise visible portfolio value such as case/evidence packaging, stronger visualisation and carefully justified analytical extensions rather than production SaaS infrastructure.
+The immediate next milestone is **v0.8**, which turns individual diagnostic runs into support cases with multiple runs, before/after comparison, evidence provenance, exportable evidence packages and read-only sharing.
 
-See [ROADMAP.md](ROADMAP.md).
+See [ROADMAP.md](ROADMAP.md) for the full v0.8-v2.0 deliverables and exit criteria.
 
 ## License
 
