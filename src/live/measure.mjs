@@ -293,7 +293,7 @@ function httpOnce(url, address, family, timeoutMs) {
       method: "GET",
       servername: net.isIP(target.hostname) ? undefined : target.hostname,
       rejectUnauthorized: false,
-      headers: { "user-agent": "Faultline-Live/1.2", accept: "*/*", connection: "close" },
+      headers: { "user-agent": "Faultline-Live/1.5", accept: "*/*", connection: "close" },
       // Pin the connection to the address we already validated for this scope.
       // Node calls this with { all: true } in some paths, which needs the
       // array form of the callback.

@@ -19,7 +19,7 @@ function startServer(port, dataFile) {
     const timer = setTimeout(() => { child.kill(); reject(new Error(`Faultline server did not start. Output: ${output}`)); }, 5_000);
     const onData = chunk => {
       output += chunk.toString();
-      if (output.includes("Faultline v0.6 preview listening")) {
+      if (output.includes("preview listening on http://localhost:")) {
         clearTimeout(timer);
         child.stdout.off("data", onData);
         resolve(child);

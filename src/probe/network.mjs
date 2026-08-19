@@ -87,7 +87,7 @@ function requestHttpOnce(url, address, family, timeoutMs) {
 
     const request = transport.request(target, {
       method: "GET",
-      headers: { "user-agent": "Faultline-Remote-Probe/1.1" },
+      headers: { "user-agent": "Faultline-Remote-Probe/1.5" },
       servername: target.hostname,
       // Node passes { all: true } on some paths; the array callback form is
       // required there or the request fails with ERR_INVALID_IP_ADDRESS.
@@ -179,7 +179,7 @@ export async function collectRemoteProbe(options) {
     sessionId: options.sessionId,
     probe: {
       name: options.name || hostname(),
-      version: "1.1-preview",
+      version: "1.5-preview",
       platform: platform(),
       hostname: hostname(),
       scope

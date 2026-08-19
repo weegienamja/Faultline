@@ -6,7 +6,7 @@
 // throwing into the diagnostic path.
 
 const DEFAULT_TIMEOUT_MS = 6_000;
-const USER_AGENT = "Faultline/1.2 (+https://github.com/weegienamja/Faultline)";
+const USER_AGENT = "Faultline/1.5 (+https://github.com/weegienamja/Faultline)";
 
 const cache = new Map();
 

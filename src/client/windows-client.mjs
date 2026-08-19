@@ -8,7 +8,7 @@ import { readFile, readdir, stat, unlink, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
 const execFileAsync = promisify(execFile);
-const CLIENT_VERSION = "1.1-preview";
+const CLIENT_VERSION = "1.5-preview";
 
 function pauseOnInteractiveExit() {
   if (!process.stdin.isTTY) return;

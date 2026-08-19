@@ -22,8 +22,8 @@ import { createStore } from "./storage/store.mjs";
 import { createPlatformRouter } from "./platform/routes.mjs";
 import { createLiveRouter } from "./live/routes.mjs";
 
-const PRODUCT_VERSION = "v1.1";
-const PRODUCT_MILESTONE = "Connectivity Contract ecosystem";
+const PRODUCT_VERSION = "v1.5";
+const PRODUCT_MILESTONE = "Network change assurance + live Internet data";
 
 const root = fileURLToPath(new URL("../public/", import.meta.url));
 const port = Number(process.env.PORT || 3000);
@@ -407,7 +407,12 @@ const server = createServer(async (req, res) => {
         evidencePackages: true,
         crossPartyRooms: true,
         multiTenancy: true,
-        contractCatalog: true
+        contractCatalog: true,
+        embeddedDiagnosticsApi: true,
+        serviceDeskIntegrations: true,
+        deepDiagnostics: true,
+        changeAssurance: true,
+        liveInternetData: true
       });
     }
 

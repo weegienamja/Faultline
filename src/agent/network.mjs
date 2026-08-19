@@ -208,7 +208,7 @@ export async function httpProbe(url, timeoutMs = 5_000) {
       method: "GET",
       redirect: "follow",
       signal: controller.signal,
-      headers: { "user-agent": "Faultline-Agent/1.1" }
+      headers: { "user-agent": "Faultline-Agent/1.5" }
     });
     const elapsedMs = Number((performance.now() - started).toFixed(1));
     await response.body?.cancel().catch(() => {});
@@ -326,7 +326,7 @@ export async function collectWindowsDiagnostics(options) {
   return {
     agent: {
       name: "faultline-windows",
-      version: "1.1-preview",
+      version: "1.5-preview",
       platform: "win32",
       hostname: hostname()
     },
