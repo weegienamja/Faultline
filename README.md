@@ -109,6 +109,7 @@ control plane: run `npm start` and open <http://localhost:3000>.
 npm start                          # dashboard on :3000
 npm run bisect -- example.com      # condition isolation, no server needed
 npm run recorder -- example.com    # rolling capture of a transient fault
+npm run recorder -- --simulate ipv6-path-loss   # reproducible end-to-end demo
 ```
 
 It also does real live measurement (DNS across four resolvers, TCP, TLS

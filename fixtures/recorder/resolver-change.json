@@ -1,0 +1,42 @@
+{
+  "scenario": "resolver-change",
+  "title": "DNS resolver change",
+  "description": "The configured DNS servers change and name resolution for the target stops working. The recorder observes the resolver change; Network Bisect can test the resolver axis to establish whether it changes the outcome.",
+  "target": "example.com",
+  "port": 443,
+  "intervalMs": 2000,
+  "phases": [
+    {
+      "label": "resolving normally",
+      "durationMs": 16000,
+      "targetTcp": "PASS",
+      "targetTcpMs": 22,
+      "ipv4": "PASS",
+      "ipv6": "INAPPLICABLE",
+      "targetDns": "PASS",
+      "gatewayMs": 2,
+      "activeInterface": "Wi-Fi",
+      "gateway": "192.168.1.1",
+      "resolvers": ["10.20.0.53"],
+      "wifiSsid": "office-5g",
+      "wifiBssid": "aa:bb:cc:dd:ee:01",
+      "vpn": false
+    },
+    {
+      "label": "resolvers replaced, target no longer resolves",
+      "durationMs": 20000,
+      "targetTcp": "FAIL",
+      "targetTcpError": "ENOTFOUND",
+      "ipv4": "UNKNOWN",
+      "ipv6": "INAPPLICABLE",
+      "targetDns": "FAIL",
+      "gatewayMs": 2,
+      "activeInterface": "Wi-Fi",
+      "gateway": "192.168.1.1",
+      "resolvers": ["192.0.2.53"],
+      "wifiSsid": "office-5g",
+      "wifiBssid": "aa:bb:cc:dd:ee:01",
+      "vpn": false
+    }
+  ]
+}

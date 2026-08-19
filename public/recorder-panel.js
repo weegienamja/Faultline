@@ -17,6 +17,7 @@ if (host) {
   let status = null;
   let incident = null;
   let stream = null;
+  let scenarios = [];
   let busy = false;
   let error = null;
 
@@ -40,6 +41,10 @@ if (host) {
     }
     try {
       status = await api("/status");
+      if (!scenarios.length) {
+        const listed = await api("/scenarios").catch(() => null);
+        scenarios = listed?.scenarios || [];
+      }
       error = null;
     } catch (failure) {
       status = null;
@@ -152,6 +157,13 @@ if (host) {
           <span class="fl-label">Window</span>
           <input class="fl-input fl-input-mono" id="recorder-window" type="number" min="60" max="600" step="30" value="180" style="width:64px;text-align:center" />
         </div>
+        <div class="fl-control-group">
+          <span class="fl-label">Simulate</span>
+          <select class="fl-select" id="recorder-simulate">
+            <option value="">Off — record the real network</option>
+            ${scenarios.map(entry => `<option value="${escapeHtml(entry.scenario)}">${escapeHtml(entry.title)}</option>`).join("")}
+          </select>
+        </div>
         <div class="fl-spacer"></div>
         <button class="fl-btn fl-btn-primary" type="submit" ${busy ? "disabled" : ""}>${busy ? "Starting…" : "Start recording"}</button>
       </form>`;
@@ -190,7 +202,8 @@ if (host) {
       <div class="fl-view-head">
         <div>
           <span class="fl-label">Incident</span>
-          <h3 class="fl-panel-title">${escapeHtml(record.id)}</h3>
+          <h3 class="fl-panel-title">${escapeHtml(record.id)} ${record.simulated ? badge("SIMULATED", "warn") : ""}</h3>
+          ${record.simulated ? `<p class="fl-meta" style="color:var(--fl-warn)">Generated from scenario <code>${escapeHtml(record.scenario || "")}</code>. Not a measurement of any real network.</p>` : ""}
           <p class="fl-meta">${escapeHtml(record.trigger.summary || "")} · ${time(record.trigger.at)}</p>
         </div>
         <div class="fl-view-head-actions">
@@ -206,7 +219,10 @@ if (host) {
              <p class="fl-meta" style="margin-top:8px">${escapeHtml(change.note)}</p>
              ${differences}`
           : `<p class="fl-body fl-prose">${escapeHtml(change?.reason || "No comparison was possible.")}</p>`}`,
-        foot: `<span>Every row is a real measurement taken at the stated time.</span>`
+        // Must not claim a real measurement on a simulated record.
+        foot: record.simulated
+          ? `<span>Every row was generated from scenario <code>${escapeHtml(record.scenario || "")}</code>. Nothing here was measured.</span>`
+          : `<span>Every row is a real measurement taken at the stated time.</span>`
       })}
 
       ${candidates?.available ? panel({
@@ -260,11 +276,16 @@ if (host) {
           </p>
         </div>
         <div class="fl-view-head-actions">
+          ${status?.simulated ? badge("SIMULATED", "warn") : ""}
           ${recording ? badge("Recording", "ok") : badge("Not recording", "idle")}
           <span class="fl-source" data-kind="measured">Measured locally</span>
         </div>
       </div>
 
+      ${status?.simulated ? `<div class="fl-analyst-block" data-kind="interpretation" style="border-color:var(--fl-warn-line);margin-bottom:12px">
+          <span class="fl-label" style="color:var(--fl-warn)">Simulated capture — not a real measurement</span>
+          <p class="fl-meta">Scenario <code>${escapeHtml(status.simulation?.scenario || "")}</code>: ${escapeHtml(status.simulation?.description || "")}</p>
+        </div>` : ""}
       ${recording ? "" : startForm()}
       ${error ? `<p class="fl-status-line" data-tone="error">${escapeHtml(error)}</p>` : ""}
 
@@ -292,7 +313,7 @@ if (host) {
           ? `<div class="fl-table-wrap"><table class="fl-table">
                <thead><tr><th>Incident</th><th>Trigger</th><th>At</th><th>Differences</th><th></th></tr></thead>
                <tbody>${status.incidents.map(entry => `<tr>
-                 <td class="fl-mono">${escapeHtml(entry.id)}</td>
+                 <td class="fl-mono">${escapeHtml(entry.id)} ${entry.simulated ? badge("SIM", "warn") : ""}</td>
                  <td>${escapeHtml(entry.triggerSummary || entry.trigger || "")}</td>
                  <td class="fl-num">${time(entry.at)}</td>
                  <td class="fl-num">${entry.differences}</td>
@@ -326,6 +347,17 @@ if (host) {
   host.addEventListener("submit", async event => {
     if (event.target.id !== "recorder-form") return;
     event.preventDefault();
+
+    // Read the form BEFORE rendering: render() rebuilds the panel's innerHTML,
+    // which replaces these inputs with fresh ones carrying their defaults.
+    // Reading afterwards silently discarded whatever the user actually typed.
+    const request = {
+      target: document.getElementById("recorder-target")?.value?.trim(),
+      simulate: document.getElementById("recorder-simulate")?.value || undefined,
+      intervalMs: Number(document.getElementById("recorder-interval")?.value || 3) * 1000,
+      windowMs: Number(document.getElementById("recorder-window")?.value || 180) * 1000
+    };
+
     busy = true;
     error = null;
     render();
@@ -333,11 +365,7 @@ if (host) {
       status = await api("/start", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          target: document.getElementById("recorder-target")?.value?.trim(),
-          intervalMs: Number(document.getElementById("recorder-interval")?.value || 3) * 1000,
-          windowMs: Number(document.getElementById("recorder-window")?.value || 180) * 1000
-        })
+        body: JSON.stringify(request)
       });
       openStream();
     } catch (failure) {

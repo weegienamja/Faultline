@@ -1,0 +1,53 @@
+{
+  "scenario": "ipv6-path-loss",
+  "title": "IPv6 path loss",
+  "description": "The target is dual-stack and the endpoint prefers IPv6. Local IPv6 connectivity is lost, so the default connection starts failing while forcing IPv4 still works. This is the shape of a real IPv6 brownout, and the condition Network Bisect isolates as LOCAL_CAPABILITY_DEFICIENCY.",
+  "target": "example.com",
+  "port": 443,
+  "intervalMs": 2000,
+  "phases": [
+    {
+      "label": "healthy on IPv4 and IPv6",
+      "durationMs": 20000,
+      "targetTcp": "PASS",
+      "targetTcpMs": 31,
+      "ipv4": "PASS",
+      "ipv6": "PASS",
+      "gatewayMs": 2,
+      "gatewayLossPct": 0,
+      "activeInterface": "Ethernet",
+      "gateway": "192.168.1.1",
+      "resolvers": ["10.20.0.53"],
+      "vpn": false
+    },
+    {
+      "label": "IPv6 unavailable locally, default connection fails",
+      "durationMs": 20000,
+      "note": "IPv4 still passes when forced, which is why the discriminator is the address family rather than the target.",
+      "targetTcp": "FAIL",
+      "targetTcpError": "ENETUNREACH",
+      "ipv4": "PASS",
+      "ipv6": "FAIL",
+      "gatewayMs": 2,
+      "gatewayLossPct": 0,
+      "activeInterface": "Ethernet",
+      "gateway": "192.168.1.1",
+      "resolvers": ["10.20.0.53"],
+      "vpn": false
+    },
+    {
+      "label": "IPv6 restored",
+      "durationMs": 20000,
+      "targetTcp": "PASS",
+      "targetTcpMs": 30,
+      "ipv4": "PASS",
+      "ipv6": "PASS",
+      "gatewayMs": 2,
+      "gatewayLossPct": 0,
+      "activeInterface": "Ethernet",
+      "gateway": "192.168.1.1",
+      "resolvers": ["10.20.0.53"],
+      "vpn": false
+    }
+  ]
+}

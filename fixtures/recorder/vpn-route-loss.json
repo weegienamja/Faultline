@@ -1,0 +1,56 @@
+{
+  "scenario": "vpn-route-loss",
+  "title": "VPN route change",
+  "description": "A VPN tunnel comes up and takes the default route. The target stops being reachable over the tunnel path and recovers when the previous route returns. The recorder observes the route and interface change alongside the failure; it does not claim the change caused it.",
+  "target": "api.example.com",
+  "port": 443,
+  "intervalMs": 2000,
+  "phases": [
+    {
+      "label": "healthy on the local route",
+      "durationMs": 16000,
+      "targetTcp": "PASS",
+      "targetTcpMs": 28,
+      "ipv4": "PASS",
+      "ipv6": "INAPPLICABLE",
+      "gatewayMs": 2,
+      "gatewayLossPct": 0,
+      "activeInterface": "Ethernet",
+      "gateway": "192.168.1.1",
+      "route": { "destination": "0.0.0.0/0", "nextHop": "192.168.1.1", "interfaceAlias": "Ethernet", "metric": 25 },
+      "resolvers": ["10.20.0.53"],
+      "vpn": false
+    },
+    {
+      "label": "VPN takes the default route, target unreachable",
+      "durationMs": 20000,
+      "targetTcp": "FAIL",
+      "targetTcpError": "ETIMEDOUT",
+      "ipv4": "FAIL",
+      "ipv6": "INAPPLICABLE",
+      "gatewayMs": 3,
+      "gatewayLossPct": 0,
+      "activeInterface": "Corp VPN",
+      "gateway": "10.8.0.1",
+      "route": { "destination": "0.0.0.0/0", "nextHop": "10.8.0.1", "interfaceAlias": "Corp VPN", "metric": 5 },
+      "resolvers": ["10.20.0.53"],
+      "vpn": true,
+      "vpnAdapters": ["Corp VPN"]
+    },
+    {
+      "label": "previous route restored",
+      "durationMs": 16000,
+      "targetTcp": "PASS",
+      "targetTcpMs": 30,
+      "ipv4": "PASS",
+      "ipv6": "INAPPLICABLE",
+      "gatewayMs": 2,
+      "gatewayLossPct": 0,
+      "activeInterface": "Ethernet",
+      "gateway": "192.168.1.1",
+      "route": { "destination": "0.0.0.0/0", "nextHop": "192.168.1.1", "interfaceAlias": "Ethernet", "metric": 25 },
+      "resolvers": ["10.20.0.53"],
+      "vpn": false
+    }
+  ]
+}

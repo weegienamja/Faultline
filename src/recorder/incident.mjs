@@ -72,11 +72,23 @@ export function buildIncident({
 
   const observedChange = buildObservedChange({ lastHealthy, firstFailing, trigger, afterWindow });
 
+  // Provenance is derived from the samples themselves rather than passed in, so
+  // a simulated incident cannot be constructed as a real one by a caller that
+  // forgets to say so. If any sample came from a simulation, the whole record
+  // is marked, and every downstream consumer sees it.
+  const allSamples = [...beforeWindow, ...duringWindow, ...afterWindow];
+  const simulated = allSamples.some(sample => sample?.simulated === true);
+  const scenario = simulated ? allSamples.find(sample => sample?.scenario)?.scenario ?? null : null;
+
   return {
     schema: "faultline.flight-recorder-incident",
     schemaVersion: 1,
     id,
-    evidenceClass: "observed",
+    // Top-level and unmissable. Real captures carry source "measured".
+    source: simulated ? "simulation" : "measured",
+    simulated,
+    scenario,
+    evidenceClass: simulated ? "simulated" : "observed",
     target: target ? { host: target.host, port: target.port, input: target.input } : null,
     contract: contract ? { id: contract.id, version: contract.version ?? null } : null,
     trigger: {
@@ -104,7 +116,9 @@ export function buildIncident({
     closedAt,
     closeReason,
     epistemics: {
-      observed: "Every sample is a real measurement taken from this machine at the stated time.",
+      observed: simulated
+        ? "SIMULATED. These samples were generated from a scenario file. They are not measurements of any real network."
+        : "Every sample is a real measurement taken from this machine at the stated time.",
       comparison: "Differences are a deterministic comparison of two observed windows.",
       limit: "Temporal association is not causation. The recorder observed; it did not experiment.",
       next: "Network Bisect can test whether a candidate condition actually changes the outcome."
@@ -263,6 +277,9 @@ export function buildCandidates(observedChange) {
 export function summariseIncident(incident) {
   return {
     id: incident.id,
+    source: incident.source ?? "measured",
+    simulated: incident.simulated === true,
+    scenario: incident.scenario ?? null,
     target: incident.target?.host ?? null,
     trigger: incident.trigger?.type ?? null,
     triggerSummary: incident.trigger?.summary ?? null,
