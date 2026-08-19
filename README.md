@@ -8,75 +8,81 @@ Faultline is an incident-first portfolio/research prototype for connectivity fai
 endpoint -> LAN/Wi-Fi -> VPN/firewall -> ISP/Internet -> application/service
 ```
 
-Faultline collects scoped evidence from affected endpoints and independent vantages, applies deterministic fault-domain reasoning, preserves evidence in support cases, identifies statistically similar incidents, and supports controlled sharing across organisations.
+Faultline collects scoped endpoint and independent-vantage evidence, applies deterministic fault-domain reasoning, preserves evidence in support cases, identifies statistically similar incidents, and supports controlled sharing across organisations.
 
 ## Implemented previews
 
 - v0.1-v0.7: deterministic diagnosis, Windows telemetry, remote correlation, probe fleet, one-time diagnostics, topology and Connectivity Contracts
-- Data Science: standardisation, evidence similarity, DBSCAN clustering and explicit outliers
-- **v0.8:** support cases, multiple runs, provenance, before/after comparison and evidence exports
-- **v0.9:** cross-party incident rooms with scoped external contributions
-- **v1.0:** organisation/project tenancy with isolated cases and credential lifecycle
-- **v1.1:** project-scoped Connectivity Contract catalog with version lifecycle and provenance
+- Data Science: evidence standardisation, similarity, DBSCAN clustering and explicit outliers
+- **v0.8:** cases, multiple runs, provenance, comparison and evidence exports
+- **v0.9:** cross-party incident rooms and external counter-evidence
+- **v1.0:** organisation/project tenancy and scoped credential lifecycle
+- **v1.1:** project Connectivity Contract catalog with immutable published versions
+- **v1.2:** project API keys, versioned embedded-diagnostics API, dependency-free SDK and one-use browser embed tokens
 
 Faultline does **not** use an AI/LLM API in diagnosis or Incident Intelligence.
 
 ## Architecture
 
 ```text
-Platform admin
-     |
-     +--> Organizations
-             |
-             +--> Projects
-                    |
-                    +--> Connectivity Contract catalog
-                    +--> Support cases
-                            |
-             +--------------+---------------+
-             |                              |
-      Faultline.exe                 Registered probes
-      affected endpoint             independent vantages
-             |                              |
-             +--------------+---------------+
-                            |
-                   deterministic diagnosis
-                            |
-          +-----------------+-----------------+
-          |                                   |
-   evidence package                    Incident Intelligence
-          |
-   cross-party room
+Organization / Project
+       |
+       +--> Contract catalog
+       +--> Project API keys ----> SDK / support backend
+       |                              |
+       |                         one-use embed token
+       |                              |
+       +--> Support cases <------ embedded widget
+                |
+       +--------+--------+
+       |                 |
+ Faultline.exe       Remote probes
+       |                 |
+       +--------+--------+
+                |
+      deterministic diagnosis
+                |
+     evidence + incident intelligence
+                |
+        cross-party room
 ```
 
-## v1.1 Connectivity Contract catalog
+## v1.2 Embedded Diagnostics
 
-Contracts can now live inside a tenant project rather than only as repository built-ins.
+Project API keys are opaque `fl_api_...` credentials stored only as hashes. Supported scopes are:
 
 ```text
-draft -> published -> deprecated
+diagnostics:create
+diagnostics:read
+cases:read
+evidence:read
 ```
 
-Published versions are treated as snapshots. A changed requirement is created as a new draft version rather than mutating a published version in place.
+Versioned API:
 
 ```text
-GET  /api/tenant/projects/:projectId/contracts
-POST /api/tenant/projects/:projectId/contracts
-POST /api/tenant/projects/:projectId/contracts/:entryId/publish
-POST /api/tenant/projects/:projectId/contracts/:entryId/deprecate
-POST /api/tenant/projects/:projectId/contracts/:entryId/clone
-GET  /api/tenant/projects/:projectId/published-contracts/:contractId
+POST /api/v1/diagnostics
+GET  /api/v1/diagnostics/:sessionId
+GET  /api/v1/cases/:caseId
+GET  /api/v1/cases/:caseId/evidence
+POST /api/v1/embed-tokens
 ```
 
-A case diagnostic may reference `catalogContractId` and optional `catalogContractVersion`; the selected published contract is copied into the diagnostic session for reproducibility.
+`sdk/faultline.mjs` provides a dependency-free `FaultlineClient` for server-side use.
 
-Catalog entries can store provenance such as source, reference URL, verifier label and notes. Faultline does not claim a profile is vendor-certified merely because these fields exist, and the repo deliberately avoids invented Microsoft/Cisco/Slack requirements.
+Browser integrations must **not** receive a project API key. A backend mints a short-lived, target-scoped `fl_embed_...` token and passes only that one-use credential to `public/faultline-widget.js`. The widget consumes it through `POST /api/embed/diagnostics` and opens the resulting consent invitation.
 
-See [Contract Catalog](docs/CONTRACT_CATALOG.md) and [Connectivity Contracts](docs/CONNECTIVITY_CONTRACTS.md).
+See [Embedded Diagnostics](docs/EMBEDDED_DIAGNOSTICS.md).
+
+## Connectivity Contract catalog
+
+Tenant projects support draft, published and deprecated contract versions. Published snapshots are not edited in place; a changed requirement becomes a new draft version. Provenance fields document where requirements came from without implying vendor certification.
+
+See [Contract Catalog](docs/CONTRACT_CATALOG.md).
 
 ## Tenant boundary
 
-The legacy `FAULTLINE_ADMIN_TOKEN` remains a platform/development credential. Tenant-facing access uses separate hashed `fl_org_...` credentials scoped to one organisation and its projects.
+The legacy `FAULTLINE_ADMIN_TOKEN` remains a platform/development credential. Tenant-facing organisation access uses hashed `fl_org_...` credentials, while embedded application access uses narrower project API keys.
 
 See [Multi-Tenancy](docs/MULTI_TENANCY.md).
 
@@ -93,18 +99,20 @@ See [Multi-Tenancy](docs/MULTI_TENANCY.md).
 
 ## Run locally
 
-Requires Node.js 20+.
-
 ```bash
 export FAULTLINE_ADMIN_TOKEN='fl_admin_change_this_to_a_long_random_value'
 npm start
 ```
 
-## Security model
+Requires Node.js 20+.
+
+## Security credentials
 
 ```text
 Platform admin token      platform/development administration
 Organization token        one organisation's tenant API
+Project API key           scoped embedded/server integration
+Embed token               one target, short TTL, one use
 Diagnostic invitation     consent for one endpoint diagnostic
 Launcher token            one exchange for endpoint access
 Endpoint token            one short-lived evidence uploader
@@ -112,7 +120,7 @@ Registered probe token    one remote worker identity
 Case-room token            one shared case and role
 ```
 
-Raw organisation, endpoint, probe, invitation, launcher and case-room credentials are not persisted.
+Raw organization, API, embed, endpoint, probe, invitation, launcher and case-room credentials are not persisted.
 
 ## Tests
 
@@ -125,7 +133,7 @@ CI also builds the Docker image and separately builds and executes the packaged 
 
 ## Current limitations
 
-This remains a portfolio/research implementation rather than production SaaS. Persistence is a single-writer JSON store, tenant identity is credential-based rather than named-user SSO/RBAC, the contract evaluator remains target-scoped, and the packaged Windows client is unsigned.
+Faultline remains a portfolio/research implementation, not production SaaS. Persistence is a single-writer JSON store, identity is credential-based rather than named-user SSO/RBAC, API usage is not metered, embed/API idempotency is not yet persisted, the contract evaluator remains target-scoped, and the Windows client is unsigned.
 
 ## Roadmap
 
@@ -133,9 +141,9 @@ This remains a portfolio/research implementation rather than production SaaS. Pe
 v0.8  Cases + Evidence Packages             complete preview
 v0.9  Cross-Party Incident Rooms            complete preview
 v1.0  Multi-Tenant MVP architecture         complete preview
-v1.1  Connectivity Contract Ecosystem       current
-v1.2  Embedded Diagnostics API + SDK        next
-v1.3  Service Desk Integrations
+v1.1  Connectivity Contract Ecosystem       complete preview
+v1.2  Embedded Diagnostics API + SDK        current
+v1.3  Service Desk Integrations             next
 v1.4  Deeper Network / Protocol Diagnostics
 v1.5  Network Change Assurance
 ```
