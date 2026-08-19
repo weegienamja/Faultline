@@ -19,6 +19,7 @@ import {
 } from "./probe/registry.mjs";
 import { normaliseProbeSelector, selectProbe } from "./probe/scheduler.mjs";
 import { createStore } from "./storage/store.mjs";
+import { createPlatformRouter } from "./platform/routes.mjs";
 
 const root = fileURLToPath(new URL("../public/", import.meta.url));
 const port = Number(process.env.PORT || 3000);
@@ -210,6 +211,7 @@ async function createAgentRun(payload, session) {
   const run = {
     id: session.id,
     sessionId: session.id,
+    caseId: session.caseId || null,
     title: session.title || context.title || "Live endpoint diagnostic",
     customer: session.customer || context.customer || "Live endpoint",
     target: session.target.input,
@@ -229,6 +231,10 @@ async function createAgentRun(payload, session) {
 
   const correlated = correlateAgentRun(run);
   await store.putRun({ ...run, source: correlated.source });
+  await platform.recordSessionEvidence(session, "diagnostic.endpoint_evidence", {
+    summary: `Endpoint evidence received for ${session.id}.`,
+    evidenceKind: "observed"
+  });
   return correlated;
 }
 
@@ -268,6 +274,11 @@ async function attachRemoteProbe(payload, session, registeredProbe = null) {
   const correlated = correlateAgentRun(run);
   run.source = correlated.source;
   await store.putRun(run);
+  await platform.recordSessionEvidence(session, "diagnostic.remote_evidence", {
+    summary: `Independent remote-vantage evidence received for ${session.id}.`,
+    evidenceKind: "observed",
+    metadata: { probeId: registeredProbe?.id || payload.probe?.id || null }
+  });
   return correlated;
 }
 
@@ -338,21 +349,47 @@ async function resolveProbeAssignment(payload) {
   };
 }
 
+async function createSessionFromPayload(payload) {
+  const assignment = await resolveProbeAssignment(payload);
+  const created = createDiagnosticSession({ ...payload, ...assignment });
+  await store.putSession(created.session);
+  if (created.session.assignedProbeId) {
+    await appendAudit("probe.session_assigned", created.session.assignedProbeId, {
+      sessionId: created.session.id,
+      mode: created.session.probeSelection?.mode || "explicit"
+    });
+  }
+  return created;
+}
+
+const platform = createPlatformRouter({
+  store,
+  requireAdmin,
+  bodyFrom,
+  json,
+  createSession: createSessionFromPayload,
+  publicSession
+});
+
 const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host || "localhost"}`);
 
+    if (await platform.handle(req, res, url)) return;
+
     if (req.method === "GET" && url.pathname === "/api/health") {
       return json(res, 200, {
         ok: true,
-        version: "0.6-preview",
+        version: "0.8-preview",
         persistence: true,
         registeredProbeFleet: true,
         probeScheduling: true,
         publicProbeSafety: true,
         topologyPreview: true,
         ephemeralInvitations: true,
-        windowsClientPreview: true
+        windowsClientPreview: true,
+        caseWorkspaces: true,
+        evidencePackages: true
       });
     }
 
@@ -504,15 +541,7 @@ const server = createServer(async (req, res) => {
     if (req.method === "POST" && url.pathname === "/api/sessions") {
       requireAdmin(req);
       const payload = await bodyFrom(req);
-      const assignment = await resolveProbeAssignment(payload);
-      const created = createDiagnosticSession({ ...payload, ...assignment });
-      await store.putSession(created.session);
-      if (created.session.assignedProbeId) {
-        await appendAudit("probe.session_assigned", created.session.assignedProbeId, {
-          sessionId: created.session.id,
-          mode: created.session.probeSelection?.mode || "explicit"
-        });
-      }
+      const created = await createSessionFromPayload(payload);
       return json(res, 201, {
         session: publicSession(created.session),
         credentials: created.credentials,
@@ -622,6 +651,7 @@ const server = createServer(async (req, res) => {
 
 server.listen(port, () => {
   console.log(`Faultline v0.6 preview listening on http://localhost:${port}`);
+  console.log("Current product milestone: v0.8 preview");
   console.log(`Persistent store: ${dataFile}`);
   if (!configuredAdminToken) {
     console.log("No FAULTLINE_ADMIN_TOKEN was configured. Generated a development admin credential:");
