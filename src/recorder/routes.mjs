@@ -12,6 +12,10 @@
 import { createRecorder, DEFAULTS, RECORDER_STATE } from "./recorder.mjs";
 import { summariseIncident } from "./incident.mjs";
 import { createSimulationSampler, listScenarios, loadScenario } from "./simulate.mjs";
+import { buildBisectAttachment, summariseAttachment } from "./attachments.mjs";
+import { buildCapsule, capsuleFilename } from "../evidence/capsule.mjs";
+import { renderCapsuleHtml } from "../evidence/capsule-html.mjs";
+import { assertRedactionMode } from "../evidence/redaction.mjs";
 import { createDeepCapture } from "./deep-capture.mjs";
 import { parseLiveTarget } from "../live/measure.mjs";
 import { assertLiteralTargetAllowed } from "../security/target.mjs";
@@ -29,6 +33,7 @@ export function createRecorderRouter({
   bodyFrom,
   json,
   store = null,
+  faultlineVersion = "unknown",
   // Closed incidents are written to the store so an investigation survives a
   // restart. The rolling sample buffer is never persisted - that distinction is
   // what keeps this a recorder rather than a time-series database. Set
@@ -80,6 +85,20 @@ export function createRecorderRouter({
     // Persisted incidents are summarised with the same function the live
             // recorder uses, so a restored incident is indistinguishable in shape.
     return [...live, ...stored.map(incident => ({ ...summariseIncident(incident), persisted: true }))];
+  }
+
+  /**
+   * Read an incident's evidence attachments.
+   *
+   * Deliberately NOT wrapped in a catch. An empty list means "no experiment was
+   * run", and the capsule states exactly that as a finding. Turning a failed
+   * read into an empty list would convert "I could not read the evidence" into
+   * "there is no evidence" - an epistemic falsehood, and precisely the kind of
+   * silent downgrade this product exists to avoid. A read failure must surface.
+   */
+  async function listAttachments(incidentId) {
+    if (!store?.listIncidentEvidence) return [];
+    return store.listIncidentEvidence(incidentId);
   }
 
   async function findIncident(id) {
@@ -223,7 +242,55 @@ export function createRecorderRouter({
         error.statusCode = 404;
         throw error;
       }
-      json(res, 200, incident);
+      json(res, 200, {
+        ...incident,
+        // Listed alongside rather than merged in: the incident record itself
+        // stays exactly as it was frozen.
+        evidence: (await listAttachments(incident.id)).map(summariseAttachment)
+      });
+      return true;
+    }
+
+    const evidenceMatch = url.pathname.match(/^\/api\/recorder\/incidents\/([A-Za-z0-9-]{1,40})\/evidence$/);
+    if (req.method === "GET" && evidenceMatch) {
+      json(res, 200, { incidentId: evidenceMatch[1], evidence: await listAttachments(evidenceMatch[1]) });
+      return true;
+    }
+
+    // --- export a portable incident capsule ---------------------------------
+    //
+    // One self-contained file. Never depends on the Analyst: export must work
+    // with no model installed and no network, because the evidence is the
+    // product.
+    const capsuleMatch = url.pathname.match(/^\/api\/recorder\/incidents\/([A-Za-z0-9-]{1,40})\/capsule$/);
+    if (req.method === "GET" && capsuleMatch) {
+      const incident = await findIncident(capsuleMatch[1]);
+      if (!incident) {
+        const error = new Error(`No Flight Recorder incident ${capsuleMatch[1]} is retained.`);
+        error.statusCode = 404;
+        throw error;
+      }
+
+      const redaction = assertRedactionMode(url.searchParams.get("redaction") || "none");
+      const capsule = buildCapsule({
+        incident,
+        attachments: await listAttachments(incident.id),
+        redaction,
+        faultlineVersion
+      });
+
+      if (url.searchParams.get("format") === "json") {
+        json(res, 200, capsule);
+        return true;
+      }
+
+      const html = renderCapsuleHtml(capsule);
+      res.writeHead(200, {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-store",
+        "content-disposition": `attachment; filename="${capsuleFilename(incident.id)}"`
+      });
+      res.end(html);
       return true;
     }
 
@@ -260,8 +327,42 @@ export function createRecorderRouter({
       });
 
       const runId = registry.record(EVIDENCE_KIND.BISECT, report);
+
+      // Durable, and separate from the frozen incident. Before this, a Bisect
+      // result lived only in the in-memory Analyst registry, so restarting the
+      // control plane left an incident that recorded a failure with no trace of
+      // the experiment that isolated it.
+      const attachment = buildBisectAttachment({ incident, report, requestedAxes: axes });
+
+      // This endpoint promises durable experimental evidence, so a failed write
+      // is a failed request. Reporting an evidenceId for something that is not
+      // stored would recreate exactly the hole PIC1 closed: the id looks
+      // durable, the restart proves it was not.
+      if (store?.putIncidentEvidence) {
+        try {
+          await store.putIncidentEvidence(attachment);
+        } catch (cause) {
+          logger("recorder.attachment_persist_failed", { id: attachment.id, message: cause?.message });
+          const error = new Error("The Network Bisect run completed, but its evidence could not be stored durably. The result below is not retained and will not survive a restart.");
+          error.statusCode = 500;
+          error.code = "EVIDENCE_NOT_PERSISTED";
+          // The experiment made real measurements. Losing them because the
+          // write failed would be a second, avoidable loss.
+          error.details = {
+            evidencePersisted: false,
+            evidenceId: null,
+            incidentId: incident.id,
+            requestedAxes: axes,
+            report
+          };
+          throw error;
+        }
+      }
+
       json(res, 201, {
         incidentId: incident.id,
+        evidenceId: attachment.id,
+        evidencePersisted: Boolean(store?.putIncidentEvidence),
         requestedAxes: axes,
         // The incident may be simulated, but this Bisect run is not: it made
         // real connections from this machine. Saying so prevents the two halves

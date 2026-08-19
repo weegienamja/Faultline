@@ -169,6 +169,29 @@ if (host) {
       </form>`;
   }
 
+  /**
+   * Export control.
+   *
+   * The label states what is inside so nobody has to open the file to find out
+   * whether an experiment was ever run against the incident.
+   */
+  function exportControl(record) {
+    const experiments = Array.isArray(record.evidence)
+      ? record.evidence.length
+      : record.experimentCount ?? 0;
+    const label = experiments ? "Export capsule · Recorder + Bisect" : "Export capsule · Recorder only";
+    return `<div class="fl-control-group" style="gap:4px">
+      <select class="fl-select fl-btn-sm" data-capsule-redaction="${escapeHtml(record.id)}" title="Redaction">
+        <option value="none">No redaction</option>
+        <option value="network-identifiers">Hide identifiers</option>
+        <option value="strict">Strict</option>
+      </select>
+      <a class="fl-btn fl-btn-sm" data-capsule-link="${escapeHtml(record.id)}"
+         href="/api/recorder/incidents/${encodeURIComponent(record.id)}/capsule"
+         download>${escapeHtml(label)}</a>
+    </div>`;
+  }
+
   function incidentView(record) {
     const window = (title, entry) => entry.samples.length
       ? `<div style="margin-top:16px"><span class="fl-label">${title}</span>${timelineTable(entry.samples)}</div>`
@@ -207,6 +230,7 @@ if (host) {
           <p class="fl-meta">${escapeHtml(record.trigger.summary || "")} · ${time(record.trigger.at)}</p>
         </div>
         <div class="fl-view-head-actions">
+          ${exportControl(record)}
           <button class="fl-btn fl-btn-sm" type="button" data-recorder="back">Back to timeline</button>
         </div>
       </div>
@@ -318,13 +342,14 @@ if (host) {
         title: "Captured windows",
         body: status?.incidents?.length
           ? `<div class="fl-table-wrap"><table class="fl-table">
-               <thead><tr><th>Incident</th><th>Trigger</th><th>At</th><th>Differences</th><th></th></tr></thead>
+               <thead><tr><th>Incident</th><th>Trigger</th><th>At</th><th>Differences</th><th></th><th></th></tr></thead>
                <tbody>${status.incidents.map(entry => `<tr>
                  <td class="fl-mono">${escapeHtml(entry.id)} ${entry.simulated ? badge("SIM", "warn") : ""}</td>
                  <td>${escapeHtml(entry.triggerSummary || entry.trigger || "")}</td>
                  <td class="fl-num">${time(entry.at)}</td>
                  <td class="fl-num">${entry.differences}</td>
                  <td><button class="fl-btn fl-btn-sm" type="button" data-recorder="open" data-incident="${escapeHtml(entry.id)}">Open</button></td>
+                 <td>${exportControl(entry)}</td>
                </tr>`).join("")}</tbody>
              </table></div>`
           : state({
@@ -383,7 +408,40 @@ if (host) {
     }
   });
 
+  host.addEventListener("change", event => {
+    const select = event.target.closest("[data-capsule-redaction]");
+    if (!select) return;
+    const link = host.querySelector(`[data-capsule-link="${CSS.escape(select.dataset.capsuleRedaction)}"]`);
+    if (link) link.dataset.redaction = select.value;
+  });
+
   host.addEventListener("click", async event => {
+    // The capsule route is admin-authenticated, and a plain download link
+    // cannot carry the credential. Fetch it and hand the browser a blob.
+    const link = event.target.closest("[data-capsule-link]");
+    if (link) {
+      event.preventDefault();
+      const id = link.dataset.capsuleLink;
+      const redaction = link.dataset.redaction || "none";
+      try {
+        const response = await fetch(`/api/recorder/incidents/${encodeURIComponent(id)}/capsule?redaction=${encodeURIComponent(redaction)}`, { headers: headers() });
+        if (!response.ok) throw new Error(`Export failed (${response.status})`);
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement("a");
+        anchor.href = url;
+        anchor.download = `faultline-${id}.html`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        URL.revokeObjectURL(url);
+      } catch (failure) {
+        error = failure.message;
+        render();
+      }
+      return;
+    }
+
     const action = event.target.closest("[data-recorder]")?.dataset.recorder;
     if (!action) return;
     const incidentId = event.target.closest("[data-incident]")?.dataset.incident;

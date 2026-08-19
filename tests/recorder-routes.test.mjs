@@ -482,3 +482,160 @@ test("the recorder panel never pairs SIMULATED with a measured-locally claim", a
     assert.match(css, /\.fl-source\[data-kind="simulated"\]/, "the simulated source chip needs its own styling");
   });
 });
+
+test("capsule export works over the API and is self-contained", async () => {
+  await withServer(4423, async base => {
+    await fetch(`${base}/api/recorder/start`, {
+      method: "POST", headers: jsonHeaders,
+      body: JSON.stringify({ simulate: "ipv6-path-loss", intervalMs: 2_000, afterWindowMs: 10_000 })
+    });
+
+    let incidentId = null;
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      await new Promise(resolve => setTimeout(resolve, 1_000));
+      const { incidents } = await (await fetch(`${base}/api/recorder/incidents`, { headers: admin })).json();
+      if (incidents.length) { incidentId = incidents[0].id; break; }
+    }
+    assert.ok(incidentId);
+    await fetch(`${base}/api/recorder/stop`, { method: "POST", headers: jsonHeaders, body: "{}" });
+
+    // HTML form: downloadable, self-contained.
+    const html = await fetch(`${base}/api/recorder/incidents/${incidentId}/capsule`, { headers: admin });
+    assert.equal(html.status, 200);
+    assert.match(html.headers.get("content-type") || "", /text\/html/);
+    assert.match(html.headers.get("content-disposition") || "", /attachment; filename="faultline-FLR/);
+
+    const body = await html.text();
+    assert.ok(!/src\s*=\s*["']https?:/i.test(body), "no remote script");
+    assert.ok(!/<link/i.test(body), "no external stylesheet");
+    assert.ok(body.includes("Simulated incident"), "a simulated incident must say so in the capsule");
+
+    // JSON form.
+    const json = await (await fetch(`${base}/api/recorder/incidents/${incidentId}/capsule?format=json`, { headers: admin })).json();
+    assert.equal(json.schema, "faultline.incident-capsule");
+    assert.equal(json.incident.id, incidentId);
+    assert.equal(json.provenance.containsSimulated, true);
+    assert.equal(json.conclusion.available, false, "nothing was tested, so no conclusion");
+    assert.ok(json.integrity.digest);
+  });
+});
+
+test("capsule export requires auth and validates redaction", async () => {
+  await withServer(4424, async base => {
+    const unauthorised = await fetch(`${base}/api/recorder/incidents/FLR-2026-0001/capsule`);
+    assert.equal(unauthorised.status, 401);
+
+    const missing = await fetch(`${base}/api/recorder/incidents/FLR-2026-9999/capsule`, { headers: admin });
+    assert.equal(missing.status, 404);
+
+    const bad = await fetch(`${base}/api/recorder/incidents/FLR-2026-0001/capsule?redaction=everything`, { headers: admin });
+    assert.ok(bad.status === 400 || bad.status === 404);
+  });
+});
+
+test("the dashboard offers capsule export with an unambiguous label", async () => {
+  await withServer(4425, async base => {
+    const panel = await (await fetch(`${base}/recorder-panel.js`)).text();
+    assert.ok(panel.includes("Export capsule · Recorder + Bisect"));
+    assert.ok(panel.includes("Export capsule · Recorder only"));
+    // The route is authenticated, so a plain download link cannot work.
+    assert.ok(panel.includes("createObjectURL"), "export must fetch with credentials, not link directly");
+  });
+});
+
+// --- evidence durability must never be reported optimistically --------------
+
+test("a failed evidence write fails the request instead of claiming durability", async () => {
+  const { createRecorderRouter } = await import("../src/recorder/routes.mjs");
+
+  const incident = {
+    id: "FLR-2026-0001",
+    target: { host: "example.com", port: 443, input: "example.com" },
+    candidateDiscriminators: { bisectAxes: ["address-family"] }
+  };
+
+  const responses = [];
+  let thrown = null;
+  const handler = createRecorderRouter({
+    requireAdmin: () => {},
+    bodyFrom: async () => ({}),
+    json: (_res, status, payload) => responses.push({ status, payload }),
+    store: {
+      getIncident: async id => (id === incident.id ? incident : null),
+      listIncidents: async () => [incident],
+      listIncidentEvidence: async () => [],
+      // The disk write fails.
+      putIncidentEvidence: async () => { throw new Error("EROFS: read-only file system"); }
+    },
+    runBisect: async () => ({ schema: "faultline.network-bisect", executed: [], verdict: { classification: "LOCAL_CAPABILITY_DEFICIENCY" } }),
+    logger: () => {}
+  });
+
+  try {
+    await handler({ method: "POST", on: () => {} }, {}, new URL(`http://x/api/recorder/incidents/${incident.id}/bisect`));
+  } catch (error) {
+    thrown = error;
+  }
+
+  assert.ok(thrown, "the request must fail rather than report a durable id");
+  assert.equal(thrown.statusCode, 500);
+  assert.equal(thrown.code, "EVIDENCE_NOT_PERSISTED");
+  assert.equal(thrown.details.evidencePersisted, false);
+  assert.equal(thrown.details.evidenceId, null, "no id may be reported for evidence that was not stored");
+  // The experiment made real measurements; losing them too would be a second loss.
+  assert.ok(thrown.details.report, "the completed run must still be returned");
+  assert.equal(responses.length, 0, "no success response may be sent");
+});
+
+test("a failed evidence read is not reported as an absence of evidence", async () => {
+  const { createRecorderRouter } = await import("../src/recorder/routes.mjs");
+
+  const incident = { id: "FLR-2026-0001", target: { host: "example.com", port: 443 }, windows: {}, observedChange: {}, candidateDiscriminators: {} };
+  let thrown = null;
+  const handler = createRecorderRouter({
+    requireAdmin: () => {},
+    bodyFrom: async () => ({}),
+    json: () => {},
+    store: {
+      getIncident: async () => incident,
+      listIncidents: async () => [incident],
+      // Reading the evidence fails.
+      listIncidentEvidence: async () => { throw new Error("EIO: i/o error"); }
+    },
+    logger: () => {}
+  });
+
+  try {
+    await handler({ method: "GET", on: () => {} }, {}, new URL(`http://x/api/recorder/incidents/${incident.id}/capsule?format=json`));
+  } catch (error) {
+    thrown = error;
+  }
+
+  // "I could not read the evidence" must never become "no experiment was run",
+  // which is what the capsule states when the attachment list is empty.
+  assert.ok(thrown, "a failed read must surface rather than yielding an empty list");
+  assert.match(String(thrown.message), /EIO/);
+});
+
+test("a successful export reports that evidence was persisted", async () => {
+  await withServer(4426, async base => {
+    await fetch(`${base}/api/recorder/start`, {
+      method: "POST", headers: jsonHeaders,
+      body: JSON.stringify({ simulate: "ipv6-path-loss", intervalMs: 2_000, afterWindowMs: 10_000 })
+    });
+    let incidentId = null;
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      await new Promise(resolve => setTimeout(resolve, 1_000));
+      const { incidents } = await (await fetch(`${base}/api/recorder/incidents`, { headers: admin })).json();
+      if (incidents.length) { incidentId = incidents[0].id; break; }
+    }
+    assert.ok(incidentId);
+    await fetch(`${base}/api/recorder/stop`, { method: "POST", headers: jsonHeaders, body: "{}" });
+
+    // No experiment yet: the capsule must say so plainly.
+    const before = await (await fetch(`${base}/api/recorder/incidents/${incidentId}/capsule?format=json`, { headers: admin })).json();
+    assert.equal(before.conclusion.available, false);
+    assert.equal(before.conclusion.observedOnly, true);
+    assert.match(before.conclusion.reason, /nothing was tested/);
+  });
+});
