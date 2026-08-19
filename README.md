@@ -18,7 +18,8 @@ Faultline collects scoped evidence from affected endpoints and independent vanta
 - **v0.9:** cross-party incident rooms with scoped external contributions
 - **v1.0:** organisation/project tenancy with isolated cases and credential lifecycle
 - **v1.1:** project-scoped Connectivity Contract catalog with version lifecycle and provenance
-- **v1.2:** embedded diagnostics API, JavaScript SDK and credential-free end-user launch widget
+- **v1.2:** embedded diagnostics API, JavaScript SDK and end-user launch widget
+- **v1.3:** service-desk ticket correlation and provenance-preserving update envelopes
 
 Faultline does **not** use an AI/LLM API in diagnosis or Incident Intelligence.
 
@@ -28,6 +29,8 @@ Faultline does **not** use an AI/LLM API in diagnosis or Incident Intelligence.
 Support portal / service desk
         |
    Faultline v1 API + SDK
+        |
+        +--> ticket correlation / update envelope
         |
 Platform / tenant control plane
         |
@@ -48,9 +51,25 @@ Platform / tenant control plane
              cross-party room
 ```
 
+## v1.3 Service Desk Integrations
+
+Faultline can associate a support case with ServiceNow, Jira Service Management, Zendesk, HaloPSA, Freshservice, ConnectWise or a generic webhook integration intent.
+
+```text
+GET  /api/v1/integrations/service-desk/providers
+POST /api/v1/diagnostics/:caseId/service-desk
+GET  /api/v1/diagnostics/:caseId/service-desk
+```
+
+The generated update envelope contains the external ticket ID, deterministic fault-domain summary, confidence, latest session reference, redacted evidence link and evidence-package digest. It is designed to be consumed by a provider-specific transport rather than copying raw telemetry into a ticket.
+
+Faultline does not persist third-party service-desk credentials and does not claim live vendor certification in this preview. HMAC signing helpers provide a safe boundary for later delivery workers/webhooks.
+
+See [Service Desk Integrations](docs/SERVICE_DESK_INTEGRATIONS.md).
+
 ## v1.2 Embedded Diagnostics API + SDK
 
-A support application can now create and track a Faultline diagnostic without requiring an engineer to recreate the case in the dashboard.
+A support application can create and track a Faultline diagnostic without requiring an engineer to recreate the case in the dashboard.
 
 ```text
 POST /api/v1/diagnostics
@@ -60,25 +79,13 @@ GET  /api/v1/diagnostics/:caseId/evidence
 GET  /api/v1/diagnostics/:caseId/events
 ```
 
-`externalRef` lets the caller preserve its own ticket/case identifier without influencing Faultline's diagnosis.
-
-`sdk/faultline-client.mjs` provides a dependency-free JavaScript client. `public/faultline-widget.js` provides an embeddable `<faultline-diagnostic-button>` that receives only an already-created one-time invitation URL, so administrative credentials are not exposed in browser code.
+`externalRef` preserves the caller's own ticket/case identifier without influencing diagnosis. `sdk/faultline-client.mjs` provides the dependency-free client and `public/faultline-widget.js` provides a credential-free user launch component.
 
 See [Embedded Diagnostics](docs/EMBEDDED_DIAGNOSTICS.md).
 
 ## v1.1 Connectivity Contract catalog
 
-Contracts can live inside a tenant project rather than only as repository built-ins.
-
-```text
-draft -> published -> deprecated
-```
-
-Published versions are snapshots. A changed requirement is created as a new draft version rather than mutating a published version in place.
-
-A case diagnostic may reference a published project contract; the selected version is copied into the diagnostic session for reproducibility.
-
-Catalog entries can store provenance such as source, reference URL, verifier label and notes. Faultline does not claim a profile is vendor-certified merely because these fields exist, and the repo deliberately avoids invented vendor requirements.
+Published project contract versions are immutable snapshots. A changed requirement becomes a new draft version rather than mutating historical diagnostic meaning.
 
 See [Contract Catalog](docs/CONTRACT_CATALOG.md) and [Connectivity Contracts](docs/CONNECTIVITY_CONTRACTS.md).
 
@@ -120,9 +127,7 @@ Registered probe token    one remote worker identity
 Case-room token            one shared case and role
 ```
 
-The v1.2 API currently reuses the platform admin credential as a preview integration boundary. The SDK credential belongs in the support application's backend. The user-facing widget receives only the one-time invitation URL.
-
-Raw organisation, endpoint, probe, invitation, launcher and case-room credentials are not persisted.
+The v1 API currently reuses the platform admin credential as a preview integration boundary. SDK credentials belong in the support application's backend. The user-facing widget receives only a one-time invitation URL. Service-desk credentials are not stored by Faultline.
 
 ## Tests
 
@@ -135,7 +140,7 @@ CI also builds the Docker image and separately builds and executes the packaged 
 
 ## Current limitations
 
-This remains a portfolio/research implementation rather than production SaaS. Persistence is a single-writer JSON store, tenant identity is credential-based rather than named-user SSO/RBAC, v1 API authentication is not yet service-account scoped, the contract evaluator remains target-scoped, and the packaged Windows client is unsigned.
+This remains a portfolio/research implementation rather than production SaaS. Persistence is a single-writer JSON store, tenant identity is credential-based rather than named-user SSO/RBAC, v1 API authentication is not yet service-account scoped, service-desk provider transports are adapter boundaries rather than live OAuth integrations, the contract evaluator remains target-scoped, and the packaged Windows client is unsigned.
 
 ## Roadmap
 
@@ -144,9 +149,9 @@ v0.8  Cases + Evidence Packages             complete preview
 v0.9  Cross-Party Incident Rooms            complete preview
 v1.0  Multi-Tenant MVP architecture         complete preview
 v1.1  Connectivity Contract Ecosystem       complete preview
-v1.2  Embedded Diagnostics API + SDK        current preview
-v1.3  Service Desk Integrations             next
-v1.4  Deeper Network / Protocol Diagnostics
+v1.2  Embedded Diagnostics API + SDK        complete preview
+v1.3  Service Desk Integrations             current preview
+v1.4  Deeper Network / Protocol Diagnostics next
 v1.5  Network Change Assurance
 ```
 
