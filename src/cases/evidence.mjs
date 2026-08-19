@@ -1,4 +1,7 @@
-import { createHash } from "node:crypto";
+// Canonicalisation and hashing live in the shared evidence module so case
+// packages and incident capsules cannot drift apart. The implementation is
+// unchanged, so existing package digests still verify.
+import { canonical, digest } from "../evidence/integrity.mjs";
 
 const COMPARISON_METRICS = [
   "gatewayLoss",
@@ -14,18 +17,6 @@ const COMPARISON_METRICS = [
 
 function clone(value) {
   return value == null ? value : structuredClone(value);
-}
-
-function canonical(value) {
-  if (Array.isArray(value)) return value.map(canonical);
-  if (value && typeof value === "object") {
-    return Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])]));
-  }
-  return value;
-}
-
-function digest(value) {
-  return createHash("sha256").update(JSON.stringify(canonical(value))).digest("hex");
 }
 
 function finite(value) {

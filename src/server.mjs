@@ -388,7 +388,7 @@ const platform = createPlatformRouter({
 const handleLive = createLiveRouter({ requireAdmin, bodyFrom, json, store, publicProbe });
 const handleBisect = createBisectRouter({ requireAdmin, bodyFrom, json });
 const handleAnalyst = createAnalystRouter({ requireAdmin, bodyFrom, json, store });
-const handleRecorder = createRecorderRouter({ requireAdmin, bodyFrom, json, store });
+const handleRecorder = createRecorderRouter({ requireAdmin, bodyFrom, json, store, faultlineVersion: PRODUCT_VERSION });
 
 const server = createServer(async (req, res) => {
   try {
@@ -425,6 +425,7 @@ const server = createServer(async (req, res) => {
         networkBisect: true,
         localAnalyst: true,
         flightRecorder: true,
+        incidentCapsules: true,
         recorderIncidentPersistence: process.env.FAULTLINE_RECORDER_PERSIST !== "0"
       });
     }

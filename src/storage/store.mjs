@@ -1,10 +1,10 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
-const STATE_VERSION = 6;
+const STATE_VERSION = 7;
 
 function emptyState() {
-  return { version: STATE_VERSION, sessions: [], runs: [], probes: [], audit: [], cases: [], organizations: [], projects: [], incidents: [] };
+  return { version: STATE_VERSION, sessions: [], runs: [], probes: [], audit: [], cases: [], organizations: [], projects: [], incidents: [], incidentEvidence: [] };
 }
 
 function normaliseState(value) {
@@ -20,7 +20,13 @@ function normaliseState(value) {
     projects: Array.isArray(value.projects) ? value.projects : [],
     // v6: closed Flight Recorder incidents. Absent in a v5 file, which loads
     // unchanged - the field simply starts empty.
-    incidents: Array.isArray(value.incidents) ? value.incidents : []
+    incidents: Array.isArray(value.incidents) ? value.incidents : [],
+    // v7: evidence produced ABOUT an incident after it closed, most obviously a
+    // Network Bisect run started from its candidate conditions. Kept separate
+    // so the frozen incident stays the immutable artefact PR #20 established:
+    // running another experiment must not rewrite the record of what was
+    // observed.
+    incidentEvidence: Array.isArray(value.incidentEvidence) ? value.incidentEvidence : []
   };
 }
 
@@ -61,7 +67,10 @@ export function createStore(filePath) {
     async getIncident(id) { await load(); return state.incidents.find(item => item.id === id) || null; },
     async listIncidents(limit = 20) { await load(); return [...state.incidents].slice(0, limit); },
     putIncident(value, { max = 20 } = {}) { return mutate(current => { const index = current.incidents.findIndex(item => item.id === value.id); if (index >= 0) current.incidents[index] = value; else current.incidents.unshift(value); current.incidents = current.incidents.slice(0, max); return value; }); },
-    deleteIncident(id) { return mutate(current => { const before = current.incidents.length; current.incidents = current.incidents.filter(item => item.id !== id); return before !== current.incidents.length; }); },
+    deleteIncident(id) { return mutate(current => { const before = current.incidents.length; current.incidents = current.incidents.filter(item => item.id !== id); const attachments = current.incidentEvidence.length; current.incidentEvidence = current.incidentEvidence.filter(item => item.incidentId !== id); return { removed: before !== current.incidents.length, attachmentsRemoved: attachments - current.incidentEvidence.length }; }); },
+    async getIncidentEvidence(id) { await load(); return state.incidentEvidence.find(item => item.id === id) || null; },
+    async listIncidentEvidence(incidentId) { await load(); return state.incidentEvidence.filter(item => item.incidentId === incidentId).sort((a,b)=>Date.parse(a.createdAt||0)-Date.parse(b.createdAt||0)); },
+    putIncidentEvidence(value, { max = 100 } = {}) { return mutate(current => { const index = current.incidentEvidence.findIndex(item => item.id === value.id); if (index >= 0) current.incidentEvidence[index] = value; else current.incidentEvidence.unshift(value); current.incidentEvidence = current.incidentEvidence.slice(0, max); return value; }); },
     async listAudit(limit=100) { await load(); return [...state.audit].sort((a,b)=>Date.parse(b.at||0)-Date.parse(a.at||0)).slice(0,limit); },
     appendAudit(event) { return mutate(current => { current.audit.unshift(event); current.audit=current.audit.slice(0,1000); return event; }); }
   };

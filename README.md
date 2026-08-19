@@ -110,6 +110,7 @@ npm start                          # dashboard on :3000
 npm run bisect -- example.com      # condition isolation, no server needed
 npm run recorder -- example.com    # rolling capture of a transient fault
 npm run recorder -- --simulate ipv6-path-loss   # reproducible end-to-end demo
+npm run capsule -- FLR-2026-0001   # one-file portable evidence, opens anywhere
 ```
 
 It also does real live measurement (DNS across four resolvers, TCP, TLS
@@ -148,6 +149,7 @@ works identically without it.
 
 - **Flight Recorder:** bounded in-memory capture of the minutes around a fault — before/during/after windows, observed differences, and candidate conditions handed to Network Bisect
 - **Faultline Analyst:** optional local-only AI that explains evidence, cites it, and is architecturally barred from producing findings
+- **Portable Incident Capsule:** one self-contained HTML file carrying the incident, the experiments, the conclusions and their provenance — opens with no Faultline, no server and no network
 
 Faultline does **not** use an AI/LLM API in diagnosis or Incident Intelligence,
 and never uses a cloud AI service anywhere.
@@ -270,6 +272,7 @@ Platform / tenant control plane
 - [Multi-Tenancy](docs/MULTI_TENANCY.md)
 - [Network Bisect](docs/NETWORK_BISECT.md)
 - [Flight Recorder](docs/FLIGHT_RECORDER.md)
+- [Portable Incident Capsule](docs/INCIDENT_CAPSULE.md)
 - [Faultline Analyst (local AI)](docs/LOCAL_ANALYST.md)
 - [Live Internet Data](docs/LIVE_INTERNET_DATA.md)
 - [Architecture](docs/ARCHITECTURE.md)
