@@ -1,4 +1,5 @@
 import { createSupportCase, attachSessionToCase, publicCase } from "../cases/service.mjs";
+import { buildServiceDeskUpdate, configureServiceDesk, listServiceDeskProviders } from "../integrations/service-desk.mjs";
 
 function notFound(message) {
   const error = new Error(message);
@@ -20,6 +21,7 @@ function publicApiCase(caseRecord, context = {}) {
   return {
     ...publicCase(caseRecord, context),
     externalRef: caseRecord.externalRef || null,
+    serviceDesk: caseRecord.serviceDesk ? structuredClone(caseRecord.serviceDesk) : null,
     apiVersion: "v1",
     sessionCount: sessions.length,
     completedRunCount: runs.length
@@ -56,10 +58,15 @@ export function createDeveloperRouter({ store, requireAdmin, bodyFrom, json, cre
     if (!url.pathname.startsWith("/api/v1")) return false;
     requireAdmin(req);
 
+    if (req.method === "GET" && url.pathname === "/api/v1/integrations/service-desk/providers") {
+      json(res, 200, listServiceDeskProviders());
+      return true;
+    }
+
     if (req.method === "POST" && url.pathname === "/api/v1/diagnostics") {
       const payload = await bodyFrom(req);
       if (!payload?.target) throw new Error("target is required.");
-      const caseRecord = {
+      let caseRecord = {
         ...createSupportCase({
           title: payload.caseTitle || payload.title || "Embedded network diagnostic",
           customer: payload.customer || "External support portal",
@@ -68,6 +75,7 @@ export function createDeveloperRouter({ store, requireAdmin, bodyFrom, json, cre
         }),
         externalRef: cleanExternalRef(payload.externalRef)
       };
+      if (payload.serviceDesk) caseRecord = { ...caseRecord, serviceDesk: configureServiceDesk(payload.serviceDesk) };
       await store.putCase(caseRecord);
       const result = await createDiagnostic(caseRecord, payload);
       const invitationToken = result.created.credentials?.invitationToken || null;
@@ -80,11 +88,11 @@ export function createDeveloperRouter({ store, requireAdmin, bodyFrom, json, cre
       return true;
     }
 
-    const match = url.pathname.match(/^\/api\/v1\/diagnostics\/([^/]+)(?:\/(runs|evidence|events))?$/);
+    const match = url.pathname.match(/^\/api\/v1\/diagnostics\/([^/]+)(?:\/(runs|evidence|events|service-desk))?$/);
     if (!match) return false;
     const id = decodeURIComponent(match[1]);
     const action = match[2] || null;
-    const caseRecord = await getCase(id);
+    let caseRecord = await getCase(id);
 
     if (req.method === "GET" && !action) {
       const context = await contextFor(caseRecord);
@@ -132,6 +140,27 @@ export function createDeveloperRouter({ store, requireAdmin, bodyFrom, json, cre
           summary: event.summary || null
         }))
       });
+      return true;
+    }
+
+    if (req.method === "POST" && action === "service-desk") {
+      const payload = await bodyFrom(req);
+      caseRecord = { ...caseRecord, serviceDesk: configureServiceDesk(payload) };
+      await store.putCase(caseRecord);
+      json(res, 201, { caseId: caseRecord.id, serviceDesk: structuredClone(caseRecord.serviceDesk) });
+      return true;
+    }
+
+    if (req.method === "GET" && action === "service-desk") {
+      if (!caseRecord.serviceDesk) notFound(`Support case ${caseRecord.id} has no service desk integration.`);
+      const evidence = await evidenceFor(caseRecord, "network-identifiers");
+      json(res, 200, buildServiceDeskUpdate({
+        integration: caseRecord.serviceDesk,
+        caseRecord,
+        evidence,
+        baseUrl: `${url.protocol}//${url.host}`,
+        reason: url.searchParams.get("reason") || "diagnostic.updated"
+      }));
       return true;
     }
 
