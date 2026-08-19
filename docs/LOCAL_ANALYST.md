@@ -120,12 +120,13 @@ AVAILABLE FAULTLINE EVIDENCE
 - Current target: example.com — available (get_current_target)
 - Latest live diagnostic — unavailable
 - Latest Network Bisect run — available (get_latest_bisect_run)
+- Flight Recorder incident (before/during/after) — available (get_latest_recorder_incident, get_recorder_incident)
 - Measured path and inferred topology — unavailable
 - Support cases — unavailable
 - Faultline documentation and engine vocabulary — available (search_faultline_docs, get_faultline_term)
 
 Not retrievable by you in this version: Change Assurance comparisons;
-Connectivity Contract results; Flight Recorder history (not implemented).
+Connectivity Contract results.
 ```
 
 This exists because an 8B model answers honestly but does not always notice
@@ -256,8 +257,9 @@ the failure recorded in `limitations`.
 `get_current_view`, `get_current_target`, `get_current_diagnosis`,
 `get_live_diagnostic`, `get_latest_bisect_run`, `get_bisect_run`,
 `get_bisect_experiment_path`, `get_bisect_hypotheses`, `get_topology`,
-`get_recent_cases`, `get_case`, `get_probe_fleet`, `search_faultline_docs`,
-`get_faultline_term`.
+`get_recent_cases`, `get_case`, `get_probe_fleet`,
+`get_latest_recorder_incident`, `get_recorder_incident`,
+`search_faultline_docs`, `get_faultline_term`.
 
 `GET /api/analyst/capabilities` returns the reason each one exists.
 
@@ -333,6 +335,7 @@ Analyst entirely, stop Ollama; to remove the runtime, uninstall Ollama.
   answering about them.
 * Answers are explanations, not determinations. Anything under **Analyst
   interpretation** is a hypothesis.
-* Flight Recorder is not implemented, so no tool reports pre-fault history and
-  the starter questions do not imply otherwise.
+* Flight Recorder incidents persist across restarts in the Faultline store, but
+  the Analyst's in-memory registry is rebuilt per process: after a restart it
+  reports none until an incident is captured or opened again.
 * Evidence retention is per-process. Restarting the control plane clears it.

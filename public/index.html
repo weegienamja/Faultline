@@ -209,15 +209,8 @@
         </section>
 
         <section class="fl-view" data-view="recorder" data-view-title="Flight Recorder" data-view-group="Capture">
-          <div class="fl-view-head">
-            <div>
-              <p class="fl-body fl-prose">
-                Continuous low-rate capture so a fault that lasts ten seconds still leaves evidence.
-                Answers the question a one-shot diagnostic cannot: <em>what was happening in the
-                seconds before it broke?</em>
-              </p>
-            </div>
-          </div>
+          <!-- Rendered by recorder-panel.js: the surface is live, so its header
+               reflects capture state rather than being static copy. -->
           <div data-mount="recorder"></div>
         </section>
 
@@ -473,6 +466,7 @@
   <script type="module" src="/views.js"></script>
   <script type="module" src="/live-panel.js"></script>
   <script type="module" src="/bisect-panel.js"></script>
+  <script type="module" src="/recorder-panel.js"></script>
   <script type="module" src="/app.js"></script>
   <script type="module" src="/invite-admin.js"></script>
   <script type="module" src="/analyst-drawer.js"></script>

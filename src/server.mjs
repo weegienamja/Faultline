@@ -23,6 +23,7 @@ import { createPlatformRouter } from "./platform/routes.mjs";
 import { createLiveRouter } from "./live/routes.mjs";
 import { createBisectRouter } from "./bisect/routes.mjs";
 import { createAnalystRouter } from "./analyst/routes.mjs";
+import { createRecorderRouter } from "./recorder/routes.mjs";
 
 const PRODUCT_VERSION = "v1.5";
 const PRODUCT_MILESTONE = "Network change assurance + live Internet data";
@@ -387,6 +388,7 @@ const platform = createPlatformRouter({
 const handleLive = createLiveRouter({ requireAdmin, bodyFrom, json, store, publicProbe });
 const handleBisect = createBisectRouter({ requireAdmin, bodyFrom, json });
 const handleAnalyst = createAnalystRouter({ requireAdmin, bodyFrom, json, store });
+const handleRecorder = createRecorderRouter({ requireAdmin, bodyFrom, json, store });
 
 const server = createServer(async (req, res) => {
   try {
@@ -396,6 +398,7 @@ const server = createServer(async (req, res) => {
     if (await handleLive(req, res, url)) return;
     if (await handleBisect(req, res, url)) return;
     if (await handleAnalyst(req, res, url)) return;
+    if (await handleRecorder(req, res, url)) return;
 
     if (req.method === "GET" && url.pathname === "/api/health") {
       return json(res, 200, {
@@ -420,7 +423,9 @@ const server = createServer(async (req, res) => {
         changeAssurance: true,
         liveInternetData: true,
         networkBisect: true,
-        localAnalyst: true
+        localAnalyst: true,
+        flightRecorder: true,
+        recorderIncidentPersistence: process.env.FAULTLINE_RECORDER_PERSIST !== "0"
       });
     }
 

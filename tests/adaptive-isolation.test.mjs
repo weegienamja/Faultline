@@ -134,6 +134,55 @@ test("experiment ordering is deterministic for identical evidence", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Axis restriction
+// ---------------------------------------------------------------------------
+// Flight Recorder observes which conditions changed around a failure and hands
+// exactly those to Bisect. Restriction is what makes that handoff real rather
+// than a re-derivation of the whole matrix.
+
+test("an axis restriction runs only the named axes", () => {
+  const context = {
+    target: TARGET, answers: { v4: ["1.2.3.4"], v6: ["2606::1"] },
+    resolvers: ["1.1.1.1", "8.8.8.8"], interfaces: model().interfaces, targetIsLoopback: false
+  };
+  const all = buildExperiments(context);
+  const restricted = buildExperiments(context, { axes: ["address-family"] });
+
+  assert.ok(all.availableAxisIds.length > 1, "the unrestricted run should offer several axes");
+  assert.deepEqual(restricted.availableAxisIds, ["address-family"]);
+  assert.ok(restricted.experiments.length < all.experiments.length);
+  assert.ok(restricted.experiments.every(experiment => experiment.axisId === "address-family"));
+});
+
+test("an unknown restricted axis is reported rather than silently matching nothing", () => {
+  const { experiments, unavailable } = buildExperiments({
+    target: TARGET, answers: { v4: ["1.2.3.4"], v6: [] },
+    resolvers: ["1.1.1.1"], interfaces: model().interfaces, targetIsLoopback: false
+  }, { axes: ["public-ip"] });
+
+  assert.equal(experiments.length, 0);
+  const reported = unavailable.find(entry => entry.axisId === "public-ip");
+  assert.ok(reported, "an unknown axis must be surfaced");
+  assert.match(reported.reason, /No Network Bisect experiment varies this condition/);
+});
+
+test("no restriction keeps the full matrix", () => {
+  const context = {
+    target: TARGET, answers: { v4: ["1.2.3.4"], v6: ["2606::1"] },
+    resolvers: ["1.1.1.1"], interfaces: model().interfaces, targetIsLoopback: false
+  };
+  assert.deepEqual(
+    buildExperiments(context, { axes: null }).availableAxisIds,
+    buildExperiments(context).availableAxisIds
+  );
+  // An empty list is "no restriction", not "restrict to nothing".
+  assert.deepEqual(
+    buildExperiments(context, { axes: [] }).availableAxisIds,
+    buildExperiments(context).availableAxisIds
+  );
+});
+
+// ---------------------------------------------------------------------------
 // Pruning
 // ---------------------------------------------------------------------------
 

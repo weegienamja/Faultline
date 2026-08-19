@@ -96,9 +96,7 @@ export function starterQuestions(view) {
     change: ["What changed between the two runs?", "Is this a regression or an improvement?"],
     probes: ["Which probes are unhealthy?", "Why was a vantage skipped?"],
     environment: ["What does this environment cover?", "Which targets need a private probe?"],
-    // Flight Recorder is not implemented. Offering "what happened before the
-    // outage" here would imply captured history that does not exist.
-    recorder: ["What is the Flight Recorder for?", "What does Faultline capture today?"],
+    recorder: ["What changed before this broke?", "What stayed healthy?", "Which differences can Network Bisect test?"],
     settings: ["Where does Faultline's evidence come from?", "What does the Analyst have access to?"]
   };
   return byView[view] || byView.overview;

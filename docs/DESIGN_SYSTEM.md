@@ -122,7 +122,7 @@ how to fill it, or it reads as broken.
 - **Locked** — `auth.lockedState()`, so every gated panel reads identically.
 
 **Do not render placeholder data to make a screen look finished.** Where a
-capability is specified but not implemented (Flight Recorder) or has no browser
+capability is not implemented yet or has no browser
 surface yet (Change Assurance), the screen says so.
 
 ## 8. Wording

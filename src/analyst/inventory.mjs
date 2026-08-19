@@ -26,8 +26,7 @@ import { EVIDENCE_KIND } from "./registry.mjs";
  */
 const NOT_RETRIEVABLE = [
   "Change Assurance comparisons",
-  "Connectivity Contract results",
-  "Flight Recorder history (not implemented)"
+  "Connectivity Contract results"
 ];
 
 /**
@@ -40,6 +39,7 @@ const NOT_RETRIEVABLE = [
 export async function buildEvidenceInventory({ registry, store, view }) {
   const bisect = registry?.latest(EVIDENCE_KIND.BISECT) ?? null;
   const live = registry?.latest(EVIDENCE_KIND.LIVE) ?? null;
+  const incident = registry?.latest(EVIDENCE_KIND.INCIDENT) ?? null;
 
   const target = view?.target || bisect?.target?.host || live?.target?.host || null;
 
@@ -92,6 +92,12 @@ export async function buildEvidenceInventory({ registry, store, view }) {
       label: "Network Bisect experiment path and hypotheses",
       available: Boolean(bisect),
       tool: "get_bisect_experiment_path, get_bisect_hypotheses"
+    },
+    {
+      key: "incident",
+      label: "Flight Recorder incident (before/during/after)",
+      available: Boolean(incident),
+      tool: "get_latest_recorder_incident, get_recorder_incident"
     },
     {
       key: "topology",
