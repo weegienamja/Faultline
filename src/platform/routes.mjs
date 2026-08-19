@@ -7,11 +7,32 @@ import {
   updateSupportCase
 } from "../cases/service.mjs";
 import { buildCaseEvidencePackage, redactCaseEvidence, renderEvidenceHtml } from "../cases/evidence.mjs";
+import {
+  addParticipantContribution,
+  createCaseParticipantInvitation,
+  findParticipantAccess,
+  publicParticipant,
+  revokeCaseParticipant,
+  sharedCaseView,
+  touchParticipant
+} from "../cases/participants.mjs";
 
 function notFound(message) {
   const error = new Error(message);
   error.statusCode = 404;
   throw error;
+}
+
+function unauthorized(message = "Case-room participant credential required.") {
+  const error = new Error(message);
+  error.statusCode = 401;
+  throw error;
+}
+
+function bearer(req) {
+  const header = String(req.headers.authorization || "");
+  const match = header.match(/^Bearer\s+(.+)$/i);
+  return match ? match[1].trim() : "";
 }
 
 function safeFilename(value) {
@@ -50,7 +71,44 @@ export function createPlatformRouter({ store, requireAdmin, bodyFrom, json, crea
     return { created, caseRecord: updatedCase };
   }
 
+  async function participantContext(req) {
+    const access = findParticipantAccess(await store.listCases(), bearer(req));
+    if (!access) unauthorized("Case-room credential is invalid, expired or revoked.");
+    const touched = touchParticipant(access.caseRecord, access.invitation.id);
+    await store.putCase(touched);
+    const invitation = touched.participantInvitations.find(item => item.id === access.invitation.id);
+    return { caseRecord: touched, invitation };
+  }
+
+  async function handleParticipantRoom(req, res, url) {
+    if (!url.pathname.startsWith("/api/case-room")) return false;
+    const { caseRecord, invitation } = await participantContext(req);
+
+    if (req.method === "GET" && url.pathname === "/api/case-room") {
+      const evidence = await evidenceFor(caseRecord, "network-identifiers");
+      json(res, 200, {
+        participant: publicParticipant(invitation),
+        case: sharedCaseView(caseRecord, evidence)
+      });
+      return true;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/case-room/contributions") {
+      const payload = await bodyFrom(req);
+      const result = addParticipantContribution(caseRecord, invitation, payload);
+      await store.putCase(result.caseRecord);
+      json(res, 201, {
+        contribution: result.contribution,
+        case: sharedCaseView(result.caseRecord, await evidenceFor(result.caseRecord, "network-identifiers"))
+      });
+      return true;
+    }
+
+    return false;
+  }
+
   async function handle(req, res, url) {
+    if (await handleParticipantRoom(req, res, url)) return true;
     if (!url.pathname.startsWith("/api/cases")) return false;
     requireAdmin(req);
 
@@ -72,21 +130,38 @@ export function createPlatformRouter({ store, requireAdmin, bodyFrom, json, crea
       const cases = await store.listCases();
       const sessions = await store.listSessions();
       const runs = await store.listRuns(5000);
-      json(res, 200, cases.map(caseRecord => publicCase(caseRecord, {
-        sessions: sessions.filter(session => session.caseId === caseRecord.id),
-        runs: runs.filter(run => (caseRecord.sessionIds || []).includes(run.sessionId || run.id))
+      json(res, 200, cases.map(caseRecord => ({
+        ...publicCase(caseRecord, {
+          sessions: sessions.filter(session => session.caseId === caseRecord.id),
+          runs: runs.filter(run => (caseRecord.sessionIds || []).includes(run.sessionId || run.id))
+        }),
+        participants: (caseRecord.participantInvitations || []).map(item => publicParticipant(item)),
+        contributionCount: (caseRecord.contributions || []).length
       })));
       return true;
     }
 
-    const match = url.pathname.match(/^\/api\/cases\/([^/]+)(?:\/(notes|diagnostics|evidence|report|compare))?$/);
+    const revokeMatch = url.pathname.match(/^\/api\/cases\/([^/]+)\/participants\/([^/]+)\/revoke$/);
+    if (req.method === "POST" && revokeMatch) {
+      const caseRecord = await getCase(decodeURIComponent(revokeMatch[1]));
+      const updated = revokeCaseParticipant(caseRecord, decodeURIComponent(revokeMatch[2]));
+      await store.putCase(updated);
+      json(res, 200, { participants: (updated.participantInvitations || []).map(item => publicParticipant(item)) });
+      return true;
+    }
+
+    const match = url.pathname.match(/^\/api\/cases\/([^/]+)(?:\/(notes|diagnostics|evidence|report|compare|participants|contributions))?$/);
     if (!match) return false;
     const id = decodeURIComponent(match[1]);
     const action = match[2] || null;
     const caseRecord = await getCase(id);
 
     if (req.method === "GET" && !action) {
-      json(res, 200, publicCase(caseRecord, await caseContext(caseRecord)));
+      json(res, 200, {
+        ...publicCase(caseRecord, await caseContext(caseRecord)),
+        participants: (caseRecord.participantInvitations || []).map(item => publicParticipant(item)),
+        contributions: structuredClone(caseRecord.contributions || [])
+      });
       return true;
     }
 
@@ -103,6 +178,28 @@ export function createPlatformRouter({ store, requireAdmin, bodyFrom, json, crea
       const result = addCaseNote(caseRecord, payload);
       await store.putCase(result.caseRecord);
       json(res, 201, { note: result.note, case: publicCase(result.caseRecord, await caseContext(result.caseRecord)) });
+      return true;
+    }
+
+    if (req.method === "POST" && action === "participants") {
+      const payload = await bodyFrom(req);
+      const result = createCaseParticipantInvitation(caseRecord, payload);
+      await store.putCase(result.caseRecord);
+      json(res, 201, {
+        participant: result.invitation,
+        credential: result.token,
+        roomPath: `/case-room#token=${encodeURIComponent(result.token)}`
+      });
+      return true;
+    }
+
+    if (req.method === "GET" && action === "participants") {
+      json(res, 200, (caseRecord.participantInvitations || []).map(item => publicParticipant(item)));
+      return true;
+    }
+
+    if (req.method === "GET" && action === "contributions") {
+      json(res, 200, structuredClone(caseRecord.contributions || []));
       return true;
     }
 
