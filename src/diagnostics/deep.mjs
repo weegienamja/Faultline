@@ -1,10 +1,14 @@
+import { execFile } from "node:child_process";
 import { resolve4, resolve6 } from "node:dns/promises";
+import { platform } from "node:os";
+import { promisify } from "node:util";
 import net from "node:net";
 import tls from "node:tls";
 import http from "node:http";
 import https from "node:https";
 import { performance } from "node:perf_hooks";
 
+const execFileAsync = promisify(execFile);
 function elapsed(started) { return Number((performance.now() - started).toFixed(1)); }
 function errorValue(error) { return error?.code || error?.name || error?.message || "error"; }
 
@@ -87,8 +91,7 @@ export function httpStageProbe(input, timeoutMs = 7000) {
     const url = input instanceof URL ? input : new URL(input);
     const client = url.protocol === "https:" ? https : http;
     const started = performance.now();
-    const timings = { startedAt: Date.now(), socketMs: null, dnsMs: null, tcpMs: null, tlsMs: null, ttfbMs: null, totalMs: null };
-    let socketAssignedAt = null;
+    const timings = { socketMs: null, dnsMs: null, tcpMs: null, tlsMs: null, ttfbMs: null, totalMs: null };
     let dnsAt = null;
     let tcpAt = null;
     let settled = false;
@@ -98,7 +101,6 @@ export function httpStageProbe(input, timeoutMs = 7000) {
       response.resume();
       response.once("end", () => finish(true, { status: response.statusCode, headersReceived: true }));
     });
-
     const finish = (ok, extra = {}) => {
       if (settled) return;
       settled = true;
@@ -106,10 +108,8 @@ export function httpStageProbe(input, timeoutMs = 7000) {
       request.destroy();
       resolve({ ok, url: url.toString(), timings, ...extra });
     };
-
     request.setTimeout(timeoutMs, () => finish(false, { error: "timeout" }));
     request.once("socket", socket => {
-      socketAssignedAt = performance.now();
       timings.socketMs = elapsed(started);
       socket.once("lookup", () => { dnsAt = performance.now(); timings.dnsMs = elapsed(started); });
       socket.once("connect", () => {
@@ -134,7 +134,30 @@ export function parseWindowsMtuPing(output) {
   return { fits: false, reason: "no-reply" };
 }
 
-export async function collectDeepDiagnostics(target, { mtuProbe = null } = {}) {
+export async function discoverWindowsPathMtu(host, { minimum = 1200, maximum = 1500 } = {}) {
+  if (platform() !== "win32") return null;
+  let low = Math.max(576, Number(minimum));
+  let high = Math.min(9000, Number(maximum));
+  let best = null;
+  const attempts = [];
+  while (low <= high && attempts.length < 10) {
+    const mtu = Math.floor((low + high) / 2);
+    const payloadBytes = Math.max(0, mtu - 28);
+    let stdout = "";
+    try {
+      const result = await execFileAsync("ping.exe", ["-n", "1", "-w", "1200", "-f", "-l", String(payloadBytes), host], { windowsHide: true, timeout: 2500 });
+      stdout = result.stdout || "";
+    } catch (error) {
+      stdout = error.stdout || error.stderr || "";
+    }
+    const parsed = parseWindowsMtuPing(stdout);
+    attempts.push({ mtuBytes: mtu, payloadBytes, ...parsed });
+    if (parsed.fits) { best = mtu; low = mtu + 1; } else { high = mtu - 1; }
+  }
+  return { pathMtuBytes: best, minimumTested: minimum, maximumTested: maximum, attempts };
+}
+
+export async function collectDeepDiagnostics(target, { mtuProbe = discoverWindowsPathMtu } = {}) {
   const host = target.host || target.hostname || String(target);
   const port = Number(target.port || 443);
   const dualStack = await resolveDualStack(host);
