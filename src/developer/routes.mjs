@@ -15,10 +15,14 @@ function cleanExternalRef(value) {
 }
 
 function publicApiCase(caseRecord, context = {}) {
+  const sessions = Array.isArray(context.sessions) ? context.sessions : [];
+  const runs = Array.isArray(context.runs) ? context.runs : [];
   return {
     ...publicCase(caseRecord, context),
     externalRef: caseRecord.externalRef || null,
-    apiVersion: "v1"
+    apiVersion: "v1",
+    sessionCount: sessions.length,
+    completedRunCount: runs.length
   };
 }
 
