@@ -1,4 +1,4 @@
-const lowerGrid = document.querySelector(".lower-grid");
+const lowerGrid = document.querySelector('[data-mount="cases"]') || document.querySelector(".lower-grid");
 const CASE_TOKEN_KEY = "faultlineAdminToken";
 let cases = [];
 let activeCaseId = null;
@@ -35,7 +35,7 @@ async function request(path, options = {}) {
 function installStyles() {
   const style = document.createElement("style");
   style.textContent = `
-  .cases-panel{margin-top:13px}.cases-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}.cases-actions{display:flex;gap:7px;flex-wrap:wrap}.case-layout{display:grid;grid-template-columns:minmax(250px,.8fr) minmax(0,1.2fr);gap:12px;margin-top:14px}.case-list{display:grid;gap:7px;max-height:340px;overflow:auto}.case-card{width:100%;text-align:left;border:1px solid var(--border-soft);border-radius:10px;background:rgba(255,255,255,.012);padding:11px;color:inherit;cursor:pointer}.case-card.active{border-color:rgba(97,230,184,.4);background:rgba(97,230,184,.045)}.case-card strong{font-size:11px;display:block}.case-card small{display:block;color:var(--muted);font-size:9px;margin-top:4px}.case-detail{border:1px solid var(--border-soft);border-radius:10px;padding:14px;min-height:150px}.case-meta{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.case-pill{border:1px solid var(--border);border-radius:999px;padding:4px 7px;color:var(--muted);font-size:8px;text-transform:uppercase;letter-spacing:.08em}.case-timeline{margin:10px 0 0;padding-left:18px;color:#adc0ba;font-size:9px;line-height:1.55;max-height:170px;overflow:auto}.case-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.case-form-grid .wide{grid-column:1/-1}.case-result{border:1px solid rgba(97,230,184,.22);border-radius:8px;padding:9px;margin-top:10px;font-size:9px;word-break:break-all}.cases-muted{color:var(--muted);font-size:10px;line-height:1.5}@media(max-width:760px){.case-layout,.case-form-grid{grid-template-columns:1fr}}
+  .cases-panel{margin-top:13px}.cases-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}.cases-actions{display:flex;gap:7px;flex-wrap:wrap}.case-layout{display:grid;grid-template-columns:minmax(250px,.8fr) minmax(0,1.2fr);gap:12px;margin-top:14px}.case-list{display:grid;gap:7px;max-height:340px;overflow:auto}.case-card{width:100%;text-align:left;border:1px solid var(--border-soft);border-radius:10px;background:rgba(255,255,255,.012);padding:11px;color:inherit;cursor:pointer}.case-card.active{border-color:var(--fl-ok-line);background:var(--fl-ok-soft)}.case-card strong{font-size:11px;display:block}.case-card small{display:block;color:var(--muted);font-size:9px;margin-top:4px}.case-detail{border:1px solid var(--border-soft);border-radius:10px;padding:14px;min-height:150px}.case-meta{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.case-pill{border:1px solid var(--border);border-radius:999px;padding:4px 7px;color:var(--muted);font-size:8px;text-transform:uppercase;letter-spacing:.08em}.case-timeline{margin:10px 0 0;padding-left:18px;color:var(--fl-text-2);font-size:9px;line-height:1.55;max-height:170px;overflow:auto}.case-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.case-form-grid .wide{grid-column:1/-1}.case-result{border:1px solid var(--fl-ok-line);border-radius:8px;padding:9px;margin-top:10px;font-size:9px;word-break:break-all}.cases-muted{color:var(--muted);font-size:10px;line-height:1.5}@media(max-width:760px){.case-layout,.case-form-grid{grid-template-columns:1fr}}
   `;
   document.head.appendChild(style);
 }
@@ -106,7 +106,8 @@ const panel = document.createElement("section");
 panel.className = "panel cases-panel";
 panel.id = "case-workspaces";
 panel.innerHTML = `<div class="cases-head"><div><span class="section-label">SUPPORT CASES</span><h3 style="margin:4px 0 0">Cases & evidence packages</h3></div><div class="cases-actions"><button class="secondary-button" id="case-refresh">Refresh</button><button class="primary-button" id="case-new">New case</button></div></div><p class="cases-muted" id="case-summary">Unlock live data to manage support cases.</p><div class="case-layout"><div class="case-list" id="case-list"></div><article class="case-detail" id="case-detail"><p class="cases-muted">Select a case to inspect its diagnostics and evidence timeline.</p></article></div>`;
-lowerGrid?.parentNode?.insertBefore(panel, lowerGrid);
+if (lowerGrid?.dataset?.mount) lowerGrid.appendChild(panel);
+else lowerGrid?.parentNode?.insertBefore(panel, lowerGrid);
 
 const summary = panel.querySelector("#case-summary");
 const list = panel.querySelector("#case-list");

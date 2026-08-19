@@ -45,51 +45,51 @@ function ms(v) {
 function installStyles() {
   const style = document.createElement("style");
   style.textContent = `
-  .live-panel{margin-bottom:13px;border-color:rgba(97,230,184,.28)}
+  .live-panel{margin-bottom:13px;border-color:var(--fl-ok-line)}
   .live-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap}
   .live-form{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;align-items:stretch}
   .live-form input[type=text]{flex:1 1 300px;min-width:220px;border:1px solid var(--border);border-radius:9px;background:var(--bg);color:var(--text);padding:11px 12px;font:12px ui-monospace,SFMono-Regular,Menlo,monospace;outline:none}
-  .live-form input[type=text]:focus{border-color:rgba(97,230,184,.5)}
+  .live-form input[type=text]:focus{border-color:var(--fl-ok-line)}
   .live-form button{white-space:nowrap}
   .live-modes{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
   .live-mode{border:1px solid var(--border);border-radius:999px;background:transparent;color:var(--muted);padding:6px 11px;font-size:10px;cursor:pointer}
-  .live-mode.active{border-color:rgba(97,230,184,.45);color:var(--accent);background:var(--accent-soft)}
+  .live-mode.active{border-color:var(--fl-ok-line);color:var(--accent);background:var(--accent-soft)}
   .live-status{margin:12px 0 0;color:var(--muted);font-size:11px;line-height:1.55;min-height:16px}
   .live-status.error{color:var(--danger)}
   .src-badge{display:inline-block;border:1px solid var(--border);border-radius:999px;padding:3px 7px;font-size:8px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
-  .src-live,.src-local,.src-deterministic{border-color:rgba(97,230,184,.4);color:var(--accent);background:var(--accent-soft)}
-  .src-ripestat,.src-globalping,.src-atlas,.src-ioda,.src-peeringdb,.src-radar{border-color:rgba(122,170,255,.38);color:#8fb6ff;background:rgba(122,170,255,.07)}
+  .src-live,.src-local,.src-deterministic{border-color:var(--fl-ok-line);color:var(--accent);background:var(--accent-soft)}
+  .src-ripestat,.src-globalping,.src-atlas,.src-ioda,.src-peeringdb,.src-radar{border-color:var(--fl-accent-line);color:var(--fl-accent);background:var(--fl-accent-soft)}
   .src-inferred{border-color:rgba(241,184,91,.36);color:var(--warn);background:rgba(241,184,91,.07)}
-  .src-demo{border-color:rgba(139,160,154,.35);color:#8ba09a;background:rgba(139,160,154,.06)}
+  .src-demo{border-color:rgba(139,160,154,.35);color:var(--fl-text-2);background:rgba(139,160,154,.06)}
   .live-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:11px;margin-top:16px}
   .live-card{border:1px solid var(--border-soft);border-radius:11px;padding:14px;background:rgba(255,255,255,.012);min-width:0}
   .live-card h4{margin:0 0 3px;font-size:12px}
   .live-card-head{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;margin-bottom:10px}
-  .live-card .note{color:#617871;font-size:9px;line-height:1.5;margin:9px 0 0}
+  .live-card .note{color:var(--fl-text-3);font-size:9px;line-height:1.5;margin:9px 0 0}
   .kv{display:grid;grid-template-columns:auto 1fr;gap:5px 12px;font-size:11px}
   .kv dt{color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:.07em;align-self:center}
   .kv dd{margin:0;overflow-wrap:anywhere;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px}
-  .unset{color:#5f7670;font-style:normal}
+  .unset{color:var(--fl-text-3);font-style:normal}
   .stage-row,.res-row,.van-row{display:grid;gap:8px;align-items:center;padding:7px 0;border-top:1px solid var(--border-soft);font-size:11px}
   .stage-row{grid-template-columns:52px 1fr auto}
   .res-row{grid-template-columns:1fr auto auto}
   .van-row{grid-template-columns:1fr auto auto}
   .stage-row:first-of-type,.res-row:first-of-type,.van-row:first-of-type{border-top:0}
   .pill{border-radius:999px;padding:3px 7px;font-size:8px;text-transform:uppercase;letter-spacing:.08em;border:1px solid var(--border);color:var(--muted);white-space:nowrap}
-  .pill.pass{color:var(--accent);border-color:rgba(97,230,184,.4);background:var(--accent-soft)}
+  .pill.pass{color:var(--accent);border-color:var(--fl-ok-line);background:var(--accent-soft)}
   .pill.fail{color:var(--danger);border-color:rgba(255,122,104,.36);background:rgba(255,122,104,.06)}
   .pill.warn{color:var(--warn);border-color:rgba(241,184,91,.36);background:rgba(241,184,91,.07)}
-  .pill.na{color:#5f7670}
-  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10px;color:#adc0ba}
+  .pill.na{color:var(--fl-text-3)}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10px;color:var(--fl-text-2)}
   .hop-list{max-height:230px;overflow:auto;margin:0;padding:0;list-style:none}
   .hop{display:grid;grid-template-columns:26px 1fr auto;gap:8px;padding:6px 0;border-top:1px solid var(--border-soft);font-size:10px;align-items:center}
   .hop:first-child{border-top:0}
   .hop small{color:var(--muted);display:block;font-size:9px}
-  .verdict{border:1px solid rgba(97,230,184,.3);border-radius:11px;padding:14px;background:var(--accent-soft);margin-top:16px}
+  .verdict{border:1px solid var(--fl-ok-line);border-radius:11px;padding:14px;background:var(--accent-soft);margin-top:16px}
   .verdict h3{margin:4px 0 6px;font-size:17px}
   .verdict p{margin:0;color:#bbcbc6;font-size:11px;line-height:1.55}
   .src-list{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
-  .disclaimer{color:#617871;font-size:9px;line-height:1.55;margin:12px 0 0;border-top:1px solid var(--border-soft);padding-top:10px}
+  .disclaimer{color:var(--fl-text-3);font-size:9px;line-height:1.55;margin:12px 0 0;border-top:1px solid var(--border-soft);padding-top:10px}
   .env-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
   .manifest-box{margin-top:11px}
   .manifest-box textarea{width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:9px;background:var(--bg);color:var(--text);padding:10px;font:10px ui-monospace,SFMono-Regular,Menlo,monospace;min-height:130px;outline:none}
@@ -104,7 +104,9 @@ function installStyles() {
 
 installStyles();
 
-const anchor = document.querySelector(".incident-strip");
+// Mounted into the Live Diagnostics view rather than located by probing the
+// DOM for a neighbouring element.
+const anchor = document.querySelector('[data-mount="live"]') || document.querySelector(".incident-strip");
 const panel = document.createElement("section");
 panel.className = "panel live-panel";
 panel.id = "live-diagnostic";
@@ -115,8 +117,8 @@ panel.innerHTML = `
       <h3 style="margin:4px 0 0">Test a real target</h3>
       <p style="margin:6px 0 0;color:var(--muted);font-size:11px;line-height:1.55;max-width:70ch">
         Runs genuine DNS, TCP, TLS, HTTP, ICMP and path measurements from this machine, then adds public routing,
-        outage and network-ownership context. Everything below is measured or retrieved live &mdash; the
-        <span class="src-badge src-demo">DEMO</span> incidents in the strip above remain synthetic.
+        outage and network-ownership context. Everything below is measured or retrieved live. The
+        <span class="src-badge src-demo">sample</span> incidents on the Overview remain synthetic.
       </p>
     </div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
@@ -150,7 +152,8 @@ panel.innerHTML = `
 
   <div id="live-results"></div>
 `;
-anchor?.parentNode?.insertBefore(panel, anchor);
+if (anchor?.dataset?.mount) anchor.appendChild(panel);
+else anchor?.parentNode?.insertBefore(panel, anchor);
 
 const form = panel.querySelector("#live-form");
 const targetInput = panel.querySelector("#live-target");
@@ -233,11 +236,11 @@ function renderDns(result) {
     `<div class="res-row"><div><strong>System resolver</strong><br><span class="mono">${escapeHtml((dns.systemResolvers || []).join(", ") || "unknown")}</span></div>
       <span class="pill ${sys.ok ? "pass" : "fail"}">${sys.ok ? "pass" : "fail"}</span>
       <span class="mono">${escapeHtml(ms(sys.elapsedMs) || "-")}</span></div>
-     <div class="res-row" style="border-top:0;padding-top:0"><span class="mono" style="grid-column:1/-1;color:#8ba09a">${escapeHtml(sys.ok ? sys.addresses.join(", ") : sys.error || "no answer")}</span></div>`,
+     <div class="res-row" style="border-top:0;padding-top:0"><span class="mono" style="grid-column:1/-1;color:var(--fl-text-2)">${escapeHtml(sys.ok ? sys.addresses.join(", ") : sys.error || "no answer")}</span></div>`,
     ...dns.comparisons.map(c => `<div class="res-row"><div><strong>${escapeHtml(c.label)}</strong></div>
       <span class="pill ${c.ok ? "pass" : "fail"}">${c.ok ? "pass" : "fail"}</span>
       <span class="mono">${escapeHtml(ms(c.elapsedMs) || "-")}</span></div>
-      <div class="res-row" style="border-top:0;padding-top:0"><span class="mono" style="grid-column:1/-1;color:#8ba09a">${escapeHtml(c.ok ? c.addresses.join(", ") : c.error || "no answer")}</span></div>`)
+      <div class="res-row" style="border-top:0;padding-top:0"><span class="mono" style="grid-column:1/-1;color:var(--fl-text-2)">${escapeHtml(c.ok ? c.addresses.join(", ") : c.error || "no answer")}</span></div>`)
   ].join("");
 
   const agree = dns.agreement;
@@ -513,6 +516,14 @@ modes.addEventListener("click", event => {
   } else if (mode === "public") {
     statusLine.textContent = "";
   }
+});
+
+// The Environment view links straight to the manifest editor, so it needs to be
+// able to select a mode from outside this module.
+window.addEventListener("faultline-live-mode", event => {
+  const wanted = event.detail?.mode;
+  const button = modes.querySelector(`button[data-mode="${wanted}"]`);
+  if (button) button.click();
 });
 
 form.addEventListener("submit", async event => {

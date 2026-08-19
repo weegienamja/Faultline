@@ -247,6 +247,7 @@ Platform / tenant control plane
 
 ## Design notes
 
+- [Design system](docs/DESIGN_SYSTEM.md)
 - [Change Assurance](docs/CHANGE_ASSURANCE.md)
 - [Deeper Diagnostics](docs/DEEP_DIAGNOSTICS.md)
 - [Service Desk Integrations](docs/SERVICE_DESK_INTEGRATIONS.md)

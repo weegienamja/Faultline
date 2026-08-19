@@ -3,313 +3,462 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="Faultline isolates where network problems begin using correlated evidence from endpoint and registered remote vantage points." />
-  <title>Faultline · Network fault isolation</title>
+  <meta name="description" content="Faultline captures evidence for transient network faults, isolates the condition responsible, and preserves the result as a portable evidence package." />
+  <title>Overview · Faultline</title>
+  <link rel="stylesheet" href="/design-system.css" />
   <link rel="stylesheet" href="/styles.css" />
-  <style>
-    .auth-button { border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--muted); padding: 10px 13px; font-size: 12px; }
-    .auth-button.unlocked { border-color: rgba(97,230,184,.42); color: var(--accent); background: var(--accent-soft); }
-    .auth-dialog { width: min(460px, calc(100vw - 32px)); border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--text); padding: 0; box-shadow: var(--shadow); }
-    .auth-dialog::backdrop { background: rgba(0, 7, 6, .76); backdrop-filter: blur(5px); }
-    .auth-form { padding: 24px; display: grid; gap: 15px; }
-    .auth-form h3 { margin: 0; }
-    .auth-form p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
-    .auth-form label { display: grid; gap: 7px; color: var(--muted); font-size: 11px; }
-    .auth-form input, .auth-form select { width: 100%; border: 1px solid var(--border); border-radius: 9px; background: var(--bg); color: var(--text); padding: 11px 12px; font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; outline: none; }
-    .auth-form input:focus, .auth-form select:focus { border-color: rgba(97,230,184,.5); }
-    .auth-actions { display: flex; justify-content: flex-end; gap: 9px; }
-    .auth-error { min-height: 18px; color: var(--danger) !important; }
-    .secondary-button { border: 1px solid var(--border); border-radius: 9px; background: transparent; color: var(--muted); padding: 9px 12px; }
-    .invite-dialog { width: min(640px, calc(100vw - 32px)); }
-    .invite-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .invite-grid .wide { grid-column: 1 / -1; }
-    .invite-result { border: 1px solid rgba(97,230,184,.3); border-radius: 10px; padding: 13px; background: var(--accent-soft); display: grid; gap: 8px; }
-    .invite-result code { display: block; overflow-wrap: anywhere; color: var(--accent); font-size: 10px; line-height: 1.5; }
-    .invite-result-actions { display: flex; gap: 8px; justify-content: flex-end; }
-    @media (max-width: 620px) { .invite-grid { grid-template-columns: 1fr; } .invite-grid .wide { grid-column: auto; } }
-    .probe-fleet { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 9px; }
-    .probe-tile { border: 1px solid var(--border-soft); border-radius: 11px; padding: 14px; background: rgba(255,255,255,.012); display: grid; gap: 9px; }
-    .probe-tile-head { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
-    .probe-tile h4 { margin: 0; font-size: 13px; }
-    .probe-tile p { margin: 2px 0 0; color: var(--muted); font-size: 10px; }
-    .probe-health { border-radius: 999px; padding: 4px 7px; font-size: 8px; text-transform: uppercase; letter-spacing: .1em; border: 1px solid var(--border); color: var(--muted); }
-    .probe-health.online { color: var(--accent); border-color: rgba(97,230,184,.35); background: var(--accent-soft); }
-    .probe-health.stale { color: var(--warn); border-color: rgba(241,184,91,.35); background: rgba(241,184,91,.07); }
-    .probe-health.offline, .probe-health.disabled { color: var(--danger); border-color: rgba(255,122,104,.3); background: rgba(255,122,104,.05); }
-    .probe-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
-    .probe-meta div { border-top: 1px solid var(--border-soft); padding-top: 7px; min-width: 0; }
-    .probe-meta small { color: var(--muted); display: block; font-size: 8px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 3px; }
-    .probe-meta strong { display: block; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .fleet-empty { color: var(--muted); font-size: 12px; margin: 0; }
-
-    .topology-panel { margin-top: 13px; overflow: hidden; }
-    .topology-heading-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
-    .topology-pill { border: 1px solid rgba(97,230,184,.28); color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 5px 8px; font-size: 9px; text-transform: uppercase; letter-spacing: .08em; }
-    .topology-pill.low { color: var(--warn); border-color: rgba(241,184,91,.3); background: rgba(241,184,91,.07); }
-    .topology-copy { color: var(--muted); font-size: 11px; line-height: 1.55; margin: -6px 0 14px; max-width: 850px; }
-    .topology-canvas { position: relative; min-height: 390px; border: 1px solid var(--border-soft); border-radius: 12px; overflow: hidden; background: radial-gradient(circle at center, rgba(97,230,184,.055), transparent 45%), rgba(3,11,10,.42); touch-action: none; }
-    .topology-grid { position: absolute; inset: 0; opacity: .18; background-image: linear-gradient(rgba(97,230,184,.08) 1px, transparent 1px), linear-gradient(90deg, rgba(97,230,184,.08) 1px, transparent 1px); background-size: 28px 28px; pointer-events: none; }
-    .topology-links { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
-    .topology-link { stroke: #355b52; stroke-width: 2; opacity: .8; }
-    .topology-link.inferred { stroke-dasharray: 7 7; opacity: .55; }
-    .topology-link.affected { stroke: var(--accent); stroke-width: 2.5; opacity: .95; }
-    .topology-link.fault { stroke: var(--danger); stroke-width: 3; opacity: 1; filter: drop-shadow(0 0 5px rgba(255,122,104,.28)); }
-    .topology-node { position: absolute; width: 132px; min-height: 70px; transform: translate(-50%, -50%); border: 1px solid #29433d; border-radius: 12px; background: rgba(11,24,21,.94); color: var(--text); display: grid; grid-template-columns: 31px 1fr; gap: 8px; align-items: center; padding: 10px; text-align: left; box-shadow: 0 10px 35px rgba(0,0,0,.24); user-select: none; cursor: grab; z-index: 2; }
-    .topology-node:active { cursor: grabbing; }
-    .topology-node.endpoint { border-color: rgba(97,230,184,.55); }
-    .topology-node.gateway { border-color: rgba(97,230,184,.34); }
-    .topology-node.boundary { border-color: rgba(139,160,154,.28); }
-    .topology-node.transit { border-color: rgba(122,170,255,.42); }
-    .topology-node.target { border-color: rgba(97,230,184,.5); }
-    .topology-link.observed-path { stroke: #61e6b8; stroke-width: 2.5; opacity: .9; }
-    .topology-node.local-fault { border-color: rgba(255,122,104,.72); box-shadow: 0 0 0 1px rgba(255,122,104,.08), 0 10px 35px rgba(0,0,0,.24); }
-    .topology-icon { width: 31px; height: 31px; border-radius: 9px; display: grid; place-items: center; background: rgba(97,230,184,.09); color: var(--accent); font-size: 16px; border: 1px solid rgba(97,230,184,.16); }
-    .topology-node strong { display: block; font-size: 10px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .topology-node small { display: block; margin-top: 3px; color: var(--muted); font-size: 8px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .topology-confidence { position: absolute; right: 6px; top: 6px; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
-    .topology-confidence.medium { background: var(--warn); }
-    .topology-confidence.low { background: #8ba09a; }
-    .topology-legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; color: var(--muted); font-size: 9px; }
-    .topology-legend span { display: inline-flex; align-items: center; gap: 6px; }
-    .legend-line { width: 24px; height: 0; border-top: 2px solid #355b52; }
-    .legend-line.inferred { border-top-style: dashed; }
-    .legend-line.fault { border-color: var(--danger); }
-    .topology-empty { min-height: 180px; display: grid; place-items: center; color: var(--muted); font-size: 12px; }
-    @media (max-width: 760px) {
-      .topology-canvas { min-height: 520px; }
-      .topology-heading-meta { justify-content: flex-start; }
-    }
-  </style>
 </head>
 <body>
-  <div class="app-shell">
-    <aside class="sidebar">
-      <a class="brand" href="#" aria-label="Faultline home">
-        <span class="brand-mark"><span></span></span>
+  <div class="fl-app">
+
+    <!-- =====================================================================
+         Primary navigation.
+
+         Grouped by the three things Faultline actually does, so the rail
+         teaches the product model rather than listing screens alphabetically.
+         ===================================================================== -->
+    <aside class="fl-rail">
+      <a class="fl-brand" href="#/overview" aria-label="Faultline overview">
+        <span class="fl-brand-mark" aria-hidden="true"></span>
         <span>Faultline</span>
+        <span class="fl-brand-env">v1.5</span>
       </a>
 
-      <nav class="nav" aria-label="Primary navigation">
-        <a class="nav-item active" href="#overview"><span class="nav-icon">◫</span> Overview</a>
-        <a class="nav-item" href="#diagnostics"><span class="nav-icon">⌁</span> Diagnostics</a>
-        <a class="nav-item" href="#topology"><span class="nav-icon">◇</span> Network map</a>
-        <a class="nav-item" href="#probes"><span class="nav-icon">◎</span> Probe fleet</a>
-        <a class="nav-item" href="#evidence"><span class="nav-icon">≋</span> Evidence</a>
-        <a class="nav-item" href="#actions"><span class="nav-icon">↗</span> Actions</a>
+      <nav class="fl-nav" aria-label="Primary">
+        <div class="fl-nav-group">
+          <a class="fl-nav-item" href="#/overview"><span class="fl-nav-icon" aria-hidden="true">▦</span><span>Overview</span></a>
+        </div>
+
+        <div class="fl-nav-group">
+          <span class="fl-nav-group-label">Capture</span>
+          <a class="fl-nav-item" href="#/live"><span class="fl-nav-icon" aria-hidden="true">⌁</span><span>Live Diagnostics</span></a>
+          <a class="fl-nav-item" href="#/recorder"><span class="fl-nav-icon" aria-hidden="true">⏺</span><span>Flight Recorder</span></a>
+        </div>
+
+        <div class="fl-nav-group">
+          <span class="fl-nav-group-label">Isolate</span>
+          <a class="fl-nav-item" href="#/bisect"><span class="fl-nav-icon" aria-hidden="true">⑂</span><span>Network Bisect</span></a>
+          <a class="fl-nav-item" href="#/topology"><span class="fl-nav-icon" aria-hidden="true">◇</span><span>Topology &amp; Paths</span></a>
+        </div>
+
+        <div class="fl-nav-group">
+          <span class="fl-nav-group-label">Preserve</span>
+          <a class="fl-nav-item" href="#/cases"><span class="fl-nav-icon" aria-hidden="true">▤</span><span>Cases</span></a>
+          <a class="fl-nav-item" href="#/evidence"><span class="fl-nav-icon" aria-hidden="true">≋</span><span>Evidence</span></a>
+          <a class="fl-nav-item" href="#/change"><span class="fl-nav-icon" aria-hidden="true">⇄</span><span>Change Assurance</span></a>
+        </div>
+
+        <div class="fl-nav-group">
+          <span class="fl-nav-group-label">Manage</span>
+          <a class="fl-nav-item" href="#/environment"><span class="fl-nav-icon" aria-hidden="true">⊞</span><span>Environment</span></a>
+          <a class="fl-nav-item" href="#/probes"><span class="fl-nav-icon" aria-hidden="true">◎</span><span>Probe Fleet</span></a>
+          <a class="fl-nav-item" href="#/settings"><span class="fl-nav-icon" aria-hidden="true">⚙</span><span>Settings</span></a>
+        </div>
       </nav>
 
-      <div class="sidebar-bottom">
-        <div class="probe-card">
-          <div class="probe-status"><span class="pulse"></span> Registered probe fleet</div>
-          <strong>Persistent identities · v1.5</strong>
-          <span>Heartbeat health + assigned diagnostic jobs</span>
-        </div>
-        <div class="profile">
-          <div class="avatar">JB</div>
-          <div><strong>Jamie Blair</strong><span>Engineer workspace</span></div>
-        </div>
+      <div class="fl-rail-foot">
+        <span class="fl-dot" id="rail-auth-dot" data-status="idle"></span>
+        <span id="rail-auth-text">Live data locked</span>
       </div>
     </aside>
 
-    <main class="main">
-      <header class="topbar">
-        <div>
-          <div class="eyebrow">NETWORK DIAGNOSTICS</div>
-          <h1>Incident overview</h1>
+    <main class="fl-main">
+
+      <header class="fl-topbar">
+        <div class="fl-crumb">
+          <span class="fl-label" id="crumb-group"></span>
+          <span class="fl-crumb-sep" aria-hidden="true">/</span>
+          <h1 class="fl-page-title" id="crumb-title">Overview</h1>
         </div>
-        <div class="top-actions">
-          <button class="auth-button" id="auth-open">Unlock live data</button>
-          <button class="primary-button" id="invite-open" type="button">New diagnostic</button>
-          <a class="primary-button" href="https://github.com/weegienamja/Faultline/blob/main/docs/PROBE_FLEET.md">Probe fleet</a>
+        <div class="fl-topbar-actions">
+          <button class="fl-btn" id="auth-open" type="button">Unlock live data</button>
+          <button class="fl-btn fl-btn-primary" id="invite-open" type="button">New diagnostic</button>
         </div>
       </header>
 
-      <div class="strip-label"><span class="section-label">DEMO SCENARIOS</span><span>Synthetic incidents retained to demonstrate known failure types. Real measurements appear in the live panel above.</span></div>
-      <section class="incident-strip" id="incident-list" aria-label="Demo diagnostic incidents"></section>
+      <div class="fl-content">
 
-      <section class="hero-grid" id="overview">
-        <article class="panel diagnosis-panel">
-          <div class="panel-heading">
+        <!-- =================================================================
+             OVERVIEW — what is the state of the current investigation
+             ================================================================= -->
+        <section class="fl-view" data-view="overview" data-view-title="Overview" data-view-group="Operations">
+
+          <div class="fl-tiles" id="overview-tiles"></div>
+
+          <div class="fl-grid" style="margin-top:12px">
+            <div class="fl-col-8">
+              <section class="fl-panel" data-status="idle" id="diagnosis-panel">
+                <header class="fl-panel-head">
+                  <div>
+                    <span class="fl-label">Likely fault domain</span>
+                    <h3 class="fl-panel-title" id="fault-domain">Loading…</h3>
+                  </div>
+                  <div class="fl-panel-head-actions">
+                    <span class="fl-meta">Confidence</span>
+                    <span class="confidence-ring" id="confidence-ring"><strong id="confidence">--%</strong></span>
+                  </div>
+                </header>
+                <div class="fl-panel-body">
+                  <p class="fl-body fl-prose" id="diagnosis-summary"></p>
+                  <div class="path" id="path"></div>
+                </div>
+                <footer class="fl-panel-foot">
+                  <span>Deterministic rules over observed measurements — no model, no inference engine.</span>
+                </footer>
+              </section>
+
+              <section class="fl-panel">
+                <header class="fl-panel-head">
+                  <div>
+                    <span class="fl-label">Fault isolation</span>
+                    <h3 class="fl-panel-title">Path health</h3>
+                  </div>
+                  <div class="fl-panel-head-actions">
+                    <span class="fl-source" data-kind="measured">Measured</span>
+                  </div>
+                </header>
+                <div class="fl-panel-body">
+                  <div class="metric-grid" id="metrics"></div>
+                </div>
+              </section>
+            </div>
+
+            <div class="fl-col-4">
+              <section class="fl-panel">
+                <header class="fl-panel-head">
+                  <div>
+                    <span class="fl-label">Incident context</span>
+                    <h3 class="fl-panel-title" id="incident-title">Loading…</h3>
+                  </div>
+                  <div class="fl-panel-head-actions">
+                    <span class="fl-badge" id="incident-status" data-status="idle">Loading</span>
+                  </div>
+                </header>
+                <div class="fl-panel-body">
+                  <dl class="fl-kv">
+                    <div><dt>Reference</dt><dd id="incident-id"></dd></div>
+                    <div><dt>Customer</dt><dd id="customer"></dd></div>
+                    <div><dt>Target</dt><dd id="target"></dd></div>
+                    <div><dt>Location</dt><dd id="location"></dd></div>
+                    <div><dt>Connection</dt><dd id="connection"></dd></div>
+                  </dl>
+                </div>
+                <footer class="fl-panel-foot">
+                  <span>Last evidence <strong id="measured-at">just now</strong></span>
+                </footer>
+              </section>
+
+              <section class="fl-panel">
+                <header class="fl-panel-head">
+                  <div>
+                    <span class="fl-label">Next best action</span>
+                    <h3 class="fl-panel-title">Recommended actions</h3>
+                  </div>
+                </header>
+                <div class="fl-panel-body">
+                  <ol class="action-list" id="action-list"></ol>
+                </div>
+              </section>
+            </div>
+          </div>
+
+          <section class="fl-panel">
+            <header class="fl-panel-head">
+              <div>
+                <span class="fl-label">Why Faultline reached this conclusion</span>
+                <h3 class="fl-panel-title">Supporting evidence</h3>
+              </div>
+              <div class="fl-panel-head-actions">
+                <a class="fl-btn fl-btn-sm" href="#/evidence">Open evidence</a>
+              </div>
+            </header>
+            <div class="fl-panel-body">
+              <div class="evidence-list" id="evidence-list"></div>
+            </div>
+          </section>
+
+          <section class="fl-panel">
+            <header class="fl-panel-head">
+              <div>
+                <span class="fl-label">Reference incidents</span>
+                <h3 class="fl-panel-title">Worked examples</h3>
+              </div>
+              <div class="fl-panel-head-actions">
+                <span class="fl-source" data-kind="demo">Sample data</span>
+              </div>
+            </header>
+            <div class="fl-panel-body">
+              <p class="fl-body fl-prose" style="margin-bottom:12px">
+                Fixed reference incidents covering known failure classes. Selecting one loads it into
+                the analysis above so the reasoning can be inspected without an active fault.
+                Real measurements come from Live Diagnostics.
+              </p>
+              <div class="incident-strip" id="incident-list"></div>
+            </div>
+          </section>
+        </section>
+
+        <!-- =================================================================
+             CAPTURE
+             ================================================================= -->
+        <!-- No view intro here: the live panel carries its own description, and
+             stating it twice in different words reads as unedited. -->
+        <section class="fl-view" data-view="live" data-view-title="Live Diagnostics" data-view-group="Capture">
+          <div data-mount="live"></div>
+        </section>
+
+        <section class="fl-view" data-view="recorder" data-view-title="Flight Recorder" data-view-group="Capture">
+          <div class="fl-view-head">
             <div>
-              <span class="section-label">LIKELY FAULT DOMAIN</span>
-              <h2 id="fault-domain">Loading…</h2>
-            </div>
-            <div class="confidence-ring" id="confidence-ring">
-              <strong id="confidence">--%</strong>
-              <span>confidence</span>
+              <p class="fl-body fl-prose">
+                Continuous low-rate capture so a fault that lasts ten seconds still leaves evidence.
+                Answers the question a one-shot diagnostic cannot: <em>what was happening in the
+                seconds before it broke?</em>
+              </p>
             </div>
           </div>
-          <p class="diagnosis-copy" id="diagnosis-summary"></p>
-          <div class="signal-line"><span></span><span></span><span></span><span></span><span></span></div>
-          <div class="path" id="path"></div>
-        </article>
+          <div data-mount="recorder"></div>
+        </section>
 
-        <article class="panel context-panel">
-          <span class="section-label">INCIDENT CONTEXT</span>
-          <div class="context-title">
+        <!-- =================================================================
+             ISOLATE
+             ================================================================= -->
+        <section class="fl-view" data-view="bisect" data-view-title="Network Bisect" data-view-group="Isolate">
+          <div data-mount="bisect"></div>
+        </section>
+
+        <section class="fl-view" data-view="topology" data-view-title="Topology &amp; Paths" data-view-group="Isolate">
+          <div class="fl-view-head">
             <div>
-              <h3 id="incident-title">Loading…</h3>
-              <span id="incident-id"></span>
+              <p class="fl-body fl-prose">
+                Local topology inferred from routing, adapter and neighbour evidence, extended with
+                observed public hops. Inferred relationships are drawn differently from observed ones —
+                Faultline does not claim topology it did not measure.
+              </p>
             </div>
-            <span class="status-pill" id="incident-status">Loading</span>
           </div>
-          <dl class="context-list">
-            <div><dt>Customer</dt><dd id="customer"></dd></div>
-            <div><dt>Target</dt><dd id="target"></dd></div>
-            <div><dt>Location</dt><dd id="location"></dd></div>
-            <div><dt>Connection</dt><dd id="connection"></dd></div>
-          </dl>
-          <div class="timestamp">Last evidence <strong id="measured-at">just now</strong></div>
-        </article>
-      </section>
 
-      <section class="panel" id="diagnostics">
-        <div class="panel-heading compact">
-          <div>
-            <span class="section-label">FAULT ISOLATION</span>
-            <h3>Path health</h3>
-          </div>
-          <span class="live-badge"><span></span> Evidence feed</span>
-        </div>
-        <div class="metric-grid" id="metrics"></div>
-      </section>
+          <section class="fl-panel topology-panel" id="topology-panel" hidden>
+            <header class="fl-panel-head">
+              <div>
+                <span class="fl-label">Inferred local topology</span>
+                <h3 class="fl-panel-title">Network map</h3>
+              </div>
+              <div class="fl-panel-head-actions">
+                <span class="fl-badge" id="topology-kind" data-status="idle">unknown</span>
+                <span class="fl-badge" id="topology-confidence" data-status="idle">low confidence</span>
+              </div>
+            </header>
+            <div class="fl-panel-body">
+              <p class="fl-body fl-prose" id="topology-summary" style="margin-bottom:12px"></p>
+              <div class="topology-canvas" id="topology-canvas" aria-label="Interactive inferred network topology"></div>
+              <div class="topology-legend">
+                <span><i class="legend-line"></i> observed relationship</span>
+                <span><i class="legend-line inferred"></i> inferred relationship</span>
+                <span><i class="legend-line fault"></i> likely affected segment</span>
+                <span><i class="legend-line observed"></i> observed public hop</span>
+                <span>Drag nodes to rearrange</span>
+              </div>
+            </div>
+          </section>
 
-      <section class="panel topology-panel" id="topology-panel" hidden>
-        <div class="panel-heading compact">
-          <div>
-            <span class="section-label">INFERRED LOCAL TOPOLOGY</span>
-            <h3 id="topology">Network map</h3>
-          </div>
-          <div class="topology-heading-meta">
-            <span class="topology-pill" id="topology-kind">unknown</span>
-            <span class="topology-pill" id="topology-confidence">low confidence</span>
-          </div>
-        </div>
-        <p class="topology-copy" id="topology-summary"></p>
-        <div class="topology-canvas" id="topology-canvas" aria-label="Interactive inferred network topology"></div>
-        <div class="topology-legend">
-          <span><i class="legend-line"></i> observed relationship</span>
-          <span><i class="legend-line inferred"></i> inferred relationship</span>
-          <span><i class="legend-line fault"></i> likely affected segment</span>
-          <span><i class="legend-line" style="border-color:#61e6b8"></i> observed public hop</span>
-          <span>Drag nodes to rearrange the map</span>
-        </div>
-      </section>
+          <section class="fl-panel route-panel" id="route-panel" hidden>
+            <header class="fl-panel-head">
+              <div>
+                <span class="fl-label">Endpoint observation</span>
+                <h3 class="fl-panel-title">Observed route</h3>
+              </div>
+              <div class="fl-panel-head-actions">
+                <span class="fl-source" data-kind="measured">ICMP</span>
+              </div>
+            </header>
+            <div class="fl-panel-body">
+              <div class="route-trace" id="route-trace"></div>
+            </div>
+            <footer class="fl-panel-foot">
+              <span>ICMP responses only. A responding hop is not proof of ownership or of the forward path.</span>
+            </footer>
+          </section>
 
-      <section class="panel route-panel" id="probe-fleet-panel" hidden>
-        <div class="panel-heading compact">
-          <div>
-            <span class="section-label">REGISTERED VANTAGE POINTS</span>
-            <h3 id="probes">Probe fleet</h3>
-          </div>
-          <span class="route-note">Health derives from authenticated worker heartbeats</span>
-        </div>
-        <div class="probe-fleet" id="probe-fleet"></div>
-      </section>
+          <div id="topology-empty-slot"></div>
+        </section>
 
-      <section class="panel route-panel" id="route-panel" hidden>
-        <div class="panel-heading compact">
-          <div>
-            <span class="section-label">ENDPOINT OBSERVATION</span>
-            <h3>Observed route</h3>
-          </div>
-          <span class="route-note">ICMP responses only · not ownership proof</span>
-        </div>
-        <div class="route-trace" id="route-trace"></div>
-      </section>
-
-      <section class="lower-grid">
-        <article class="panel" id="evidence">
-          <div class="panel-heading compact">
+        <!-- =================================================================
+             PRESERVE
+             ================================================================= -->
+        <section class="fl-view" data-view="cases" data-view-title="Cases" data-view-group="Preserve">
+          <div class="fl-view-head">
             <div>
-              <span class="section-label">WHY FAULTLINE THINKS THIS</span>
-              <h3>Evidence</h3>
+              <p class="fl-body fl-prose">
+                A case holds every run, contract result and artefact for one investigation, so the
+                evidence stays attached to the question it was collected to answer.
+              </p>
             </div>
           </div>
-          <div class="evidence-list" id="evidence-list"></div>
-        </article>
+          <div data-mount="cases"></div>
+        </section>
 
-        <article class="panel" id="actions">
-          <div class="panel-heading compact">
+        <section class="fl-view" data-view="evidence" data-view-title="Evidence" data-view-group="Preserve">
+          <div class="fl-view-head">
             <div>
-              <span class="section-label">NEXT BEST ACTION</span>
-              <h3>Recommended actions</h3>
+              <p class="fl-body fl-prose">
+                Portable evidence packages and cross-incident pattern analysis. Similarity and
+                clustering are a separate evidence class from deterministic diagnosis and are labelled
+                as such wherever they appear.
+              </p>
             </div>
           </div>
-          <ol class="action-list" id="action-list"></ol>
-        </article>
-      </section>
+          <div data-mount="intelligence"></div>
+        </section>
 
-      <footer>
-        <span>Faultline v1.5 preview · change assurance + live Internet data</span>
-        <span>Evidence before escalation.</span>
+        <section class="fl-view" data-view="change" data-view-title="Change Assurance" data-view-group="Preserve">
+          <div class="fl-view-head">
+            <div>
+              <p class="fl-body fl-prose">
+                Pin a baseline before a planned change, a post-change run after it, and compare which
+                measured behaviours actually moved.
+              </p>
+            </div>
+          </div>
+          <div data-mount="change"></div>
+        </section>
+
+        <!-- =================================================================
+             MANAGE
+             ================================================================= -->
+        <section class="fl-view" data-view="environment" data-view-title="Environment" data-view-group="Manage">
+          <div class="fl-view-head">
+            <div>
+              <p class="fl-body fl-prose">
+                Declare the sites, targets and expectations of the network Faultline is testing, so
+                results are scoped to your environment instead of a single ad-hoc hostname.
+              </p>
+            </div>
+          </div>
+          <div data-mount="environment"></div>
+        </section>
+
+        <section class="fl-view" data-view="probes" data-view-title="Probe Fleet" data-view-group="Manage">
+          <div class="fl-view-head">
+            <div>
+              <p class="fl-body fl-prose">
+                Registered vantage points with persistent identities. Health is derived from
+                authenticated worker heartbeats, not from reachability guesses.
+              </p>
+            </div>
+          </div>
+          <section class="fl-panel" id="probe-fleet-panel">
+            <header class="fl-panel-head">
+              <div>
+                <span class="fl-label">Registered vantage points</span>
+                <h3 class="fl-panel-title">Fleet health</h3>
+              </div>
+              <div class="fl-panel-head-actions">
+                <span class="fl-source" data-kind="measured">Heartbeat</span>
+              </div>
+            </header>
+            <div class="fl-panel-body">
+              <div class="probe-fleet" id="probe-fleet"></div>
+            </div>
+          </section>
+        </section>
+
+        <section class="fl-view" data-view="settings" data-view-title="Settings" data-view-group="Manage">
+          <div data-mount="settings"></div>
+        </section>
+
+      </div>
+
+      <footer class="fl-content" style="padding-top:0">
+        <p class="fl-meta">Faultline v1.5 preview · Capture, isolate and preserve network fault evidence · Evidence before escalation.</p>
       </footer>
     </main>
   </div>
 
-  <dialog class="auth-dialog" id="auth-dialog">
-    <form class="auth-form" id="auth-form">
-      <div>
-        <span class="section-label">CONTROL PLANE</span>
-        <h3>Unlock live diagnostics</h3>
+  <!-- ======================================================================
+       Dialogs
+       ====================================================================== -->
+  <dialog class="fl-dialog" id="auth-dialog">
+    <form id="auth-form">
+      <div class="fl-dialog-head">
+        <span class="fl-label">Control plane</span>
+        <h2 class="fl-panel-title" style="margin-top:4px">Unlock live data</h2>
       </div>
-      <p>Demo incidents stay public. Live endpoint, registered-probe health and probe telemetry require the Faultline admin credential and are kept only in this browser tab.</p>
-      <label>
-        Admin token
-        <input id="auth-token" type="password" autocomplete="off" spellcheck="false" placeholder="fl_admin_…" />
-      </label>
-      <p class="auth-error" id="auth-error"></p>
-      <div class="auth-actions">
-        <button class="secondary-button" type="button" id="auth-cancel">Cancel</button>
-        <button class="primary-button" type="submit">Unlock</button>
+      <div class="fl-dialog-body">
+        <p class="fl-body">
+          Reference incidents stay public. Live measurement, registered-probe health and telemetry
+          require the Faultline admin credential. It is kept in this browser tab only and is never
+          persisted.
+        </p>
+        <label class="fl-field">
+          <span class="fl-label">Admin token</span>
+          <input class="fl-input fl-input-mono" id="auth-token" type="password" autocomplete="off" spellcheck="false" placeholder="fl_admin_…" />
+        </label>
+        <p class="fl-status-line" data-tone="error" id="auth-error"></p>
+      </div>
+      <div class="fl-dialog-foot">
+        <button class="fl-btn" type="button" id="auth-cancel">Cancel</button>
+        <button class="fl-btn fl-btn-primary" type="submit">Unlock</button>
       </div>
     </form>
   </dialog>
 
-  <dialog class="auth-dialog invite-dialog" id="invite-dialog">
-    <form class="auth-form" id="invite-form">
-      <div>
-        <span class="section-label">EPHEMERAL SUPPORT DIAGNOSTIC</span>
-        <h3>Create one-time diagnostic</h3>
+  <dialog class="fl-dialog fl-dialog-wide" id="invite-dialog">
+    <form id="invite-form">
+      <div class="fl-dialog-head">
+        <span class="fl-label">One-time endpoint diagnostic</span>
+        <h2 class="fl-panel-title" style="margin-top:4px">Create diagnostic invitation</h2>
       </div>
-      <p>Create a short-lived invitation for a device that is not already managed by Faultline. The endpoint credential is minted only after the user reviews the collection scope and consents.</p>
-      <div class="invite-grid">
-        <label class="wide">Target
-          <input id="invite-target" required placeholder="microsoft.com or https://service.example/health" />
-        </label>
-        <label>Case title
-          <input id="invite-case-title" placeholder="Teams calls dropping" />
-        </label>
-        <label>Customer / label
-          <input id="invite-customer" placeholder="ABC Ltd" />
-        </label>
-        <label>Expires after
-          <select id="invite-ttl">
-            <option value="30">30 minutes</option>
-            <option value="60" selected>1 hour</option>
-            <option value="240">4 hours</option>
-            <option value="1440">24 hours</option>
-          </select>
-        </label>
-        <label>Remote vantage
-          <select id="invite-probe"><option value="">One-off probe / assign later</option></select>
-        </label>
-      </div>
-      <p class="auth-error" id="invite-admin-error"></p>
-      <div class="invite-result" id="invite-result" hidden>
-        <strong>One-time user link</strong>
-        <code id="invite-link"></code>
-        <div class="invite-result-actions">
-          <button class="secondary-button" id="invite-copy" type="button">Copy link</button>
+      <div class="fl-dialog-body">
+        <p class="fl-body">
+          Creates a short-lived invitation for a device Faultline does not already manage. The
+          endpoint credential is minted only after the user reviews the collection scope and consents.
+        </p>
+        <div class="invite-grid">
+          <label class="fl-field wide">
+            <span class="fl-label">Target</span>
+            <input class="fl-input fl-input-mono" id="invite-target" required placeholder="microsoft.com or https://service.example/health" />
+          </label>
+          <label class="fl-field">
+            <span class="fl-label">Case title</span>
+            <input class="fl-input" id="invite-case-title" placeholder="Teams calls dropping" />
+          </label>
+          <label class="fl-field">
+            <span class="fl-label">Customer / label</span>
+            <input class="fl-input" id="invite-customer" placeholder="ABC Ltd" />
+          </label>
+          <label class="fl-field">
+            <span class="fl-label">Expires after</span>
+            <select class="fl-select" id="invite-ttl">
+              <option value="30">30 minutes</option>
+              <option value="60" selected>1 hour</option>
+              <option value="240">4 hours</option>
+              <option value="1440">24 hours</option>
+            </select>
+          </label>
+          <label class="fl-field">
+            <span class="fl-label">Remote vantage</span>
+            <select class="fl-select" id="invite-probe"><option value="">One-off probe / assign later</option></select>
+          </label>
+        </div>
+        <p class="fl-status-line" data-tone="error" id="invite-admin-error"></p>
+        <div class="invite-result" id="invite-result" hidden>
+          <span class="fl-label">One-time user link</span>
+          <code id="invite-link"></code>
+          <div class="invite-result-actions">
+            <button class="fl-btn fl-btn-sm" id="invite-copy" type="button">Copy link</button>
+          </div>
         </div>
       </div>
-      <div class="auth-actions">
-        <button class="secondary-button" type="button" id="invite-cancel">Close</button>
-        <button class="primary-button" type="submit" id="invite-create">Create invitation</button>
+      <div class="fl-dialog-foot">
+        <button class="fl-btn" type="button" id="invite-cancel">Close</button>
+        <button class="fl-btn fl-btn-primary" type="submit" id="invite-create">Create invitation</button>
       </div>
     </form>
   </dialog>
 
+  <script type="module" src="/shell.js"></script>
+  <script type="module" src="/views.js"></script>
   <script type="module" src="/live-panel.js"></script>
   <script type="module" src="/bisect-panel.js"></script>
   <script type="module" src="/app.js"></script>

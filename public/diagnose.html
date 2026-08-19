@@ -6,32 +6,34 @@
   <meta name="robots" content="noindex,nofollow" />
   <meta name="description" content="Run a one-time Faultline network diagnostic for a support case." />
   <title>Faultline · One-time network diagnostic</title>
+  <link rel="stylesheet" href="/design-system.css" />
   <link rel="stylesheet" href="/styles.css" />
   <style>
     body { min-height: 100vh; display: grid; place-items: center; padding: 28px; }
     .invite-shell { width: min(780px, 100%); display: grid; gap: 14px; }
-    .invite-brand { display: flex; align-items: center; gap: 11px; color: var(--text); font-weight: 760; font-size: 19px; }
-    .invite-brand .brand-mark { padding: 0; }
-    .invite-card { border: 1px solid var(--border); border-radius: 16px; background: linear-gradient(180deg, rgba(17,29,27,.98), rgba(11,21,19,.98)); box-shadow: var(--shadow); padding: 28px; }
-    .invite-card h1 { margin: 7px 0 9px; font-size: clamp(25px, 5vw, 38px); }
-    .invite-card > p { color: #a9bdb7; line-height: 1.65; margin: 0; }
+    .invite-brand { display: flex; align-items: center; gap: 11px; color: var(--fl-text); font-weight: 650; font-size: 17px; letter-spacing: -.01em; }
+    .brand-mark { width: 20px; height: 20px; flex: 0 0 20px; border: 1.5px solid var(--fl-brand); border-radius: 3px; transform: rotate(45deg); display: grid; place-items: center; }
+    .brand-mark > span { width: 7px; height: 1.5px; background: var(--fl-brand); }
+    .invite-card { border: 1px solid var(--fl-border); border-radius: var(--fl-r-card); background: var(--fl-surface); box-shadow: var(--fl-shadow-raised); padding: 28px; }
+    .invite-card h1 { margin: 8px 0 10px; font-size: clamp(22px, 4vw, 30px); font-weight: 600; letter-spacing: -.015em; }
+    .invite-card > p { color: var(--fl-text-2); line-height: 1.65; margin: 0; }
     .invite-context { margin: 23px 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
     .invite-context div { border: 1px solid var(--border-soft); background: rgba(255,255,255,.012); border-radius: 10px; padding: 12px; min-width: 0; }
-    .invite-context small { display: block; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; font-size: 8px; margin-bottom: 5px; }
+    .invite-context small { display: block; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; font-size: 10px; margin-bottom: 5px; }
     .invite-context strong { display: block; overflow-wrap: anywhere; font-size: 12px; }
-    .contract-disclosure { margin: -8px 0 18px; border: 1px solid rgba(97,230,184,.22); background: rgba(97,230,184,.045); border-radius: 11px; padding: 15px; }
+    .contract-disclosure { margin: -8px 0 18px; border: 1px solid var(--fl-ok-line); background: var(--fl-ok-soft); border-radius: var(--fl-r-control); padding: 15px; }
     .contract-disclosure h3 { margin: 0 0 5px; font-size: 13px; }
     .contract-disclosure p { margin: 0 0 10px; color: var(--muted); font-size: 11px; line-height: 1.5; }
     .contract-checks { display: flex; gap: 7px; flex-wrap: wrap; }
-    .contract-check { border: 1px solid var(--border-soft); border-radius: 999px; padding: 5px 8px; color: #c1d0cc; font-size: 9px; }
-    .contract-check.required { border-color: rgba(97,230,184,.25); color: var(--accent); }
+    .contract-check { border: 1px solid var(--border-soft); border-radius: var(--fl-r-chip); padding: 3px 7px; color: var(--fl-text-2); font-size: 10px; }
+    .contract-check.required { border-color: var(--fl-ok-line); color: var(--fl-ok); }
     .collection-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 18px 0; }
     .collection-box { border: 1px solid var(--border-soft); border-radius: 11px; padding: 16px; }
     .collection-box h3 { font-size: 13px; margin: 0 0 10px; }
     .collection-box ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 11px; line-height: 1.7; }
     .collection-box.no h3 { color: var(--accent); }
     .consent-box { margin-top: 18px; border-top: 1px solid var(--border-soft); padding-top: 18px; display: grid; gap: 12px; }
-    .check-row { display: flex; gap: 10px; align-items: flex-start; color: #c1d0cc; font-size: 12px; line-height: 1.5; }
+    .check-row { display: flex; gap: 10px; align-items: flex-start; color: var(--fl-text-2); font-size: 12px; line-height: 1.5; }
     .check-row input { margin-top: 3px; accent-color: var(--accent); }
     .topology-option { padding: 12px; border: 1px solid var(--border-soft); border-radius: 10px; background: rgba(255,255,255,.012); }
     .invite-action { width: 100%; justify-content: center; border: 0; min-height: 44px; }
@@ -44,14 +46,14 @@
     .success-note { color: var(--accent) !important; }
     .client-steps { display: grid; gap: 9px; counter-reset: step; }
     .client-step { display: grid; grid-template-columns: 28px 1fr; gap: 11px; align-items: start; border: 1px solid var(--border-soft); border-radius: 11px; padding: 13px; background: rgba(255,255,255,.012); }
-    .client-step::before { counter-increment: step; content: counter(step); width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 800; border: 1px solid rgba(97,230,184,.2); }
+    .client-step::before { counter-increment: step; content: counter(step); width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font-size: 11px; font-weight: 800; border: 1px solid var(--fl-ok-line); }
     .client-step strong { display: block; font-size: 12px; margin-bottom: 4px; }
     .client-step span { color: var(--muted); font-size: 11px; line-height: 1.45; }
     .client-actions { display: flex; gap: 9px; flex-wrap: wrap; }
     .client-actions a, .client-actions button { min-height: 42px; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
     .client-actions .secondary-button[disabled] { opacity: .4; cursor: not-allowed; }
-    .client-warning { border: 1px solid rgba(241,184,91,.26); background: rgba(241,184,91,.06); border-radius: 10px; padding: 12px; color: #c9b07d !important; }
-    .security-note { text-align: center; color: #617871; font-size: 10px; line-height: 1.5; }
+    .client-warning { border: 1px solid var(--fl-warn-line); background: var(--fl-warn-soft); border-radius: var(--fl-r-control); padding: 12px; color: var(--fl-warn) !important; }
+    .security-note { text-align: center; color: var(--fl-text-3); font-size: 11px; line-height: 1.5; }
     @media (max-width: 680px) {
       body { padding: 16px; }
       .invite-card { padding: 21px; }

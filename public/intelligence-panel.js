@@ -2,7 +2,7 @@ import "./cases-panel.js";
 import { analyseEvidencePatterns } from "./evidence-patterns.js";
 
 const strip = document.getElementById("incident-list");
-const lowerGrid = document.querySelector(".lower-grid");
+const lowerGrid = document.querySelector('[data-mount="intelligence"]') || document.querySelector(".lower-grid");
 let data = [];
 let analysis = null;
 let refreshTimer = null;
@@ -22,7 +22,7 @@ function installStyles() {
     .intelligence-panel { margin-top: 13px; }
     .intelligence-head { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; flex-wrap:wrap; }
     .intelligence-badges { display:flex; gap:6px; flex-wrap:wrap; }
-    .intelligence-badge { border:1px solid rgba(97,230,184,.25); color:var(--accent); background:var(--accent-soft); border-radius:999px; padding:5px 8px; font-size:8px; letter-spacing:.09em; text-transform:uppercase; }
+    .intelligence-badge { border:1px solid var(--fl-ok-line); color:var(--accent); background:var(--accent-soft); border-radius:999px; padding:5px 8px; font-size:8px; letter-spacing:.09em; text-transform:uppercase; }
     .intelligence-badge.neutral { border-color:var(--border); color:var(--muted); background:rgba(255,255,255,.015); }
     .intelligence-summary { margin:10px 0 0; color:#b8c8c3; line-height:1.55; font-size:12px; max-width:850px; }
     .intelligence-layout { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(260px,.9fr); gap:12px; margin-top:16px; }
@@ -30,14 +30,14 @@ function installStyles() {
     .pattern-card h4, .similar-card h4 { margin:0 0 8px; font-size:12px; }
     .pattern-meta { color:var(--muted); font-size:10px; margin-bottom:10px; }
     .pattern-features { display:flex; flex-wrap:wrap; gap:6px; }
-    .pattern-feature { border:1px solid rgba(97,230,184,.18); border-radius:999px; padding:5px 8px; color:#bcd0ca; font-size:9px; background:rgba(97,230,184,.035); }
+    .pattern-feature { border:1px solid var(--fl-ok-line); border-radius:999px; padding:5px 8px; color:#bcd0ca; font-size:9px; background:var(--fl-ok-soft); }
     .similar-list { display:grid; gap:7px; }
     .similar-row { border-top:1px solid var(--border-soft); padding-top:8px; display:grid; grid-template-columns:1fr auto; gap:8px; }
     .similar-row:first-child { border-top:0; padding-top:0; }
     .similar-row strong { font-size:10px; display:block; }
     .similar-row small { color:var(--muted); font-size:9px; line-height:1.4; display:block; margin-top:3px; }
     .similar-score { color:var(--accent); font-size:13px; font-weight:780; white-space:nowrap; }
-    .intelligence-method { margin-top:10px; color:#617871; font-size:9px; line-height:1.5; }
+    .intelligence-method { margin-top:10px; color:var(--fl-text-3); font-size:9px; line-height:1.5; }
     .intelligence-empty { color:var(--muted); font-size:11px; line-height:1.5; }
     @media(max-width:760px) { .intelligence-layout { grid-template-columns:1fr; } }
   `;
@@ -66,7 +66,8 @@ function createPanel() {
     </div>
     <p class="intelligence-method" id="intelligence-method"></p>
   `;
-  lowerGrid?.parentNode?.insertBefore(panel, lowerGrid);
+  if (lowerGrid?.dataset?.mount) lowerGrid.appendChild(panel);
+  else lowerGrid?.parentNode?.insertBefore(panel, lowerGrid);
   return panel;
 }
 

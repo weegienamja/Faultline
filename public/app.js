@@ -33,7 +33,6 @@ function sourceLabel(incident) {
 function applyAuthState() {
   els["auth-open"].textContent = adminToken ? "Live data unlocked" : "Unlock live data";
   els["auth-open"].classList.toggle("unlocked", Boolean(adminToken));
-  els["probe-fleet-panel"].hidden = !adminToken;
 }
 
 // Panels rendered by other modules (case workspaces) refresh on this event.
@@ -71,14 +70,24 @@ function relativeSeen(value) {
 }
 
 function renderProbeFleet() {
-  els["probe-fleet-panel"].hidden = !adminToken;
+  // The fleet is a destination in its own right, so it explains why it is empty
+  // instead of disappearing when the credential is missing.
   if (!adminToken) {
-    els["probe-fleet"].innerHTML = "";
+    els["probe-fleet"].innerHTML = `<div class="fl-state" data-tone="locked">
+      <div class="fl-state-icon" aria-hidden="true">◌</div>
+      <p class="fl-state-title">Fleet health is locked</p>
+      <p class="fl-state-body">Registered probe identities and heartbeat health require the Faultline admin credential.</p>
+      <div class="fl-state-actions"><button class="fl-btn fl-btn-primary" data-action="unlock">Unlock live data</button></div>
+    </div>`;
     return;
   }
 
   if (!probes.length) {
-    els["probe-fleet"].innerHTML = '<p class="fleet-empty">No registered probes yet. Register the first remote vantage from the CLI.</p>';
+    els["probe-fleet"].innerHTML = `<div class="fl-state">
+      <div class="fl-state-icon" aria-hidden="true">◎</div>
+      <p class="fl-state-title">No registered probes</p>
+      <p class="fl-state-body">A probe is a persistent, authenticated vantage point. Register the first remote worker from the CLI to correlate endpoint evidence against a second viewpoint.</p>
+    </div>`;
     return;
   }
 
@@ -251,7 +260,12 @@ function drawTopology(topology, faultDomain, isLive) {
   els["topology-panel"].hidden = false;
   els["topology-kind"].textContent = topology.kind || "unknown";
   els["topology-confidence"].textContent = isLive ? "live measured path" : `${topology.confidence || "low"} confidence`;
-  els["topology-confidence"].className = `topology-pill ${isLive ? "" : (topology.confidence || "low")}`;
+  // Confidence is a status, not a decoration: measured paths read as observed,
+  // inferred ones carry the confidence the inference engine actually reported.
+  els["topology-confidence"].className = "fl-badge";
+  els["topology-confidence"].dataset.status = isLive
+    ? "info"
+    : ({ high: "ok", medium: "warn", low: "idle" }[topology.confidence] || "idle");
   els["topology-summary"].textContent = isLive
     ? `${topology.summary || "Live path collected."} Solid links are OBSERVED hops; dashed links are INFERRED; owner labels are public routing metadata.`
     : `${topology.summary || "Topology evidence collected."} Passive discovery only; dashed links are inferred.`;
@@ -395,7 +409,7 @@ function render() {
 
   const twoVantages = incident.vantages?.remoteProbe === true || incident.source === "correlated";
   els["incident-status"].textContent = incident.source === "demo" ? "Demo incident" : twoVantages ? "2 vantage points" : "Endpoint only";
-  els["incident-status"].classList.toggle("live", incident.source !== "demo");
+  els["incident-status"].dataset.status = incident.source === "demo" ? "idle" : "info";
   els["measured-at"].textContent = incident.updatedAt || incident.collectedAt
     ? new Date(incident.updatedAt || incident.collectedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
     : "demo data";
@@ -447,6 +461,13 @@ function render() {
   els["action-list"].innerHTML = result.actions.map(action => `<li>${escapeHtml(action)}</li>`).join("");
   renderTopology(incident);
   renderRoute(incident);
+
+  document.getElementById("diagnosis-panel")?.setAttribute(
+    "data-status",
+    m.targetReachable === false || m.dnsResolved === false ? "crit"
+      : (m.upstreamLoss ?? 0) >= 2 || (m.gatewayLoss ?? 0) >= 2 ? "warn" : "ok"
+  );
+  window.dispatchEvent(new CustomEvent("faultline-incident", { detail: { incident, incidents, probes } }));
 }
 
 async function fetchJson(path, token = "") {
