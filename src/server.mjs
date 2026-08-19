@@ -424,7 +424,6 @@ const server = createServer(async (req, res) => {
 
     if (req.method === "GET" && url.pathname === "/api/audit") {
       requireAdmin(req);
-      const probes = await store.listProbes();
       return json(res, 200, await store.listAudit(200));
     }
 
@@ -651,7 +650,8 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(port, () => {
-  console.log(`Faultline v0.8 preview listening on http://localhost:${port}`);
+  console.log(`Faultline v0.6 preview listening on http://localhost:${port}`);
+  console.log("Current product milestone: v0.8 preview");
   console.log(`Persistent store: ${dataFile}`);
   if (!configuredAdminToken) {
     console.log("No FAULTLINE_ADMIN_TOKEN was configured. Generated a development admin credential:");
