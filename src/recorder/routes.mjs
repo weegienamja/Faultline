@@ -87,13 +87,18 @@ export function createRecorderRouter({
     return [...live, ...stored.map(incident => ({ ...summariseIncident(incident), persisted: true }))];
   }
 
+  /**
+   * Read an incident's evidence attachments.
+   *
+   * Deliberately NOT wrapped in a catch. An empty list means "no experiment was
+   * run", and the capsule states exactly that as a finding. Turning a failed
+   * read into an empty list would convert "I could not read the evidence" into
+   * "there is no evidence" - an epistemic falsehood, and precisely the kind of
+   * silent downgrade this product exists to avoid. A read failure must surface.
+   */
   async function listAttachments(incidentId) {
     if (!store?.listIncidentEvidence) return [];
-    try {
-      return await store.listIncidentEvidence(incidentId);
-    } catch {
-      return [];
-    }
+    return store.listIncidentEvidence(incidentId);
   }
 
   async function findIncident(id) {
@@ -328,15 +333,36 @@ export function createRecorderRouter({
       // control plane left an incident that recorded a failure with no trace of
       // the experiment that isolated it.
       const attachment = buildBisectAttachment({ incident, report, requestedAxes: axes });
+
+      // This endpoint promises durable experimental evidence, so a failed write
+      // is a failed request. Reporting an evidenceId for something that is not
+      // stored would recreate exactly the hole PIC1 closed: the id looks
+      // durable, the restart proves it was not.
       if (store?.putIncidentEvidence) {
-        await store.putIncidentEvidence(attachment).catch(error => {
-          logger("recorder.attachment_persist_failed", { id: attachment.id, message: error?.message });
-        });
+        try {
+          await store.putIncidentEvidence(attachment);
+        } catch (cause) {
+          logger("recorder.attachment_persist_failed", { id: attachment.id, message: cause?.message });
+          const error = new Error("The Network Bisect run completed, but its evidence could not be stored durably. The result below is not retained and will not survive a restart.");
+          error.statusCode = 500;
+          error.code = "EVIDENCE_NOT_PERSISTED";
+          // The experiment made real measurements. Losing them because the
+          // write failed would be a second, avoidable loss.
+          error.details = {
+            evidencePersisted: false,
+            evidenceId: null,
+            incidentId: incident.id,
+            requestedAxes: axes,
+            report
+          };
+          throw error;
+        }
       }
 
       json(res, 201, {
         incidentId: incident.id,
         evidenceId: attachment.id,
+        evidencePersisted: Boolean(store?.putIncidentEvidence),
         requestedAxes: axes,
         // The incident may be simulated, but this Bisect run is not: it made
         // real connections from this machine. Saying so prevents the two halves

@@ -66,11 +66,18 @@ export function createStore(filePath) {
     // only a closed incident, which is a finished evidence artefact like a run.
     async getIncident(id) { await load(); return state.incidents.find(item => item.id === id) || null; },
     async listIncidents(limit = 20) { await load(); return [...state.incidents].slice(0, limit); },
-    putIncident(value, { max = 20 } = {}) { return mutate(current => { const index = current.incidents.findIndex(item => item.id === value.id); if (index >= 0) current.incidents[index] = value; else current.incidents.unshift(value); current.incidents = current.incidents.slice(0, max); return value; }); },
+    // Retention is RELATIONAL. Evicting an incident evicts its evidence in the
+    // same mutation: an attachment pointing at an incident nobody can read is
+    // not evidence, and leaving it behind quietly grows an orphan set.
+    putIncident(value, { max = 20 } = {}) { return mutate(current => { const index = current.incidents.findIndex(item => item.id === value.id); if (index >= 0) current.incidents[index] = value; else current.incidents.unshift(value); if (current.incidents.length > max) { const evicted = new Set(current.incidents.slice(max).map(item => item.id)); current.incidents = current.incidents.slice(0, max); current.incidentEvidence = current.incidentEvidence.filter(item => !evicted.has(item.incidentId)); } return value; }); },
     deleteIncident(id) { return mutate(current => { const before = current.incidents.length; current.incidents = current.incidents.filter(item => item.id !== id); const attachments = current.incidentEvidence.length; current.incidentEvidence = current.incidentEvidence.filter(item => item.incidentId !== id); return { removed: before !== current.incidents.length, attachmentsRemoved: attachments - current.incidentEvidence.length }; }); },
     async getIncidentEvidence(id) { await load(); return state.incidentEvidence.find(item => item.id === id) || null; },
     async listIncidentEvidence(incidentId) { await load(); return state.incidentEvidence.filter(item => item.incidentId === incidentId).sort((a,b)=>Date.parse(a.createdAt||0)-Date.parse(b.createdAt||0)); },
-    putIncidentEvidence(value, { max = 100 } = {}) { return mutate(current => { const index = current.incidentEvidence.findIndex(item => item.id === value.id); if (index >= 0) current.incidentEvidence[index] = value; else current.incidentEvidence.unshift(value); current.incidentEvidence = current.incidentEvidence.slice(0, max); return value; }); },
+    // Bounded PER INCIDENT, not globally. A global cap would let a busy
+    // incident silently delete the evidence attached to a different, retained
+    // one - so a capsule could report "nothing was tested" about an incident
+    // that was in fact tested.
+    putIncidentEvidence(value, { maxPerIncident = 10 } = {}) { return mutate(current => { const index = current.incidentEvidence.findIndex(item => item.id === value.id); if (index >= 0) current.incidentEvidence[index] = value; else current.incidentEvidence.unshift(value); const kept = []; const counts = new Map(); for (const item of current.incidentEvidence) { const seen = counts.get(item.incidentId) || 0; if (seen < maxPerIncident) { kept.push(item); counts.set(item.incidentId, seen + 1); } } current.incidentEvidence = kept; return value; }); },
     async listAudit(limit=100) { await load(); return [...state.audit].sort((a,b)=>Date.parse(b.at||0)-Date.parse(a.at||0)).slice(0,limit); },
     appendAudit(event) { return mutate(current => { current.audit.unshift(event); current.audit=current.audit.slice(0,1000); return event; }); }
   };

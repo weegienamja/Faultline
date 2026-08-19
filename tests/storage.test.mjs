@@ -110,3 +110,56 @@ test("deleting an incident removes its evidence attachments", async()=>{
     assert.equal((await store.listIncidentEvidence("FLR-2026-0008")).length,1,"other incidents are untouched");
   } finally { await rm(dir,{recursive:true,force:true}); }
 });
+
+test("evicting an incident evicts its evidence, leaving no orphans", async()=>{
+  const dir=await mkdtemp(join(tmpdir(),"faultline-store-")); const file=join(dir,"faultline.json");
+  try {
+    const store=createStore(file);
+    // Fill past the retention limit, attaching evidence to the oldest.
+    await store.putIncident({ id:"FLR-OLD" }, { max: 3 });
+    await store.putIncidentEvidence({ id:"FLE-OLD-1", incidentId:"FLR-OLD" });
+    await store.putIncidentEvidence({ id:"FLE-OLD-2", incidentId:"FLR-OLD" });
+    for (const id of ["FLR-A","FLR-B","FLR-C"]) await store.putIncident({ id }, { max: 3 });
+
+    const retained=(await store.listIncidents()).map(i=>i.id);
+    assert.ok(!retained.includes("FLR-OLD"),"the oldest incident should have been evicted");
+    // Its attachments must go with it in the same mutation.
+    assert.deepEqual(await store.listIncidentEvidence("FLR-OLD"),[],"orphan evidence must not survive");
+
+    const reopened=createStore(file);
+    assert.deepEqual(await reopened.listIncidentEvidence("FLR-OLD"),[]);
+  } finally { await rm(dir,{recursive:true,force:true}); }
+});
+
+test("evidence retention is per incident, so a busy incident cannot delete another's", async()=>{
+  const dir=await mkdtemp(join(tmpdir(),"faultline-store-")); const file=join(dir,"faultline.json");
+  try {
+    const store=createStore(file);
+    await store.putIncident({ id:"FLR-QUIET" });
+    await store.putIncident({ id:"FLR-BUSY" });
+
+    // One experiment on a quiet incident.
+    await store.putIncidentEvidence({ id:"FLE-QUIET", incidentId:"FLR-QUIET", createdAt:"2026-08-19T20:00:00.000Z" }, { maxPerIncident: 3 });
+    // Then many on another. A global cap would silently discard FLE-QUIET and
+    // the capsule would report "nothing was tested" about a tested incident.
+    for (let index=0; index<12; index+=1) {
+      await store.putIncidentEvidence({ id:`FLE-BUSY-${index}`, incidentId:"FLR-BUSY", createdAt:`2026-08-19T21:00:${String(index).padStart(2,"0")}.000Z` }, { maxPerIncident: 3 });
+    }
+
+    assert.equal((await store.listIncidentEvidence("FLR-QUIET")).length,1,"a quiet incident keeps its evidence");
+    assert.equal((await store.listIncidentEvidence("FLR-BUSY")).length,3,"the busy incident is bounded per incident");
+  } finally { await rm(dir,{recursive:true,force:true}); }
+});
+
+test("per-incident trimming keeps the newest evidence", async()=>{
+  const dir=await mkdtemp(join(tmpdir(),"faultline-store-")); const file=join(dir,"faultline.json");
+  try {
+    const store=createStore(file);
+    for (let index=0; index<5; index+=1) {
+      await store.putIncidentEvidence({ id:`FLE-${index}`, incidentId:"FLR-1", createdAt:`2026-08-19T20:0${index}:00.000Z` }, { maxPerIncident: 2 });
+    }
+    const kept=(await store.listIncidentEvidence("FLR-1")).map(e=>e.id);
+    // listIncidentEvidence returns oldest first; the two newest survive.
+    assert.deepEqual(kept,["FLE-3","FLE-4"]);
+  } finally { await rm(dir,{recursive:true,force:true}); }
+});

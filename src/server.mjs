@@ -687,7 +687,9 @@ const server = createServer(async (req, res) => {
     }
   } catch (error) {
     const status = error.statusCode || (/not found/i.test(error.message) ? 404 : 400);
-    json(res, status, { error: error.message, ...(error.code ? { code: error.code } : {}) });
+    // `details` lets a failure carry what did succeed - a Bisect run that
+    // completed but could not be stored must not vanish from the response.
+    json(res, status, { error: error.message, ...(error.code ? { code: error.code } : {}), ...(error.details ? { details: error.details } : {}) });
   }
 });
 

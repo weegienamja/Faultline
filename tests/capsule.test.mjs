@@ -415,3 +415,77 @@ test("capsule filenames are safe", () => {
 test("building a capsule without an incident is refused", () => {
   assert.throws(() => buildCapsule({ incident: null }), /incident is required/);
 });
+
+// --- repeated experiments ---------------------------------------------------
+//
+// Re-running Bisect must update the answer. Selecting the first attachment ever
+// stored would leave the capsule headlining a superseded result while the newer
+// one sat further down the same file.
+
+function attachmentAt(createdAt, classification, { axes = ["source-interface"], confirmed = true } = {}) {
+  const attachment = buildBisectAttachment({
+    incident: INCIDENT,
+    report: { ...BISECT_REPORT, verdict: { ...BISECT_REPORT.verdict, classification }, confirmation: { ...BISECT_REPORT.confirmation, confirmed } },
+    requestedAxes: axes,
+    now: () => new Date(createdAt)
+  });
+  return attachment;
+}
+
+test("the capsule headlines the latest experimental run, not the first", () => {
+  const older = attachmentAt("2026-08-19T20:10:00.000Z", "INSUFFICIENT_EVIDENCE", { confirmed: false });
+  const newer = attachmentAt("2026-08-19T20:20:00.000Z", "LOCAL_CAPABILITY_DEFICIENCY", { confirmed: true });
+
+  // Supplied oldest-first, exactly as the store returns them.
+  const capsule = buildCapsule({ incident: INCIDENT, attachments: [older, newer] });
+
+  assert.equal(capsule.conclusion.available, true);
+  assert.equal(capsule.conclusion.classification, "LOCAL_CAPABILITY_DEFICIENCY", "the newest run is the current answer");
+  assert.equal(capsule.conclusion.evidenceId, newer.id);
+  assert.equal(capsule.conclusion.confirmed, true);
+});
+
+test("a superseded run is disclosed rather than hidden", () => {
+  const older = attachmentAt("2026-08-19T20:10:00.000Z", "INSUFFICIENT_EVIDENCE", { confirmed: false });
+  const newer = attachmentAt("2026-08-19T20:20:00.000Z", "LOCAL_CAPABILITY_DEFICIENCY");
+  const capsule = buildCapsule({ incident: INCIDENT, attachments: [older, newer] });
+
+  assert.equal(capsule.conclusion.runCount, 2);
+  assert.deepEqual(capsule.conclusion.supersededRuns.map(entry => entry.classification), ["INSUFFICIENT_EVIDENCE"]);
+  // Both remain embedded as evidence.
+  assert.equal(capsule.evidence.experiments.length, 2);
+
+  const html = renderCapsuleHtml(capsule);
+  assert.match(html, /2 experimental runs/);
+  assert.match(html, /INSUFFICIENT_EVIDENCE/);
+});
+
+test("each axis uses the latest run that tested that axis", () => {
+  const oldInterface = attachmentAt("2026-08-19T20:10:00.000Z", "INSUFFICIENT_EVIDENCE", { axes: ["source-interface"], confirmed: false });
+  const newInterface = attachmentAt("2026-08-19T20:30:00.000Z", "FAILURE_DISCRIMINATOR", { axes: ["source-interface"] });
+  const family = attachmentAt("2026-08-19T20:20:00.000Z", "LOCAL_CAPABILITY_DEFICIENCY", { axes: ["address-family"] });
+
+  const capsule = buildCapsule({ incident: INCIDENT, attachments: [oldInterface, family, newInterface] });
+  const conditions = capsule.evidence.testableConditions.conditions;
+
+  const iface = conditions.find(entry => entry.axis === "source-interface");
+  assert.equal(iface.experiment.evidenceId, newInterface.id, "latest run for this axis");
+  assert.equal(iface.runCount, 2);
+  assert.equal(iface.supersededRuns.length, 1);
+
+  // A different axis is unaffected by the newer run on another one.
+  const addressFamily = conditions.find(entry => entry.axis === "address-family");
+  assert.equal(addressFamily.experiment.evidenceId, family.id);
+  assert.equal(addressFamily.runCount, 1);
+  assert.deepEqual(addressFamily.supersededRuns, []);
+});
+
+test("the timeline stays chronological even though selection is newest-first", () => {
+  const older = attachmentAt("2026-08-19T20:10:00.000Z", "INSUFFICIENT_EVIDENCE");
+  const newer = attachmentAt("2026-08-19T20:20:00.000Z", "LOCAL_CAPABILITY_DEFICIENCY");
+  const capsule = buildCapsule({ incident: INCIDENT, attachments: [newer, older] });
+
+  const experiments = capsule.timeline.filter(event => event.kind === "experiment");
+  assert.equal(experiments.length, 2);
+  assert.ok(Date.parse(experiments[0].at) < Date.parse(experiments[1].at), "reading a timeline forward is the point of it");
+});

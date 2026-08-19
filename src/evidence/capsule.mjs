@@ -78,11 +78,14 @@ export function groupDifferences(differences = []) {
  */
 export function buildTestableConditions(incident, attachments) {
   const candidates = incident.candidateDiscriminators || {};
-  const bisectRuns = attachments.filter(entry => entry.kind === "network-bisect");
+  const bisectRuns = newestFirst(attachments.filter(entry => entry.kind === "network-bisect"));
 
   const conditions = (candidates.bisectAxes || []).map(axis => {
     const contributing = (candidates.testable || []).filter(entry => entry.axis === axis);
-    const run = bisectRuns.find(entry => (entry.origin?.requestedAxes || []).includes(axis)) ?? null;
+    // Latest run that tested THIS axis wins. Re-running Bisect must update the
+    // answer rather than leaving an older, superseded result on display.
+    const forAxis = bisectRuns.filter(entry => (entry.origin?.requestedAxes || []).includes(axis));
+    const run = forAxis[0] ?? null;
 
     return {
       axis,
@@ -94,6 +97,14 @@ export function buildTestableConditions(incident, attachments) {
         ? "Derived from multiple simultaneous observed changes."
         : null,
       tested: Boolean(run),
+      // Earlier runs are still embedded; the count says so rather than hiding
+      // that the answer changed.
+      runCount: forAxis.length,
+      supersededRuns: forAxis.length > 1 ? forAxis.slice(1).map(entry => ({
+        evidenceId: entry.id,
+        createdAt: entry.createdAt,
+        classification: entry.payload?.conclusion?.classification ?? null
+      })) : [],
       experiment: run
         ? {
             evidenceId: run.id,
@@ -120,7 +131,12 @@ export function buildTestableConditions(incident, attachments) {
 
 /** The one-line answer, if the evidence produced one. */
 function buildConclusion(incident, attachments) {
-  const run = attachments.find(entry => entry.kind === "network-bisect" && entry.payload?.conclusion);
+  // Newest first: the current experimental conclusion is the latest completed
+  // run, not the first one ever attached. Otherwise re-running Bisect after an
+  // inconclusive attempt would leave the capsule headlining the stale result
+  // while the newer, confirmed one sat further down the same file.
+  const runs = newestFirst(attachments.filter(entry => entry.kind === "network-bisect" && entry.payload?.conclusion));
+  const run = runs[0];
   if (!run) {
     return {
       available: false,
@@ -142,10 +158,29 @@ function buildConclusion(incident, attachments) {
     claim: conclusion.claim ?? null,
     stoppingReason: run.payload.stoppingReason ?? null,
     confirmed: run.payload.confirmation?.confirmed ?? null,
+    // Stated so a reader can see the answer was revised rather than being the
+    // only one ever produced.
+    runCount: runs.length,
+    supersededRuns: runs.slice(1).map(entry => ({
+      evidenceId: entry.id,
+      createdAt: entry.createdAt,
+      classification: entry.payload?.conclusion?.classification ?? null
+    })),
     establishes: "Changing this condition changed the outcome reproducibly, under interleaved A/B confirmation.",
     // The boundary Faultline exists to hold.
     doesNotEstablish: "Why that condition fails. A confirmed discriminator is an association, not a cause."
   };
+}
+
+/**
+ * Newest first, for SELECTION only.
+ *
+ * The timeline stays chronological - reading the sequence of events forward is
+ * the point of a timeline. Selection is the opposite question: which result is
+ * current.
+ */
+function newestFirst(entries) {
+  return [...entries].sort((a, b) => Date.parse(b.createdAt || 0) - Date.parse(a.createdAt || 0));
 }
 
 /** Ordered events, so a reader can follow what happened without reading JSON. */

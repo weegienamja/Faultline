@@ -122,6 +122,11 @@ function renderSummary(capsule) {
            <span class="label">Deterministic conclusion</span>
            <p class="headline">${escapeHtml(conclusion.headline || conclusion.classification || "")}</p>
            <p class="mono small">${escapeHtml(conclusion.classification || "")}</p>
+           ${conclusion.runCount > 1 ? `<p class="small warn-text">
+             ${escapeHtml(String(conclusion.runCount))} experimental runs. This is the latest; earlier
+             result(s) ${escapeHtml(conclusion.supersededRuns.map(entry => entry.classification || "unknown").join(", "))}
+             remain embedded below.
+           </p>` : ""}
            <div class="split">
              <div><span class="label ok">This establishes</span><p>${escapeHtml(conclusion.establishes)}</p></div>
              <div><span class="label warn">This does not establish</span><p>${escapeHtml(conclusion.doesNotEstablish)}</p></div>
@@ -231,6 +236,7 @@ function renderTestable(capsule) {
           ${condition.tested ? chip("tested", "ok") : chip("not tested", "idle")}
           ${run?.simulated === false && capsule.provenance.containsSimulated ? chip("real measurement", "info") : ""}
         </div>
+        ${condition.runCount > 1 ? `<p class="small warn-text">Latest of ${escapeHtml(String(condition.runCount))} runs against this condition.</p>` : ""}
         ${condition.note ? `<p class="small">${escapeHtml(condition.note)} <span class="mono">${escapeHtml(condition.derivedFrom.join(" · "))}</span></p>` : ""}
 
         ${payload ? `

@@ -116,13 +116,45 @@ incidentEvidence: [
 ]
 ```
 
-Store v7. A v6 file loads unchanged and gains an empty collection. Deleting an
-incident removes its attachments too — an attachment pointing at an incident
-nobody can read is not evidence.
+Store v7. A v6 file loads unchanged and gains an empty collection.
+
+**Retention is relational.** Evicting an incident evicts its evidence in the
+same mutation, so no orphan attachments accumulate. Evidence is bounded **per
+incident** (10) rather than globally, because a global cap would let a busy
+incident silently delete the evidence attached to a different, retained one —
+and the capsule would then report "nothing was tested" about an incident that
+was in fact tested.
+
+**Failures are never downgraded into absence.** An empty attachment list means
+"no experiment was run", and the capsule states that as a finding. So a failed
+read is allowed to surface rather than being caught and returned as `[]`, and a
+failed write fails the request with `EVIDENCE_NOT_PERSISTED` rather than
+returning an `evidenceId` for something that is not stored. The completed run
+travels in the error `details` so a real measurement is not lost twice.
 
 This closed a real hole: before it, a Bisect run started from an incident lived
 only in the in-memory Analyst registry, so restarting Faultline left an incident
 that recorded a failure with no trace of the experiment that isolated it.
+
+## Repeated experiments: latest run wins
+
+Bisect can be run against an incident more than once. The capsule's headline is
+the **latest completed run**, not the first one attached — otherwise re-running
+after an inconclusive attempt would leave the summary contradicting the newer,
+confirmed evidence sitting further down the same file.
+
+Each testable condition independently uses the latest run that tested *that*
+axis, so a newer run on one condition does not displace the answer for another.
+
+Superseded runs are disclosed rather than hidden:
+
+```
+2 experimental runs. This is the latest; earlier result(s)
+INSUFFICIENT_EVIDENCE remain embedded below.
+```
+
+Selection is newest-first; the **timeline stays chronological**, because reading
+a sequence of events forward is the point of a timeline.
 
 ## Provenance belongs to each artefact
 
@@ -262,6 +294,7 @@ Verified end to end. On the receiving machine, with zero non-`file://` requests:
 ## Limitations
 
 * Attachments are Network Bisect runs today. The envelope supports other kinds; nothing else produces one yet.
+* Redaction is **fail-open**: a new schema field carrying identifiers needs a path added or it exports. The known paths are asserted by tests, and a fail-closed export projection is the planned hardening (see *Capsule redaction v2*).
 * An unsigned digest is an integrity checksum, not proof of origin.
 * Redaction paths are maintained by hand. A new field carrying identifiers needs a path added, and the tests assert the known ones.
 * One incident per capsule. Bundling several is not supported.
