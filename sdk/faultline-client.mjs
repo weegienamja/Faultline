@@ -11,10 +11,7 @@ export class FaultlineClient {
   async request(path, { method = "GET", body } = {}) {
     const response = await this.fetch(`${this.baseUrl}${path}`, {
       method,
-      headers: {
-        authorization: `Bearer ${this.token}`,
-        ...(body ? { "content-type": "application/json" } : {})
-      },
+      headers: { authorization: `Bearer ${this.token}`, ...(body ? { "content-type": "application/json" } : {}) },
       body: body ? JSON.stringify(body) : undefined
     });
     const payload = await response.json().catch(() => ({}));
@@ -35,6 +32,13 @@ export class FaultlineClient {
   getServiceDeskProviders() { return this.request("/api/v1/integrations/service-desk/providers"); }
   configureServiceDesk(caseId, input) { return this.request(`/api/v1/diagnostics/${encodeURIComponent(caseId)}/service-desk`, { method: "POST", body: input }); }
   getServiceDeskUpdate(caseId, { reason = "diagnostic.updated" } = {}) { return this.request(`/api/v1/diagnostics/${encodeURIComponent(caseId)}/service-desk?reason=${encodeURIComponent(reason)}`); }
+
+  createChangeWindow(caseId, input) { return this.request(`/api/cases/${encodeURIComponent(caseId)}/change-windows`, { method: "POST", body: input }); }
+  listChangeWindows(caseId) { return this.request(`/api/cases/${encodeURIComponent(caseId)}/change-windows`); }
+  setChangeBaseline(caseId, changeId, sessionId) { return this.request(`/api/cases/${encodeURIComponent(caseId)}/change-windows/${encodeURIComponent(changeId)}/baseline`, { method: "POST", body: { sessionId } }); }
+  setChangePostRun(caseId, changeId, sessionId) { return this.request(`/api/cases/${encodeURIComponent(caseId)}/change-windows/${encodeURIComponent(changeId)}/post-change`, { method: "POST", body: { sessionId } }); }
+  getChangeComparison(caseId, changeId) { return this.request(`/api/cases/${encodeURIComponent(caseId)}/change-windows/${encodeURIComponent(changeId)}/comparison`); }
+  getChangeEvidence(caseId, changeId) { return this.request(`/api/cases/${encodeURIComponent(caseId)}/change-windows/${encodeURIComponent(changeId)}/evidence`); }
 
   async waitForRun(caseId, { intervalMs = 1000, timeoutMs = 60_000, signal } = {}) {
     const started = Date.now();
