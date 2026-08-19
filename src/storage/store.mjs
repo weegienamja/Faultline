@@ -1,18 +1,21 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
+const STATE_VERSION = 4;
+
 function emptyState() {
-  return { version: 3, sessions: [], runs: [], probes: [], audit: [] };
+  return { version: STATE_VERSION, sessions: [], runs: [], probes: [], audit: [], cases: [] };
 }
 
 function normaliseState(value) {
   if (!value || typeof value !== "object") return emptyState();
   return {
-    version: 3,
+    version: STATE_VERSION,
     sessions: Array.isArray(value.sessions) ? value.sessions : [],
     runs: Array.isArray(value.runs) ? value.runs : [],
     probes: Array.isArray(value.probes) ? value.probes : [],
-    audit: Array.isArray(value.audit) ? value.audit : []
+    audit: Array.isArray(value.audit) ? value.audit : [],
+    cases: Array.isArray(value.cases) ? value.cases : []
   };
 }
 
@@ -60,6 +63,11 @@ export function createStore(filePath) {
       return [...state.sessions];
     },
 
+    async listSessionsByCase(caseId) {
+      await load();
+      return state.sessions.filter(session => session.caseId === caseId);
+    },
+
     putSession(session) {
       return mutate(current => {
         const index = current.sessions.findIndex(item => item.id === session.id);
@@ -79,6 +87,14 @@ export function createStore(filePath) {
       return [...state.runs]
         .sort((a, b) => Date.parse(b.updatedAt || b.collectedAt || 0) - Date.parse(a.updatedAt || a.collectedAt || 0))
         .slice(0, limit);
+    },
+
+    async listRunsForSessions(sessionIds = []) {
+      await load();
+      const wanted = new Set(sessionIds);
+      return state.runs
+        .filter(run => wanted.has(run.sessionId || run.id))
+        .sort((a, b) => Date.parse(a.updatedAt || a.collectedAt || 0) - Date.parse(b.updatedAt || b.collectedAt || 0));
     },
 
     putRun(run) {
@@ -107,6 +123,26 @@ export function createStore(filePath) {
         if (index >= 0) current.probes[index] = probe;
         else current.probes.unshift(probe);
         return probe;
+      });
+    },
+
+    async getCase(id) {
+      await load();
+      return state.cases.find(item => item.id === id) || null;
+    },
+
+    async listCases() {
+      await load();
+      return [...state.cases]
+        .sort((a, b) => Date.parse(b.updatedAt || b.createdAt || 0) - Date.parse(a.updatedAt || a.createdAt || 0));
+    },
+
+    putCase(caseRecord) {
+      return mutate(current => {
+        const index = current.cases.findIndex(item => item.id === caseRecord.id);
+        if (index >= 0) current.cases[index] = caseRecord;
+        else current.cases.unshift(caseRecord);
+        return caseRecord;
       });
     },
 
