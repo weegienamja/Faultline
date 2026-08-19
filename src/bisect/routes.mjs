@@ -7,6 +7,7 @@
 // The CLI (`npm run bisect`) needs none of this and is the primary entry point.
 
 import { bisect } from "./engine.mjs";
+import { isolate } from "./adaptive.mjs";
 import { assertLiteralTargetAllowed } from "../security/target.mjs";
 import { parseLiveTarget } from "../live/measure.mjs";
 
@@ -37,12 +38,16 @@ export function createBisectRouter({ requireAdmin, bodyFrom, json }) {
         return numeric;
       };
 
-      const report = await bisect(target.input, {
+      const shared = {
         repeat: clamp(payload.repeat, 3, MAX_REPEAT),
         confirmPairs: clamp(payload.confirmPairs, 3, MAX_CONFIRM),
-        timeoutMs: Math.min(Math.max(Number(payload.timeoutMs) || 5_000, 500), 30_000),
-        includeSourceInterface: payload.includeSourceInterface !== false
-      });
+        timeoutMs: Math.min(Math.max(Number(payload.timeoutMs) || 5_000, 500), 30_000)
+      };
+
+      // Adaptive planning is the default; "exhaustive" runs the full matrix.
+      const report = payload.mode === "exhaustive"
+        ? await bisect(target.input, { ...shared, includeSourceInterface: payload.includeSourceInterface !== false })
+        : await isolate(target.input, { ...shared, maxExperiments: clamp(payload.maxExperiments, 12, 40) });
 
       json(res, 201, report);
       return true;

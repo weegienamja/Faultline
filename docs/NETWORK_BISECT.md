@@ -1,219 +1,294 @@
-# Network Bisect
+# Network Bisect — adaptive fault isolation
 
 `git bisect` finds the commit that broke a build. Network Bisect finds the
-**network condition** that breaks a connection.
+**network condition** that changes whether a target works — and it chooses which
+experiment to run next rather than sweeping every test.
 
 ```bash
 npm run bisect -- github.com
 ```
 
-No server, no account, no API key, no external service. Every row of output is a
+No server, no account, no API key, no third-party call. Every line of output is a
 real connection made from your machine.
 
 ---
 
-## The problem
+## What it does differently
 
-When something "doesn't work on this network", the isolation procedure is
-manual, disruptive and mostly guesswork:
-
-```text
-turn Wi-Fi off and on
-try your phone hotspot
-disconnect the VPN
-change your DNS to 8.8.8.8
-disable IPv6
-try a different browser
-try from another machine
-```
-
-Each step reconfigures the machine, often needs admin rights, interrupts
-everything else, and gets undone before anyone writes down what happened. On a
-managed endpoint most of them are not possible at all. And when one of them
-appears to help, nobody re-tests to check the network did not simply recover on
-its own.
-
-## The idea
-
-Nearly every one of those conditions can be varied **per connection** instead of
-per machine:
-
-| Support instruction | What Faultline varies instead | System change |
-|---|---|---|
-| "disable IPv6" | resolve and connect A-only or AAAA-only | none |
-| "change your DNS" | send this lookup to a specific nameserver | none |
-| "drop the VPN" | bind the socket to a different local source address | none |
-| "try another server" | connect to each resolved answer individually | none |
-| "it's a TLS problem" | pin the handshake to TLS 1.2 or 1.3 | none |
-| "it's HTTP/2" | offer only h2 or only http/1.1 via ALPN | none |
-| "it's the firewall" | send or omit SNI; try port 80 against 443 | none |
-
-Nothing is reconfigured, nothing needs elevation, and other traffic is
-undisturbed. Each variation is a controlled experiment.
-
-## What it produces
+A sweep runs everything and lets you read the table. This engine behaves more
+like an engineer conducting controlled experiments:
 
 ```text
-  CONDITION                     VARIANT                           RESULT n     DETAIL
-  ----------------------------------------------------------------------------------
-  baseline                      baseline (system defaults)        PASS  2/2   HTTP 200
-  IP address family             IPv4 only                         PASS  2/2   HTTP 200
-  IP address family             IPv6 only                         FAIL  0/2   tcp: ENETUNREACH
-  DNS resolver                  resolver 1.1.1.1                  PASS  2/2   HTTP 200
-  DNS resolver                  resolver 8.8.8.8                  PASS  2/2   HTTP 200
-  Specific resolved address     address 2606:4700:10::6814:179a   FAIL  0/2   tcp: ENETUNREACH
-  Local source interface        via Ethernet (192.168.0.95)       PASS  2/2   HTTP 200
-  Local source interface        via Ethernet 2 (192.168.56.1)     FAIL  0/2   tcp: ENETUNREACH
-  TLS version                   TLS 1.2 only                      PASS  2/2   HTTP 200
-  TLS SNI                       no SNI                            FAIL  0/2   tls: handshake
-
-  CONDITION ISOLATED
-  IP address family: IPv6 only flips PASS to FAIL
-
-  Evidence supports: the failure is reproducibly associated with
-  ip address family = IPv6 only.
-
-  Interleaved confirmation (A=baseline, B=IPv6 only): A+ B- A+ B-
-  Difference held under alternation.
+1  establish what kind of baseline this is
+2  form explicit competing explanations
+3  choose the experiment that best separates them
+4  observe
+5  eliminate the explanations that no longer fit
+6  choose again
+7  stop when the evidence has isolated a boundary
 ```
+
+Every step is recorded, so a run reads as reasoning rather than as output:
+
+```text
+  Baseline
+  FAIL 3/3 — ECONNREFUSED
+
+  Baseline fails consistently. Isolating which condition changes that.
+
+  [1] IP address family: IPv4 only
+      Highest discrimination score (6.6). Separates 10 live explanations into
+      3 predicted outcomes (3/3/4).
+      PASS 3/3 — HTTP 200
+
+  Confirming (interleaved A/B; A = baseline)
+      A- B+ A- B+ A- B+   held under alternation
+
+  FAILURE CONDITION ISOLATED
+  IP address family: IPv4 only changes FAIL to PASS
+
+  Evidence supports a fault specific to ip address family. Changing only that
+  condition reproducibly restores the connection.
+
+  Experiments: 1 executed, 1 skipped as low-value, 0 inapplicable.
+  12 real connection attempts. Stopping reason: ISOLATED.
+```
+
+One experiment. Twelve connections. The sweep needs 33 for the same target.
 
 ---
 
-## Why this is not just running curl a few times
+## Result states
 
-Four properties do the real work, and each exists because the naive version of
-this tool would be wrong.
+Two-state pass/fail is not enough. These are first class and never collapsed:
 
-### 1. Reproducibility gating
+| State | Meaning |
+|---|---|
+| `PASS` | the connection completed under this condition |
+| `FAIL` | it did not complete, and it could have |
+| `INAPPLICABLE` | the condition cannot be applied to this target/machine pair |
+| `UNSUPPORTED` | the machine cannot perform the experiment at all |
+| `UNSTABLE` | repeated trials disagreed |
 
-An intermittent fault will make a single trial "prove" anything. Every
-condition runs `--repeat` times and **only a unanimous result** counts as a
-discriminator.
+`INAPPLICABLE` and `UNSUPPORTED` are statements about the *experiment*, not about
+the network. Only `PASS` and `FAIL` are evidence about connectivity, and only
+those ever move a hypothesis.
 
-If the baseline itself is unstable, bisection is **refused**:
+This is what fixes a concrete bug in the previous version: a VirtualBox
+host-only adapter is "Up" and has an address, but owns no route to the Internet.
+Binding to it produced `ENETUNREACH`, which was scored `FAIL` and reported
+alongside genuine findings. It is now `INAPPLICABLE`, decided from routing data.
+
+## Baseline states
+
+The engine interprets a healthy baseline completely differently from a failing one.
+
+| Baseline | What the run becomes |
+|---|---|
+| `FAILED_BASELINE` | true fault isolation — look for `FAIL → PASS` |
+| `HEALTHY_BASELINE` | differential capability analysis — nothing is broken |
+| `INTERMITTENT_BASELINE` | isolation **refused**, flake rate reported |
+
+A healthy baseline never produces a "fault". `github.com` not answering over
+IPv6 is reported as a target property, not as something wrong with your network.
+
+## Conclusions
+
+| Classification | Meaning |
+|---|---|
+| `FAILURE_DISCRIMINATOR` | a condition reproducibly repairs a failing baseline |
+| `LOCAL_CAPABILITY_DEFICIENCY` | the target offers it; this machine cannot use it |
+| `TARGET_PROPERTY` | the target does not offer it at all |
+| `NO_MEANINGFUL_DIFFERENCE` | nothing changed the outcome |
+| `UNSTABLE_BASELINE` | the baseline could not be reproduced |
+| `INSUFFICIENT_EVIDENCE` | observations conflict, or explanations cannot be separated |
+| `INAPPLICABLE_CONDITION` | no experiment applied |
+
+---
+
+## The experiment-selection algorithm
+
+For a candidate experiment, every live hypothesis states what it expects.
+That partitions the live set by predicted outcome. If they all predict the same
+thing, the experiment cannot change what is believed, and it scores zero.
+
+Otherwise the score uses the **expected size of the surviving hypothesis set** —
+the standard "expected remaining candidates" measure from decision-tree and
+Mastermind-style solvers:
 
 ```text
-  INTERMITTENT BASELINE
-  Baseline is intermittent - bisection refused
-
-  The target succeeded 2 of 4 times under unchanged conditions. Any condition
-  would appear to "fix" it by chance, so no differentiating condition is reported.
+expectedRemaining = Σ over groups g:  (|g| / N) · |g|
+discrimination    = N − expectedRemaining
+score             = discrimination / cost
 ```
 
-Most tools would happily blame whichever variant happened to run during a good
-patch. This one declines, and tells you the flake rate instead.
+Reading it plainly: if the experiment produces the outcome group *g* predicted,
+roughly the members of *g* survive; the chance of landing in *g* is taken as
+`|g|/N` because that many live hypotheses expect it. Lower remaining is better.
 
-### 2. Interleaved paired confirmation
+Worked examples with **N = 6**:
 
-Running all of A and then all of B confounds the comparison with **time**. If
-the network recovers halfway through, B looks like the cure.
+| Split | expectedRemaining | discrimination |
+|---|---|---|
+| 3 / 3 | `(3/6)·3 + (3/6)·3` = **3.00** | **3.00** |
+| 2 / 4 | `(2/6)·2 + (4/6)·4` = **3.33** | 2.67 |
+| 1 / 5 | `(1/6)·1 + (5/6)·5` = **4.33** | 1.67 |
+| 6 / 0 | `(6/6)·6` = **6.00** | 0.00 |
 
-The winning condition is therefore re-tested alternately:
+So a balanced 3/3 split outranks a lopsided 1/5 at equal cost — the property a
+bisection strategy needs. Hypotheses answering `UNKNOWN` make no commitment and
+are excluded from the partition rather than lumped into a group they never
+claimed.
+
+Ties break deterministically: lower cost, then lower intrusiveness, then registry
+order, then id. **The same evidence always produces the same plan** — there is a
+test for it.
+
+### Predictions
+
+A hypothesis about an axis it owns predicts `DIFFERS` ("some variant of this axis
+changes the outcome") rather than committing to which one. Observing "same as
+baseline" then *weakens* it rather than contradicting it, because another variant
+of that axis may still be the one that differs.
+
+### Pruning
+
+An experiment is dropped before scoring, with a recorded reason, when:
+
+- its axis already has a confirmed discriminator,
+- an equivalent experiment already produced the same connection,
+- it is known-inapplicable (no route from that source),
+- it differs by design rather than by fault (SNI on a name-based host),
+- or no live hypothesis disagrees about it.
+
+`SKIPPED` is always explainable and is never confused with `UNSUPPORTED`.
+
+## Stopping rules
+
+| Reason | Fires when |
+|---|---|
+| `ISOLATED` | a boundary was reproducibly identified and confirmed |
+| `TARGET_PROPERTY` | the difference comes from what the target offers |
+| `NO_DISCRIMINATOR` | every applicable experiment behaved identically |
+| `UNSTABLE` | the baseline could not be reproduced |
+| `INSUFFICIENT_EVIDENCE` | a candidate failed confirmation, or explanations remain |
+| `UNSUPPORTED` | the machine cannot run the necessary experiments |
+
+The engine does not keep connecting merely because tests exist.
+
+---
+
+## Interface classification
+
+Source-interface experiments need to know whether an interface can plausibly
+reach the target. That is decided from routing, not adapter names:
 
 ```text
-A+ B- A+ B-      difference held
-A- B- A+ B+      network drifted; NOT confirmed
+Ethernet     192.168.0.95   PRIMARY
+Ethernet 2   192.168.56.1   HOST_ONLY    NO TARGET ROUTE
 ```
 
-A drifting network produces a failed confirmation instead of a false
-conclusion, reported as `UNCONFIRMED`.
+On Windows, `Find-NetRoute` performs the OS's own route selection for the
+destination; if it does not select this interface, the interface has no route and
+the experiment is `INAPPLICABLE`. Owning the lowest-metric default route makes an
+interface `PRIMARY` regardless of what it is called.
 
-### 3. Duplicate collapsing
+Classifications: `PRIMARY`, `ETHERNET`, `WIFI`, `VPN`, `VIRTUAL`, `HOST_ONLY`,
+`LOOPBACK`, `UNKNOWN`. A vendor is never asserted from a description string
+alone — "host-only" is used because the OS also reports no default route through
+it. On non-Windows hosts route state is `UNKNOWN`, which the planner treats as
+"cannot decide" rather than "no route".
 
-Several axes can express the same physical change: `address-family=ipv4` and
-`address=<the only A record>` produce an identical connection. Discriminators
-are grouped by the **effective connection tuple** they produce
-`(family, address, source, port, tlsVersion, alpn, sni)`, so one finding is
-reported once and attributed to the most general axis that expresses it. The
-equivalent forms are kept and listed, not silently dropped.
+---
 
-### 4. Honest classification
+## Interleaved paired confirmation
 
-Not every difference is a fault:
+Running all of A then all of B confounds the comparison with time: if the network
+recovers halfway through, B looks like the cure. Any candidate is re-tested
+alternately:
 
-- **`github.com` has no AAAA record.** Forcing IPv6 fails at DNS with `ENODATA`.
-  That is a property of the target, so it is reported as
-  `TARGET PROPERTY, NOT A LOCAL FAULT` — never as "your IPv6 is broken".
-- **Omitting SNI breaks any name-based virtual host** by design. It is flagged
-  as an *expected difference* and can never outrank a real finding.
-- **ALPN is judged at the TLS handshake.** This client speaks HTTP/1.1; if it
-  forced ALPN to `h2` and then sent an HTTP/1.1 request, the server's h2 preface
-  would fail to parse and be misreported as a network fault. The useful question
-  is whether the handshake can negotiate the protocol at all, which is exactly
-  what a middlebox that mishandles h2 breaks.
+```text
+A- B+ A- B+ A- B+     difference held
+A- B- A+ B+           network drifted; NOT confirmed
+```
+
+Drift produces `INSUFFICIENT_EVIDENCE`, not a false conclusion.
 
 ---
 
 ## Usage
 
 ```bash
-npm run bisect -- github.com
+npm run bisect -- github.com                      # adaptive (default)
+npm run bisect -- github.com --all                # full condition matrix
 npm run bisect -- https://internal.example/health --repeat 5
-npm run bisect -- 1.1.1.1 --no-source
 npm run bisect -- example.com --json --out bisect.json
 ```
 
 | Option | Meaning |
 |---|---|
-| `--repeat <n>` | Trials per condition, 1-10 (default 3). Raise it for intermittent faults. |
-| `--confirm <n>` | Interleaved A/B pairs used to confirm the winner (default 3) |
-| `--timeout <ms>` | Per-connection timeout (default 5000) |
-| `--no-source` | Skip the source-interface axis |
-| `--resolvers <csv>` | Comparison resolvers (default `1.1.1.1,8.8.8.8,9.9.9.9`) |
-| `--json` / `--out <file>` | Machine-readable report |
+| `--all` | complete condition matrix instead of adaptive planning |
+| `--repeat <n>` | trials per condition, 1-10 (default 3) |
+| `--confirm <n>` | interleaved A/B pairs (default 3) |
+| `--timeout <ms>` | per-connection timeout (default 5000) |
+| `--max <n>` | maximum experiments in adaptive mode (default 12) |
+| `--no-source` | skip the source-interface axis |
+| `--resolvers <csv>` | comparison resolvers |
+| `--json` / `--out <file>` | machine-readable report |
 
 ### Exit codes
 
-Usable in a script or a support runbook:
-
 | Code | Meaning |
 |---|---|
-| `0` | No fault reproduced |
-| `1` | A differentiating condition was isolated |
-| `2` | Failure was not condition-specific |
-| `3` | Evidence insufficient (intermittent baseline, or unconfirmed) |
-| `4` | The run itself failed |
+| `0` | no fault reproduced / target property / no meaningful difference |
+| `1` | a condition was isolated |
+| `2` | failure was not specific to any tested condition |
+| `3` | evidence insufficient (intermittent, or unconfirmed) |
+| `4` | the run could not be performed |
 
-### In the dashboard
+### Two modes
 
-The **Network Bisect** panel runs the same engine through
-`POST /api/bisect`. That route is admin-authenticated because a run makes many
-real outbound connections; the CLI needs no credential at all.
+**Adaptive** is fast diagnosis: it stops when the evidence is sufficient.
+**`--all`** is a full capability audit: it runs every condition regardless, which
+is what you want when documenting what a target supports rather than chasing a
+fault.
 
 ---
 
-## Verdicts
+## Adding a new axis
 
-| Verdict | Meaning |
-|---|---|
-| `isolated` | One condition reproducibly flips the outcome and survived paired confirmation |
-| `not-published` | The variant is unavailable because the target publishes no such record |
-| `unconditional` | Every tested condition failed — the evidence points away from client-side path or protocol selection |
-| `intermittent` | The baseline is unstable; bisection refused |
-| `unstable` | A candidate appeared in the sweep but did not survive alternation |
-| `healthy` | Nothing failed |
+The planner never sees how a condition is applied. An axis registers:
+
+```js
+{
+  id, label, rationale, cost, intrusiveness,
+  stopAt,                        // stage that decides the verdict, if not the whole stack
+  applicability(context),        // { applicable, variants } or { applicable: false, reason }
+  expectedDifference             // differs by design rather than by fault
+}
+```
+
+Packet size / DF bit, proxy, gateway selection and MTU threshold can be added
+this way without changing the planner or the hypothesis engine.
 
 ## What it does not claim
 
-A confirmed discriminator establishes **association**, not causation. The
-wording throughout is "evidence supports", never "this caused the fault".
-Faultline reports that the failure tracks a condition; deciding why is still an
-engineering judgement.
+A confirmed discriminator establishes **association**, not causation. The wording
+is "evidence supports", never "this caused the fault". No probabilities, no
+confidence percentages, no model.
 
 ## Privacy
 
-- No packet capture, no payloads, no browser history, no credentials.
-- No subnet scanning: only the target you named is contacted.
-- Local interface addresses are used to bind sockets and are never transmitted
-  anywhere. Bisect makes no third-party API calls at all.
+No packet capture, no payloads, no browser history, no credentials, no subnet
+scanning. Local interface addresses are used to bind sockets and are never
+transmitted. Bisect makes no third-party API calls at all.
 
 ## Limits
 
-- The source-interface axis binds IPv4 source addresses; an IPv4 source cannot
-  be bound to an IPv6 connection and is reported as `inapplicable`.
-- Binding a source address tests whether that interface can carry the
-  connection. It does not override policy routing that ignores the source.
-- The HTTP stage speaks HTTP/1.1; h2-specific behaviour beyond ALPN
-  negotiation is out of scope.
-- A wall-clock run of the full axis set is roughly `axes x variants x repeat`
-  connections, so raise `--repeat` deliberately.
+- Source-interface binding is IPv4; route lookup is Windows-only, and other
+  platforms report `UNKNOWN` rather than guessing.
+- Binding a source tests whether that interface can carry the connection; it does
+  not override policy routing that ignores the source.
+- The HTTP stage speaks HTTP/1.1, so h2 behaviour beyond ALPN negotiation is out
+  of scope.
+- MTU/DF is not yet an axis; the registry is shaped to accept it.

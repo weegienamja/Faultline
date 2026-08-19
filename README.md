@@ -32,61 +32,73 @@ check whether the network simply recovered on its own.
 ## What Faultline does instead
 
 `git bisect` finds the commit that broke a build. **Network Bisect** finds the
-network *condition* that breaks a connection — by varying one condition at a
-time **per connection**, leaving the operating system untouched.
+network *condition* that changes whether a target works — and it **chooses which
+experiment to run next** instead of sweeping every test.
+
+It varies conditions **per connection**, so the machine is never reconfigured:
+address family, DNS resolver, resolved address, source interface, TLS version,
+ALPN, SNI, port.
 
 ```text
-  CONDITION                     VARIANT                           RESULT n     DETAIL
-  ----------------------------------------------------------------------------------
-  baseline                      baseline (system defaults)        PASS  2/2   HTTP 200
-  IP address family             IPv4 only                         PASS  2/2   HTTP 200
-  IP address family             IPv6 only                         FAIL  0/2   tcp: ENETUNREACH
-  DNS resolver                  resolver 1.1.1.1                  PASS  2/2   HTTP 200
-  Specific resolved address     address 2606:4700:10::6814:179a   FAIL  0/2   tcp: ENETUNREACH
-  Local source interface        via Ethernet (192.168.0.95)       PASS  2/2   HTTP 200
-  Local source interface        via Ethernet 2 (192.168.56.1)     FAIL  0/2   tcp: ENETUNREACH
-  TLS version                   TLS 1.2 only                      PASS  2/2   HTTP 200
+  Baseline
+  FAIL 3/3 — ECONNREFUSED
 
-  CONDITION ISOLATED
-  IP address family: IPv6 only flips PASS to FAIL
+  Baseline fails consistently. Isolating which condition changes that.
 
-  Evidence supports: the failure is reproducibly associated with
-  ip address family = IPv6 only.
+  [1] IP address family: IPv4 only
+      Highest discrimination score (6.6). Separates 10 live explanations into
+      3 predicted outcomes (3/3/4).
+      PASS 3/3 — HTTP 200
 
-  Interleaved confirmation (A=baseline, B=IPv6 only): A+ B- A+ B-
-  Difference held under alternation.
+  Confirming (interleaved A/B; A = baseline)
+      A- B+ A- B+ A- B+   held under alternation
+
+  FAILURE CONDITION ISOLATED
+  IP address family: IPv4 only changes FAIL to PASS
+
+  Evidence supports a fault specific to ip address family. Changing only that
+  condition reproducibly restores the connection.
+
+  Experiments: 1 executed, 1 skipped as low-value, 0 inapplicable.
+  12 real connection attempts. Stopping reason: ISOLATED.
 ```
 
-Eight condition axes are varied per connection, so nothing on the machine
-changes: **address family**, **DNS resolver**, **specific resolved address**,
-**local source interface** (VPN vs direct, without disconnecting the VPN),
-**TLS version**, **ALPN**, **SNI** and **port**.
+**One experiment. Twelve connections.** The exhaustive sweep needs 33 for the
+same target — and `--all` still gives you that when you want a full audit.
 
-## Why this isn't just ping and traceroute
+## Why this isn't just ping, traceroute, MTR or curl
 
-`ping`, `traceroute` and `mtr` tell you *that* a path is bad. They cannot tell
-you *which condition* makes the difference, and they will happily mislead you
-when a fault is intermittent. Network Bisect is built around that problem:
+Those tell you *that* a path is bad. They cannot tell you *which condition* makes
+the difference, and they mislead you when a fault is intermittent. The engine is
+built around exactly those failure modes:
 
-- **Reproducibility gating** — every condition runs N times and only a unanimous
-  result counts. If the baseline itself is unstable, bisection is **refused**
-  rather than blaming whichever variant ran during a good patch.
-- **Interleaved paired confirmation** — the winner is re-tested `A B A B` so a
-  network that recovers mid-run shows up as *unconfirmed* instead of as a cure.
-- **Duplicate collapsing** — conditions that produce an identical connection are
-  reported once, attributed to the most general axis.
-- **Honest classification** — `github.com` publishing no AAAA record is reported
-  as a property of the target, never as "your IPv6 is broken". Omitting SNI
-  breaking a name-based host is flagged as expected, not as a fault.
-
-Read the design: **[Network Bisect](docs/NETWORK_BISECT.md)**.
+- **It reasons about what to test next.** Every live explanation predicts an
+  outcome for each candidate experiment. The engine runs the one that best
+  *partitions* them, using the expected size of the surviving explanation set.
+  A 3/3 split beats a 1/5 split. There are no probabilities and no model —
+  [the formula is documented and tested](docs/NETWORK_BISECT.md).
+- **It refuses bad conclusions.** An unstable baseline gets isolation *refused*
+  with the flake rate reported, rather than blaming whichever variant happened to
+  run during a good patch.
+- **It controls for time.** Candidates are re-tested `A B A B`; a network that
+  recovers mid-run shows up as *unconfirmed*, not as a cure.
+- **It knows what is not evidence.** A host-only adapter with no route to the
+  target is `INAPPLICABLE`, decided from the routing table — not a `FAIL` that
+  competes with genuine findings.
+- **It won't invent a fault.** With a healthy baseline the run becomes a
+  *capability analysis*: `github.com` having no AAAA record is reported as a
+  target property, while `example.com` having AAAA that this host cannot reach is
+  reported as a local deficiency. Different conclusions, different evidence.
 
 ## Exit codes
 
 ```text
-0  no fault reproduced          2  failure was not condition-specific
-1  a condition was isolated     3  evidence insufficient (intermittent/unconfirmed)
+0  no fault / target property     2  failure was not condition-specific
+1  a condition was isolated       3  evidence insufficient (intermittent/unconfirmed)
+4  the run could not be performed
 ```
+
+Adaptive planning is the default; `--all` runs the complete condition matrix.
 
 ## The rest of Faultline
 
@@ -125,7 +137,7 @@ to the evidence that produced it.
 - **v1.5:** named change windows, pinned baseline/post-change runs, regression detection and integrity-tagged assurance packages
 
 - **Live data:** real DNS/TCP/TLS/HTTP/ICMP/path measurement plus public routing, outage and network-ownership context
-- **Network Bisect:** controlled per-connection condition isolation with reproducibility gating and paired confirmation
+- **Network Bisect:** adaptive fault isolation — competing hypotheses, deterministic experiment selection, reproducibility gating and paired confirmation
 
 Faultline does **not** use an AI/LLM API in diagnosis or Incident Intelligence.
 

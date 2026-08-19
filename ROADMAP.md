@@ -144,21 +144,25 @@ Network Bisect already refuses to draw conclusions from an unstable baseline
 and reports the flake rate instead. Capturing the unstable window is the next
 step.
 
-## Condition isolation
+## Condition isolation — the current centre of gravity
 
 **Problem:** "works on my machine" and "try your hotspot" are guesswork.
 
-Delivered as **Network Bisect**: per-connection variation of address family,
-resolver, resolved address, source interface, TLS version, ALPN, SNI and port,
-with reproducibility gating, interleaved paired confirmation and duplicate
-collapsing.
+Delivered as **Network Bisect**, now an adaptive isolation engine rather than a
+sweep. It forms explicit competing explanations, scores each candidate
+experiment by how well it partitions them, runs the best one, eliminates the
+explanations that no longer fit, and stops when the evidence has isolated a
+boundary. Routing data decides whether a source interface can even reach the
+target, so an unreachable adapter is `INAPPLICABLE` rather than a false `FAIL`.
 
-Worth extending:
+Worth extending, in roughly this order:
 
-- MTU / DF-bit as a bisect axis, so black holes surface as a condition
+- MTU / DF-bit as an axis, so black holes surface as a condition rather than as
+  "weirdness". The experiment registry is already shaped to accept it.
 - proxy vs direct where a proxy is configured
 - combination search when no single factor explains the difference
 - bisecting from a registered private probe as well as the local machine
+- Linux and macOS route lookup, so interface classification is not Windows-only
 
 ## Path reasoning
 
@@ -216,14 +220,14 @@ on machines that are not Windows.
 | Deeper diagnostics | Dual-stack, TLS, HTTP stage timing, bounded path-MTU |
 | Change assurance | Named change windows, pinned baseline/post-change comparison |
 | Live Internet data | Real local measurement plus RIPEstat, Globalping, RIPE Atlas, IODA, PeeringDB |
-| **Network Bisect** | **Per-connection condition isolation with reproducibility gating** |
+| **Network Bisect** | **Adaptive fault isolation: competing hypotheses, deterministic experiment selection, pruning and paired confirmation** |
 
 **Next, by capability rather than release number**
 
 | Theme | The question it answers |
 |---|---|
 | Intermittent faults | What was happening in the seconds before it broke? |
-| Condition isolation | Which single condition makes the difference? (extending Bisect) |
+| Condition isolation | Which single condition makes the difference? **(delivered — adaptive planner)** |
 | Path reasoning | Where do working and failing paths actually diverge? |
 | Portable evidence | Can someone else inspect this without my server? |
 | Private / multi-platform | Can it run inside the network that is actually broken, on any OS? |
