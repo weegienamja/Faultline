@@ -2,92 +2,82 @@
 
 **Evidence-based network fault isolation across endpoints, networks, ISPs and services.**
 
-Faultline explores a recurring support gap: when a network-dependent application fails across ownership boundaries, each team can usually see its own infrastructure but nobody has a shared evidence set showing where the fault begins.
+Faultline explores a support gap that appears when a network-dependent application fails across ownership boundaries. The endpoint, local network, VPN, ISP, Internet path and application may be owned by different teams, while each party can see only part of the failure.
 
 ```text
 Affected endpoint -> Wi-Fi/LAN -> ISP -> Internet -> application/service
 ```
 
-Faultline creates a short-lived diagnostic case, collects evidence from the affected Windows endpoint and an independent remote probe, correlates those observations into a deterministic fault domain, and shows the evidence behind the conclusion.
+Faultline creates a scoped diagnostic, collects evidence from the affected Windows endpoint and an independent remote probe, applies deterministic fault-domain reasoning, and preserves the evidence behind the conclusion.
 
-It is intentionally an **incident-first support prototype**, not a replacement for continuous observability products.
+It is an **incident-first portfolio/research prototype**, not a replacement for continuous observability platforms.
 
 ## Current state
 
-The repository contains the stable v0.5 registered-probe foundation plus working v0.6/v0.7 previews and a contained Data Science incident-intelligence layer.
-
-### Implemented
+Implemented previews now include:
 
 - deterministic fault-domain diagnosis
-- Windows endpoint telemetry
-- standalone `Faultline.exe` preview with no Node/npm requirement on the affected PC
-- one-time diagnostic invitation and explicit consent flow
-- one-use browser-to-client launcher credential
-- two-vantage endpoint + remote-probe correlation
-- persistent diagnostic sessions and telemetry
-- registered remote-probe fleet
-- automatic probe selection by scope, country, region and tags
-- public/private probe trust scopes
-- public-probe destination and redirect safety policy
-- probe drain, maintenance, credential rotation and revocation
-- bounded lifecycle audit events
-- passive inferred local Network Map
-- **v0.7 Connectivity Contracts** for application-specific DNS/TCP/TLS/HTTP conditions
-- **Incident Intelligence preview** using standardisation, similarity scoring and DBSCAN clustering
-- explicit outlier/noise handling instead of forcing every incident into a pattern
-- Docker deployment
+- real Windows endpoint telemetry
+- standalone `Faultline.exe` with one-time consent/credential handoff
+- endpoint + independent remote-vantage correlation
+- registered probe fleet with automatic scheduling and public-probe safety controls
+- passive inferred Network Map
+- versioned Connectivity Contracts for DNS/TCP/TLS/HTTP requirements
+- Incident Intelligence using standardisation, similarity scoring and DBSCAN clustering
+- **v0.8 Cases & Evidence Packages** with multiple diagnostics, evidence timeline, before/after comparison and shareable exports
+- Docker deployment and Windows CI packaging
 - zero third-party runtime dependencies
 
 ## No AI API by design
 
-Faultline does **not** use an AI or LLM API in the diagnosis path or the incident-intelligence layer.
+Faultline does not use an AI or LLM API in diagnosis or Incident Intelligence.
 
 ```text
-same evidence -> same rules -> same diagnosis
+same evidence -> same rules -> same deterministic diagnosis
 ```
 
-The deterministic engine answers **where the evidence suggests the fault begins**. The Data Science layer answers a different question: **which other visible incidents have a similar measured evidence pattern?**
-
-Fault-domain labels are deliberately removed before fitting the dashboard clustering model so the unsupervised analysis cannot simply rediscover the diagnosis already assigned by Faultline.
+The Data Science layer answers a separate question: **which other incidents have a similar measured evidence pattern?** Fault-domain labels are removed before clustering so the unsupervised model cannot simply rediscover the existing diagnosis.
 
 ## Architecture
 
 ```text
-                            Faultline control plane
-                     +--------------------------------+
-                     | sessions + credentials         |
-                     | probe registry + scheduler     |
-                     | invitation/client handoff      |
-                     | persistent evidence + audit    |
-                     | deterministic correlation      |
-                     +---------------+----------------+
-                                     |
-                    +----------------+----------------+
-                    |                                 |
-                    v                                 v
-             Faultline.exe                     Registered probe
-             affected endpoint                 independent vantage
-                    |                                 |
-          local path + topology                  safe target tests
-          Connectivity Contract                 generic reachability
-                    |                                 |
-                    +----------------+----------------+
-                                     |
-                                     v
-                           correlated fault domain
-                                     |
-                                     v
-                       Incident Intelligence layer
-                    similarity + DBSCAN + outliers
+                              Faultline control plane
+                    +-------------------------------------+
+                    | cases + diagnostic sessions         |
+                    | credentials + invitations           |
+                    | probe registry + scheduler          |
+                    | evidence + audit + correlation      |
+                    +------------------+------------------+
+                                       |
+                    +------------------+------------------+
+                    |                                     |
+                    v                                     v
+             Faultline.exe                         Registered probe
+             affected endpoint                     independent vantage
+                    |                                     |
+          local path + topology                      safe target tests
+          Connectivity Contract                     remote reachability
+                    |                                     |
+                    +------------------+------------------+
+                                       |
+                                       v
+                              deterministic diagnosis
+                                       |
+                     +-----------------+-----------------+
+                     |                                   |
+                     v                                   v
+               Support case                       Incident Intelligence
+          timeline + evidence package            similarity + DBSCAN
 ```
 
-Detailed design notes:
+Design notes:
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [Ephemeral diagnostics](docs/EPHEMERAL_DIAGNOSTICS.md)
 - [Windows client](docs/WINDOWS_CLIENT.md)
 - [Connectivity Contracts](docs/CONNECTIVITY_CONTRACTS.md)
 - [Incident Intelligence](docs/INCIDENT_INTELLIGENCE.md)
+- [Cases & Evidence Packages](docs/CASES_AND_EVIDENCE.md)
 - [Probe fleet](docs/PROBE_FLEET.md)
 - [Fleet safety](docs/FLEET_SAFETY.md)
 - [Topology](docs/TOPOLOGY.md)
@@ -115,19 +105,9 @@ $env:FAULTLINE_ADMIN_TOKEN = "fl_admin_change_this_to_a_long_random_value"
 npm start
 ```
 
-Then open:
+Then open `http://localhost:3000`. Demo incidents remain public. Use **Unlock live data** for live diagnostics, probes and case workspaces.
 
-```text
-http://localhost:3000
-```
-
-Demo incidents remain public. Use **Unlock live data** for live sessions and the probe fleet.
-
-# One-time support diagnostic
-
-## Engineer workflow
-
-Use **New diagnostic** in the dashboard or the CLI.
+## One-time support diagnostic
 
 ```bash
 npm run invite -- \
@@ -140,85 +120,54 @@ npm run invite -- \
   --api-base https://faultline.example.com
 ```
 
-By default the CLI asks Faultline to choose the least-loaded matching online **public** probe.
-
-Optional probe selectors:
-
-```bash
-npm run invite -- \
-  --target https://example.com \
-  --contract secure-web \
-  --probe-country gb \
-  --probe-region europe-west \
-  --probe-tags uk,vps \
-  --admin-token "$FAULTLINE_ADMIN_TOKEN"
-```
-
-Explicit registered probe:
-
-```bash
-npm run invite -- --target example.com --probe PRB-8A1B2C3D4E --admin-token "$FAULTLINE_ADMIN_TOKEN"
-```
-
-One-off probe fallback:
-
-```bash
-npm run invite -- --target example.com --one-off-probe --admin-token "$FAULTLINE_ADMIN_TOKEN"
-```
-
-Faultline returns a short-lived link such as:
+The affected-user flow is:
 
 ```text
-https://faultline.example.com/diagnose#invite=fl_inv_...
-```
-
-Remote invitation links should use HTTPS. Plain HTTP is retained for localhost development.
-
-## Affected-user workflow
-
-```text
-Open one-time link
-      |
-      v
-Review diagnostic scope + Connectivity Contract
-      |
-      v
-Explicit consent
-      |
-      v
-Download .faultline handoff
-      |
-      v
-Run Faultline.exe
-      |
-      v
-One-use launcher -> endpoint credential
-      |
-      v
-Collect + upload evidence
-      |
-      v
-Independent probe adds second vantage
-      |
-      v
-Fault-domain result
+one-time link
+    -> review scope + Connectivity Contract
+    -> explicit consent
+    -> download .faultline handoff
+    -> run Faultline.exe
+    -> one-use launcher exchange
+    -> collect + upload endpoint evidence
+    -> independent probe adds second vantage
+    -> deterministic fault-domain result
 ```
 
 The browser never receives the endpoint upload credential.
 
-The invitation secret is consumed after consent. A separate `fl_launch_...` credential is written into the downloaded handoff and exchanged once by `Faultline.exe`. The endpoint credential is created only during that native-client exchange.
+## v0.8 Cases & Evidence Packages
 
-# v0.7 Connectivity Contracts
+A diagnostic session is one measurement. A **case** represents the support incident around those measurements.
 
-Connectivity Contracts describe **what a particular application path requires from the network**.
+The dashboard now supports:
 
-List the built-in profiles:
-
-```bash
-npm run invite -- --list-contracts
+```text
+Support case
+  |- title / customer / service / severity / status
+  |- diagnostic run 1
+  |- diagnostic run 2
+  |- engineer notes
+  |- evidence timeline
+  |- before/after comparison
+  `- evidence export
 ```
 
-Current generic profiles:
+Case evidence is explicitly separated into:
+
+- **observed** endpoint and remote-vantage measurements
+- **inferred** topology evidence
+- **deterministic** diagnosis and Connectivity Contract results
+- **statistical** incident-pattern evidence
+- **annotations** supplied by engineers
+
+Exports are available as versioned JSON or print-friendly HTML. The dashboard applies network-identifier redaction by default before export. JSON packages contain a canonical SHA-256 digest as an integrity aid.
+
+See [docs/CASES_AND_EVIDENCE.md](docs/CASES_AND_EVIDENCE.md).
+
+## Connectivity Contracts
+
+Built-in generic profiles currently include:
 
 ```text
 basic-reachability   DNS + TCP
@@ -226,233 +175,103 @@ secure-web           DNS + TCP + TLS + HTTP
 web-api              DNS + TCP + TLS + HTTP
 ```
 
-A validated, versioned contract snapshot is stored with each diagnostic session. The affected user sees the selected contract and required checks before consenting.
+A validated, versioned contract snapshot is stored with the diagnostic session. Structured results include `contractPassed`, `contractPassRate`, `contractFailedRequired` and `contractFailureType`.
 
-Structured contract results are stored under:
+The current evaluator remains target-scoped. See [docs/CONNECTIVITY_CONTRACTS.md](docs/CONNECTIVITY_CONTRACTS.md).
 
-```text
-telemetry.connectivityContract
-```
+## Incident Intelligence
 
-with summary features such as:
+The dashboard uses classical, inspectable Data Science:
 
 ```text
-contractPassed
-contractPassRate
-contractFailedRequired
-contractFailureType
+telemetry
+  -> median imputation
+  -> z-score standardisation
+  -> binary + one-hot feature encoding
+  -> weighted evidence distance
+  -> pairwise similarity
+  -> DBSCAN cluster or explicit outlier
 ```
 
-The first evaluator is intentionally **target-scoped**. Verified multi-endpoint vendor profiles remain later work.
+Similarity percentages are evidence-similarity scores, not probabilities that two incidents share a root cause. See [docs/INCIDENT_INTELLIGENCE.md](docs/INCIDENT_INTELLIGENCE.md).
 
-See [docs/CONNECTIVITY_CONTRACTS.md](docs/CONNECTIVITY_CONTRACTS.md).
+## Probe fleet
 
-# Incident Intelligence
+Public probes are restricted to Internet-routable destinations and a conservative port policy. They independently revalidate DNS answers and HTTP redirects before connection. Private probes are explicitly trusted internal vantages.
 
-The dashboard now includes a **Related evidence patterns** panel.
+The scheduler excludes disabled, revoked, stale/offline, draining and maintenance probes and can filter by scope, country, region and tags before choosing the least-loaded eligible probe.
 
-It analyses only the incidents the current browser session is already allowed to see:
-
-```text
-locked dashboard       -> demo incidents
-admin-unlocked         -> authorised live + demo incidents
-```
-
-The pipeline is classical, inspectable Data Science:
-
-```text
-raw incident telemetry
-        |
-        v
-median imputation for missing numerical values
-        |
-        v
-z-score standardisation
-        |
-        +-- binary network-state encoding
-        +-- one-hot Connectivity Contract categories
-        |
-        v
-weighted evidence distance
-        |
-        +--> pairwise similarity ranking
-        |
-        v
-DBSCAN density clustering
-        |
-        +--> dense incident pattern
-        +--> explicit noise / outlier
-```
-
-Current numerical features include gateway latency/loss, upstream loss, jitter, DNS/TCP/HTTP timings and contract summary values. Binary features include DNS, Internet, target, remote-vantage and VPN states.
-
-The dashboard deliberately strips the deterministic fault-domain label before fitting clusters. Diagnosis remains available to the normal Faultline UI, but it does not drive evidence-pattern membership.
-
-The demo dataset contains a repeatable three-case upstream-degradation family (`FL-1042`, `FL-1040`, `FL-1038`) and unrelated DNS, VPN and local-network cases that remain outliers at the preview threshold.
-
-Similarity percentages are relative evidence-similarity scores, **not probabilities that two incidents share a root cause**.
-
-See [docs/INCIDENT_INTELLIGENCE.md](docs/INCIDENT_INTELLIGENCE.md).
-
-# Windows client
-
-The packaged endpoint client uses Node's Single Executable Application mechanism and requires no separate Node/npm installation on the affected computer.
-
-```powershell
-New-Item -ItemType Directory -Force dist | Out-Null
-npm run build:windows-client
-.\dist\Faultline.exe --self-test
-```
-
-GitHub Actions builds the executable on `windows-latest`, runs its embedded self-test and publishes it as a workflow artifact.
-
-Configure the consent-page download URL with:
-
-```text
-FAULTLINE_WINDOWS_CLIENT_URL=https://downloads.example.com/Faultline.exe
-```
-
-The current binary is an unsigned preview. Authenticode signing and a stable release channel remain production-hardening work.
-
-# Probe fleet
-
-Register a public probe:
-
-```bash
-npm run probe:register -- \
-  --name london-1 \
-  --location "London, UK" \
-  --country gb \
-  --region europe-west \
-  --scope public \
-  --tags uk,vps \
-  --admin-token "$FAULTLINE_ADMIN_TOKEN"
-```
-
-Run the worker:
-
-```bash
-npm run probe -- \
-  --probe PRB-8A1B2C3D4E \
-  --token "$FAULTLINE_PROBE_TOKEN" \
-  --api-base https://faultline.example.com \
-  --watch
-```
-
-A **public** probe is intended for Internet-routable services and applies strict destination/port checks. A **private** probe is an explicitly trusted internal vantage.
-
-The scheduler excludes disabled, revoked, stale/offline, draining and maintenance probes, filters by scope/country/region/tags, and selects the least-loaded eligible probe.
-
-# Network Map
-
-The Windows endpoint uses passive local evidence rather than sweeping the subnet:
-
-- active IPv4 interface/address
-- adapter MAC
-- default gateway
-- Wi-Fi SSID/BSSID/signal/channel when available
-- existing IPv4 neighbour table
-
-Faultline renders a draggable inferred graph and distinguishes observed from inferred relationships.
-
-# Security model
+## Security model
 
 ```text
 Admin token
-  -> manage probes, create sessions, view live data
+  -> manage live control-plane data
 
 Invitation token
-  -> preview + consent to one ephemeral diagnostic
+  -> preview + consent for one ephemeral diagnostic
 
 Launcher token
-  -> one exchange for the endpoint credential
+  -> one exchange for endpoint access
 
 Endpoint token
   -> upload evidence for one short-lived session
 
 Registered probe token
-  -> heartbeat, read own jobs, submit assigned evidence
+  -> heartbeat, receive assigned jobs and submit evidence
 ```
 
-Important properties:
+Raw endpoint, probe, invitation and launcher secrets are not persisted. Public probes enforce their own destination policy, topology can be disabled before consent, and contract requirements are disclosed before collection.
 
-- raw endpoint/probe/invitation/launcher secrets are not persisted; hashes are stored instead
-- browser consent does not expose endpoint credentials
-- launcher credentials are one-use
-- endpoint credentials expire with their session
-- public probes enforce their own destination policy
-- topology collection can be disabled before consent
-- contract details are disclosed before consent
-- incident intelligence creates no separate private-data API and uses only already-authorised incident data
-- diagnosis, contract evaluation and intelligence explanations remain deterministic
-
-# Tests and CI
+## Tests and CI
 
 ```bash
 npm run check
 npm test
 ```
 
-Coverage includes:
+CI validates the Node test suite and Docker image. A separate Windows job builds `Faultline.exe`, runs its packaged self-test and uploads the executable artifact.
 
-- fault-domain diagnosis
-- endpoint parsing and telemetry
-- two-vantage correlation
-- session authentication and expiry
-- probe scheduling, safety and credential lifecycle
-- topology inference
-- invitation/consent/client credential exchange
-- Connectivity Contract validation and persistence
-- incident feature engineering and vector compatibility
-- DBSCAN cluster/outlier behaviour
-- similarity ordering
-- proof that fault-domain labels do not influence dashboard clustering
-- Windows packaged-client self-test
+## Current limitations
 
-CI also builds the Docker image. A separate Windows job builds and executes the generated `Faultline.exe` self-test.
+Faultline remains a portfolio/research prototype:
 
-# Current limitations
-
-Faultline is a portfolio/research prototype, not a production multi-tenant SaaS platform.
-
-- JSON persistence and one-writer assumption
+- JSON persistence with a one-writer assumption
 - one administrator security domain
-- scheduler does not use distributed leases
+- scheduler has no distributed leases
 - probe rate limiting is in-memory
-- job delivery is polling-based
-- remote probes currently provide generic reachability rather than executing full Connectivity Contracts
-- v0.7 contract evaluation is target-scoped
-- Windows client needs broader real-machine testing and is unsigned
-- topology remains endpoint inference rather than authoritative discovery
-- incident-intelligence parameters are prototype values fitted to a small visible evidence set
-- similarity is descriptive, not a calibrated common-root-cause probability
-- no time-window, ASN/provider or geography features yet
+- remote probes do not yet execute full Connectivity Contracts
+- packaged Windows client is unsigned and needs broader real-machine testing
+- topology remains endpoint inference rather than authoritative physical discovery
+- Incident Intelligence uses prototype parameters over a small visible dataset
+- case evidence digest is not a cryptographic signature or legal chain-of-custody system
 
-# Roadmap
+## Roadmap
 
-The completed foundation now covers deterministic diagnosis, real endpoint telemetry, multi-vantage correlation, the remote-probe fleet, one-time Windows diagnostics, inferred topology, Connectivity Contracts and the first Incident Intelligence model.
-
-The redesigned forward roadmap is:
+Completed foundation:
 
 ```text
-v0.8  Cases + Evidence Packages
+v0.1-v0.7  diagnosis, telemetry, multi-vantage correlation,
+           probe fleet, one-time Windows diagnostics,
+           topology and Connectivity Contracts
+Data Science preview  incident similarity + DBSCAN
+v0.8       cases + evidence packages                  <- current
+```
+
+Forward path:
+
+```text
 v0.9  Cross-Party Incident Rooms
-v1.0  Hosted Commercial MVP
+v1.0  Hosted Multi-Tenant MVP
 v1.1  Connectivity Contract Ecosystem
 v1.2  Embedded Diagnostics API + SDK
 v1.3  Service Desk Integrations
 v1.4  Deeper Network / Protocol Diagnostics
 v1.5  Network Change Assurance
-v1.6  Incident Intelligence v2
-v1.7  Multi-Vantage Orchestration
-v1.8  Authoritative Topology + Ownership Boundaries
-v1.9  Enterprise Readiness
+v1.6+ deeper intelligence, orchestration, ownership and enterprise hardening
 v2.0  Cross-Boundary Network Incident Platform
 ```
 
-The immediate next milestone is **v0.8**, which turns individual diagnostic runs into support cases with multiple runs, before/after comparison, evidence provenance, exportable evidence packages and read-only sharing.
-
-See [ROADMAP.md](ROADMAP.md) for the full v0.8-v2.0 deliverables and exit criteria.
+See [ROADMAP.md](ROADMAP.md) for deliverables and exit criteria.
 
 ## License
 
