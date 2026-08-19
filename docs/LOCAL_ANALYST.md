@@ -335,6 +335,7 @@ Analyst entirely, stop Ollama; to remove the runtime, uninstall Ollama.
   answering about them.
 * Answers are explanations, not determinations. Anything under **Analyst
   interpretation** is a hypothesis.
-* Flight Recorder incidents are retrievable, but retention is per-process: a
-  restart clears them, and the Analyst then reports none rather than guessing.
+* Flight Recorder incidents persist across restarts in the Faultline store, but
+  the Analyst's in-memory registry is rebuilt per process: after a restart it
+  reports none until an incident is captured or opened again.
 * Evidence retention is per-process. Restarting the control plane clears it.

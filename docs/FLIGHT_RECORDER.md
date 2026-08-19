@@ -9,7 +9,10 @@ another AP — and all that remains is a user saying "it was broken a minute ago
 Flight Recorder keeps a short rolling window so that minute still exists.
 
 It is deliberately **not** continuous monitoring, an NMS, or a time-series
-database. Retention is minutes, in memory, and nothing reaches disk.
+database. The rolling sample buffer is minutes long and lives only in memory.
+A *closed incident* is different: it is a finished evidence artefact, so it is
+written to the Faultline store and survives a restart, like a diagnostic run or
+a case.
 
 ---
 
@@ -291,8 +294,18 @@ One recorder runs per control plane. Starting a second while one is running is a
 
 ## Retention and privacy
 
-* **Memory only.** Nothing is written to disk. The buffer is discarded when the
-  process exits.
+Two different lifetimes, and the distinction is the point:
+
+| | Lifetime |
+|---|---|
+| Rolling sample buffer | memory only, minutes, discarded on exit |
+| Closed incident | written to the Faultline store, survives a restart |
+
+That is what keeps this a recorder rather than a time-series database: the
+continuous stream is ephemeral, and only the frozen window around an actual
+event becomes durable evidence.
+
+* **The buffer is never persisted.** Only closed incidents are.
 * **Bounded twice.** By window (60–600 s) and by a hard sample cap, so a
   misconfigured interval cannot exhaust memory before the window bound applies.
 * **Bounded incidents.** Ten retained per process.
@@ -301,6 +314,13 @@ One recorder runs per control plane. Starting a second while one is running is a
 * **No external contact by default.** The only destination is the target itself.
   Public IP sampling is off unless `samplePublicIp` is set, and is the one
   outbound call to anything else.
+* **Persistence can be switched off.** `FAULTLINE_RECORDER_PERSIST=0` keeps
+  incidents in memory only, restoring the fully ephemeral behaviour.
+
+A persisted incident contains local network identifiers — interface names,
+gateway and local addresses, DNS servers, Wi-Fi SSID/BSSID — because those are
+the evidence. The store file is written `0600`. At most 20 incidents are kept on
+disk, oldest evicted first.
 
 Closed incidents are also placed on the Analyst's in-memory evidence registry so
 the local Analyst can explain them. That retention disappears with the process
@@ -333,6 +353,7 @@ broke? · What stayed healthy? · Which differences can Network Bisect test?*
 | `maxIncidents` | 10 | — |
 | `captureOnStateChange` | false | — |
 | `samplePublicIp` | false | — |
+| `FAULTLINE_RECORDER_PERSIST` | `1` | `0` disables incident persistence |
 
 Gateway thresholds: 5% loss, 40 ms latency.
 
@@ -357,7 +378,7 @@ except one case that records against an unresolvable host.
   Faultline's local collection. On other platforms those fields are absent and
   the triggers that depend on them do not fire; connectivity sampling works
   everywhere.
-* Retention is per-process and per-target. One recorder at a time.
+* One recorder runs at a time. Closed incidents persist; the live buffer does not.
 * The recorder observes. It does not experiment, and therefore never establishes
   cause — that is Network Bisect's job.
 * A change that happens and reverts entirely between two ticks is not seen. A

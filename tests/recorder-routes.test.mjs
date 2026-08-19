@@ -86,8 +86,10 @@ test("an idle recorder reports a clean stopped state", async () => {
     assert.equal(status.state, "stopped");
     assert.deepEqual(status.incidents, []);
     assert.equal(status.activeIncident, null);
-    // Retention is stated even before anything is recorded.
-    assert.match(status.retention, /In-memory only/);
+    // Retention is stated even before anything is recorded, and distinguishes
+    // the ephemeral buffer from durable incidents.
+    assert.match(status.retention, /rolling sample buffer is in memory only/i);
+    assert.equal(status.incidentsPersisted, true);
   });
 });
 
@@ -229,4 +231,105 @@ test("the dashboard ships the Flight Recorder panel", async () => {
     assert.equal(module.status, 200);
     assert.match(module.headers.get("content-type") || "", /javascript/);
   });
+});
+
+test("a closed incident survives a control-plane restart", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "faultline-recorder-restart-"));
+  const dataFile = join(dir, "state.json");
+
+  try {
+    // --- first process: record, capture by hand, let the incident close ------
+    const first = await startServer(4413, dataFile);
+    let incidentId = null;
+    try {
+      const base = "http://127.0.0.1:4413";
+      await fetch(`${base}/api/recorder/start`, {
+        method: "POST",
+        headers: jsonHeaders,
+        // Unresolvable host: real code path, no outbound traffic.
+        body: JSON.stringify({ target: "localhost.faultline.invalid", port: 443, intervalMs: 2_000, afterWindowMs: 10_000, deepCapture: false })
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 2_500));
+      await fetch(`${base}/api/recorder/mark`, { method: "POST", headers: jsonHeaders, body: JSON.stringify({ note: "restart check" }) });
+
+      // Wait for the after-window to elapse so the incident closes and persists.
+      for (let attempt = 0; attempt < 40; attempt += 1) {
+        await new Promise(resolve => setTimeout(resolve, 1_000));
+        const { incidents } = await (await fetch(`${base}/api/recorder/incidents`, { headers: admin })).json();
+        if (incidents.length) {
+          incidentId = incidents[0].id;
+          break;
+        }
+      }
+      assert.ok(incidentId, "an incident should have closed in the first process");
+    } finally {
+      await stopServer(first);
+    }
+
+    // --- second process: same data file, no recorder running -----------------
+    const second = await startServer(4414, dataFile);
+    try {
+      const base = "http://127.0.0.1:4414";
+      const status = await (await fetch(`${base}/api/recorder/status`, { headers: admin })).json();
+      assert.equal(status.state, "stopped", "a restart starts with no recorder running");
+      assert.ok(status.incidents.some(entry => entry.id === incidentId), "the incident must survive the restart");
+
+      const restored = await (await fetch(`${base}/api/recorder/incidents/${incidentId}`, { headers: admin })).json();
+      assert.equal(restored.id, incidentId);
+      assert.equal(restored.schema, "faultline.flight-recorder-incident");
+      assert.equal(restored.evidenceClass, "observed");
+
+      // This target never resolves, so no sample is ever healthy and there is
+      // no comparison basis. "insufficient_evidence" is the correct answer, and
+      // the record says so rather than inventing a difference.
+      assert.equal(restored.observedChange.comparable, false);
+      assert.equal(restored.observedChange.classification, "insufficient_evidence");
+      assert.match(restored.observedChange.reason, /No healthy sample/);
+
+      // The epistemic framing must survive the round trip intact.
+      assert.ok(restored.epistemics.limit.includes("not causation"));
+      assert.ok(restored.windows.during.samples.length > 0, "captured samples must survive");
+      assert.equal(restored.trigger.manual, true);
+    } finally {
+      await stopServer(second);
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("persistence can be switched off", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "faultline-recorder-nopersist-"));
+  const child = spawn(process.execPath, ["src/server.mjs"], {
+    cwd: process.cwd(),
+    env: {
+      ...process.env,
+      PORT: "4415",
+      FAULTLINE_ADMIN_TOKEN: ADMIN_TOKEN,
+      FAULTLINE_DATA_FILE: join(dir, "state.json"),
+      FAULTLINE_ANALYST_ENDPOINT: "http://127.0.0.1:11499",
+      FAULTLINE_RECORDER_PERSIST: "0"
+    },
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+
+  try {
+    await new Promise((resolve, reject) => {
+      let output = "";
+      const timer = setTimeout(() => reject(new Error(`server did not start: ${output}`)), 10_000);
+      child.stdout.on("data", chunk => {
+        output += chunk.toString();
+        if (output.includes(STARTED)) { clearTimeout(timer); resolve(); }
+      });
+      child.stderr.on("data", chunk => { output += chunk.toString(); });
+    });
+
+    const status = await (await fetch("http://127.0.0.1:4415/api/recorder/status", { headers: admin })).json();
+    assert.equal(status.incidentsPersisted, false);
+    assert.match(status.retention, /In-memory only/);
+  } finally {
+    await stopServer(child);
+    await rm(dir, { recursive: true, force: true });
+  }
 });

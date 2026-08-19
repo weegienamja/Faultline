@@ -1,10 +1,10 @@
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
-const STATE_VERSION = 5;
+const STATE_VERSION = 6;
 
 function emptyState() {
-  return { version: STATE_VERSION, sessions: [], runs: [], probes: [], audit: [], cases: [], organizations: [], projects: [] };
+  return { version: STATE_VERSION, sessions: [], runs: [], probes: [], audit: [], cases: [], organizations: [], projects: [], incidents: [] };
 }
 
 function normaliseState(value) {
@@ -17,7 +17,10 @@ function normaliseState(value) {
     audit: Array.isArray(value.audit) ? value.audit : [],
     cases: Array.isArray(value.cases) ? value.cases : [],
     organizations: Array.isArray(value.organizations) ? value.organizations : [],
-    projects: Array.isArray(value.projects) ? value.projects : []
+    projects: Array.isArray(value.projects) ? value.projects : [],
+    // v6: closed Flight Recorder incidents. Absent in a v5 file, which loads
+    // unchanged - the field simply starts empty.
+    incidents: Array.isArray(value.incidents) ? value.incidents : []
   };
 }
 
@@ -53,6 +56,12 @@ export function createStore(filePath) {
     async listProjects() { await load(); return [...state.projects]; },
     async listProjectsByOrganization(organizationId) { await load(); return state.projects.filter(item => item.organizationId === organizationId); },
     putProject(value) { return upsert("projects", value); },
+    // Flight Recorder incidents. The rolling sample buffer is never persisted;
+    // only a closed incident, which is a finished evidence artefact like a run.
+    async getIncident(id) { await load(); return state.incidents.find(item => item.id === id) || null; },
+    async listIncidents(limit = 20) { await load(); return [...state.incidents].slice(0, limit); },
+    putIncident(value, { max = 20 } = {}) { return mutate(current => { const index = current.incidents.findIndex(item => item.id === value.id); if (index >= 0) current.incidents[index] = value; else current.incidents.unshift(value); current.incidents = current.incidents.slice(0, max); return value; }); },
+    deleteIncident(id) { return mutate(current => { const before = current.incidents.length; current.incidents = current.incidents.filter(item => item.id !== id); return before !== current.incidents.length; }); },
     async listAudit(limit=100) { await load(); return [...state.audit].sort((a,b)=>Date.parse(b.at||0)-Date.parse(a.at||0)).slice(0,limit); },
     appendAudit(event) { return mutate(current => { current.audit.unshift(event); current.audit=current.audit.slice(0,1000); return event; }); }
   };

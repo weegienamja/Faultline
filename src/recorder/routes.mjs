@@ -10,6 +10,7 @@
 // small, and nothing in the product needs it yet.
 
 import { createRecorder, DEFAULTS, RECORDER_STATE } from "./recorder.mjs";
+import { summariseIncident } from "./incident.mjs";
 import { createDeepCapture } from "./deep-capture.mjs";
 import { parseLiveTarget } from "../live/measure.mjs";
 import { assertLiteralTargetAllowed } from "../security/target.mjs";
@@ -26,6 +27,12 @@ export function createRecorderRouter({
   requireAdmin,
   bodyFrom,
   json,
+  store = null,
+  // Closed incidents are written to the store so an investigation survives a
+  // restart. The rolling sample buffer is never persisted - that distinction is
+  // what keeps this a recorder rather than a time-series database. Set
+  // FAULTLINE_RECORDER_PERSIST=0 to keep incidents in memory only.
+  persistIncidents = process.env.FAULTLINE_RECORDER_PERSIST !== "0",
   deepCapture = createDeepCapture(),
   makeRecorder = createRecorder,
   runBisect = isolate,
@@ -37,11 +44,16 @@ export function createRecorderRouter({
   const listeners = new Set();
 
   function broadcast(event) {
-    // A closed incident becomes retrievable evidence for the Analyst. In memory
-    // only, on the same bounded registry as bisect and live runs.
     if (event.type === "incident-closed" && recorder) {
       const incident = recorder.getIncident(event.id);
-      if (incident) registry.record(EVIDENCE_KIND.INCIDENT, incident, { id: incident.id });
+      if (incident) {
+        // Retrievable by the Analyst for this process.
+        registry.record(EVIDENCE_KIND.INCIDENT, incident, { id: incident.id });
+        // And durable, so the investigation outlives the control plane.
+        if (persistIncidents && store?.putIncident) {
+          store.putIncident(incident).catch(error => logger("recorder.persist_failed", { id: incident.id, message: error?.message }));
+        }
+      }
     }
     for (const listener of listeners) {
       try {
@@ -56,6 +68,22 @@ export function createRecorderRouter({
     const numeric = Number(value ?? fallback);
     if (!Number.isFinite(numeric)) return fallback;
     return Math.min(Math.max(numeric, min), max);
+  }
+
+  /** Live incidents first, then persisted ones, without duplicates. */
+  async function listAllIncidents() {
+    const live = recorder ? recorder.listIncidents() : [];
+    if (!persistIncidents || !store?.listIncidents) return live;
+    const seen = new Set(live.map(entry => entry.id));
+    const stored = (await store.listIncidents()).filter(entry => !seen.has(entry.id));
+    // Persisted incidents are summarised with the same function the live
+            // recorder uses, so a restored incident is indistinguishable in shape.
+    return [...live, ...stored.map(incident => ({ ...summariseIncident(incident), persisted: true }))];
+  }
+
+  async function findIncident(id) {
+    return recorder?.getIncident(id)
+      ?? (persistIncidents && store?.getIncident ? await store.getIncident(id) : null);
   }
 
   function requireRecorder() {
@@ -126,7 +154,15 @@ export function createRecorderRouter({
 
     // --- status ------------------------------------------------------------
     if (req.method === "GET" && url.pathname === "/api/recorder/status") {
-      json(res, 200, recorder ? recorder.status() : idleStatus());
+      const base = recorder ? recorder.status() : idleStatus();
+      json(res, 200, {
+        ...base,
+        incidents: await listAllIncidents(),
+        incidentsPersisted: persistIncidents,
+        retention: persistIncidents
+          ? "The rolling sample buffer is in memory only. Closed incidents are written to the Faultline store and survive a restart."
+          : "In-memory only. Nothing is written to disk and the buffer is discarded when the process exits."
+      });
       return true;
     }
 
@@ -145,14 +181,17 @@ export function createRecorderRouter({
     }
 
     // --- incidents ---------------------------------------------------------
+    //
+    // Served from the live recorder first, then the store. After a restart the
+    // recorder is empty but the incidents are still there.
     if (req.method === "GET" && url.pathname === "/api/recorder/incidents") {
-      json(res, 200, { incidents: recorder ? recorder.listIncidents() : [] });
+      json(res, 200, { incidents: await listAllIncidents() });
       return true;
     }
 
     const incidentMatch = url.pathname.match(/^\/api\/recorder\/incidents\/([A-Za-z0-9-]{1,40})$/);
     if (req.method === "GET" && incidentMatch) {
-      const incident = recorder?.getIncident(incidentMatch[1]) ?? null;
+      const incident = await findIncident(incidentMatch[1]);
       if (!incident) {
         const error = new Error(`No Flight Recorder incident ${incidentMatch[1]} is retained.`);
         error.statusCode = 404;
@@ -169,7 +208,7 @@ export function createRecorderRouter({
     // this route is what makes the difference testable rather than rhetorical.
     const bisectMatch = url.pathname.match(/^\/api\/recorder\/incidents\/([A-Za-z0-9-]{1,40})\/bisect$/);
     if (req.method === "POST" && bisectMatch) {
-      const incident = recorder?.getIncident(bisectMatch[1]) ?? null;
+      const incident = await findIncident(bisectMatch[1]);
       if (!incident) {
         const error = new Error(`No Flight Recorder incident ${bisectMatch[1]} is retained.`);
         error.statusCode = 404;
