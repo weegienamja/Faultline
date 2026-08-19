@@ -27,25 +27,14 @@ export class FaultlineClient {
     return payload;
   }
 
-  createDiagnostic(input) {
-    return this.request("/api/v1/diagnostics", { method: "POST", body: input });
-  }
-
-  createRun(caseId, input) {
-    return this.request(`/api/v1/diagnostics/${encodeURIComponent(caseId)}/runs`, { method: "POST", body: input });
-  }
-
-  getDiagnostic(caseId) {
-    return this.request(`/api/v1/diagnostics/${encodeURIComponent(caseId)}`);
-  }
-
-  getEvidence(caseId, { redaction = "none" } = {}) {
-    return this.request(`/api/v1/diagnostics/${encodeURIComponent(caseId)}/evidence?redaction=${encodeURIComponent(redaction)}`);
-  }
-
-  getEvents(caseId) {
-    return this.request(`/api/v1/diagnostics/${encodeURIComponent(caseId)}/events`);
-  }
+  createDiagnostic(input) { return this.request("/api/v1/diagnostics", { method: "POST", body: input }); }
+  createRun(caseId, input) { return this.request(`/api/v1/diagnostics/${encodeURIComponent(caseId)}/runs`, { method: "POST", body: input }); }
+  getDiagnostic(caseId) { return this.request(`/api/v1/diagnostics/${encodeURIComponent(caseId)}`); }
+  getEvidence(caseId, { redaction = "none" } = {}) { return this.request(`/api/v1/diagnostics/${encodeURIComponent(caseId)}/evidence?redaction=${encodeURIComponent(redaction)}`); }
+  getEvents(caseId) { return this.request(`/api/v1/diagnostics/${encodeURIComponent(caseId)}/events`); }
+  getServiceDeskProviders() { return this.request("/api/v1/integrations/service-desk/providers"); }
+  configureServiceDesk(caseId, input) { return this.request(`/api/v1/diagnostics/${encodeURIComponent(caseId)}/service-desk`, { method: "POST", body: input }); }
+  getServiceDeskUpdate(caseId, { reason = "diagnostic.updated" } = {}) { return this.request(`/api/v1/diagnostics/${encodeURIComponent(caseId)}/service-desk?reason=${encodeURIComponent(reason)}`); }
 
   async waitForRun(caseId, { intervalMs = 1000, timeoutMs = 60_000, signal } = {}) {
     const started = Date.now();
