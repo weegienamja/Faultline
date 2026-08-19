@@ -1,6 +1,7 @@
 import { createSupportCase, publicCase } from "../cases/service.mjs";
 import { createOrganization, createProject, findOrganizationAccess, publicOrganization, publicProject, rotateOrganizationCredential, revokeOrganizationCredential, scopeCaseToTenant, assertTenantCase } from "./service.mjs";
 import { createProjectContract, listProjectContracts, publishProjectContract, deprecateProjectContract, cloneProjectContractVersion, getPublishedProjectContract } from "../contracts/catalog.mjs";
+import { createProjectApiKey, publicApiKeys, revokeProjectApiKey } from "../api/keys.mjs";
 
 function bearer(req){const match=String(req.headers.authorization||"").match(/^Bearer\s+(.+)$/i);return match?match[1].trim():"";}
 function fail(message,statusCode){const e=new Error(message);e.statusCode=statusCode;throw e;}
@@ -20,6 +21,13 @@ export function createTenantRouter({store,requireAdmin,bodyFrom,json,caseContext
     if(req.method==="GET"&&url.pathname==="/api/tenant"){return json(res,200,{organization:publicOrganization(org),projects:(await store.listProjectsByOrganization(org.id)).map(publicProject)}),true;}
     if(req.method==="POST"&&url.pathname==="/api/tenant/projects"){const payload=await bodyFrom(req);const project=createProject(org,payload);if((await store.listProjectsByOrganization(org.id)).some(item=>item.slug===project.slug)) fail("Project slug already exists in this organization.",409);await store.putProject(project);return json(res,201,publicProject(project)),true;}
     if(req.method==="GET"&&url.pathname==="/api/tenant/projects"){return json(res,200,(await store.listProjectsByOrganization(org.id)).map(publicProject)),true;}
+
+    const keysMatch=url.pathname.match(/^\/api\/tenant\/projects\/([^/]+)\/api-keys(?:\/([^/]+)\/revoke)?$/);
+    if(keysMatch){const project=await ownedProject(org,decodeURIComponent(keysMatch[1]));const keyId=keysMatch[2]?decodeURIComponent(keysMatch[2]):null;
+      if(req.method==="GET"&&!keyId)return json(res,200,publicApiKeys(project)),true;
+      if(req.method==="POST"&&!keyId){const result=createProjectApiKey(project,await bodyFrom(req));await store.putProject(result.project);return json(res,201,{apiKey:result.apiKey,credential:result.credential}),true;}
+      if(req.method==="POST"&&keyId){const updated=revokeProjectApiKey(project,keyId);await store.putProject(updated);return json(res,200,publicApiKeys(updated)),true;}
+    }
 
     const contractsMatch=url.pathname.match(/^\/api\/tenant\/projects\/([^/]+)\/contracts(?:\/([^/]+)\/(publish|deprecate|clone))?$/);
     if(contractsMatch){const project=await ownedProject(org,decodeURIComponent(contractsMatch[1]));const entryId=contractsMatch[2]?decodeURIComponent(contractsMatch[2]):null;const action=contractsMatch[3]||null;
