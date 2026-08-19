@@ -1,5 +1,6 @@
 import { createSupportCase, publicCase } from "../cases/service.mjs";
 import { createOrganization, createProject, findOrganizationAccess, publicOrganization, publicProject, rotateOrganizationCredential, revokeOrganizationCredential, scopeCaseToTenant, assertTenantCase } from "./service.mjs";
+import { createProjectContract, listProjectContracts, publishProjectContract, deprecateProjectContract, cloneProjectContractVersion, getPublishedProjectContract } from "../contracts/catalog.mjs";
 
 function bearer(req){const match=String(req.headers.authorization||"").match(/^Bearer\s+(.+)$/i);return match?match[1].trim():"";}
 function fail(message,statusCode){const e=new Error(message);e.statusCode=statusCode;throw e;}
@@ -20,11 +21,22 @@ export function createTenantRouter({store,requireAdmin,bodyFrom,json,caseContext
     if(req.method==="POST"&&url.pathname==="/api/tenant/projects"){const payload=await bodyFrom(req);const project=createProject(org,payload);if((await store.listProjectsByOrganization(org.id)).some(item=>item.slug===project.slug)) fail("Project slug already exists in this organization.",409);await store.putProject(project);return json(res,201,publicProject(project)),true;}
     if(req.method==="GET"&&url.pathname==="/api/tenant/projects"){return json(res,200,(await store.listProjectsByOrganization(org.id)).map(publicProject)),true;}
 
+    const contractsMatch=url.pathname.match(/^\/api\/tenant\/projects\/([^/]+)\/contracts(?:\/([^/]+)\/(publish|deprecate|clone))?$/);
+    if(contractsMatch){const project=await ownedProject(org,decodeURIComponent(contractsMatch[1]));const entryId=contractsMatch[2]?decodeURIComponent(contractsMatch[2]):null;const action=contractsMatch[3]||null;
+      if(req.method==="GET"&&!entryId){const status=url.searchParams.get("status");return json(res,200,listProjectContracts(project,{status})),true;}
+      if(req.method==="POST"&&!entryId){const result=createProjectContract(project,await bodyFrom(req));await store.putProject(result.project);return json(res,201,result.entry),true;}
+      if(req.method==="POST"&&action==="publish"){const result=publishProjectContract(project,entryId);await store.putProject(result.project);return json(res,200,result.entry),true;}
+      if(req.method==="POST"&&action==="deprecate"){const result=deprecateProjectContract(project,entryId);await store.putProject(result.project);return json(res,200,result.entry),true;}
+      if(req.method==="POST"&&action==="clone"){const result=cloneProjectContractVersion(project,entryId,await bodyFrom(req));await store.putProject(result.project);return json(res,201,result.entry),true;}
+    }
+    const resolveContract=url.pathname.match(/^\/api\/tenant\/projects\/([^/]+)\/published-contracts\/([^/]+)$/);
+    if(req.method==="GET"&&resolveContract){const project=await ownedProject(org,decodeURIComponent(resolveContract[1]));return json(res,200,getPublishedProjectContract(project,decodeURIComponent(resolveContract[2]),url.searchParams.get("version"))),true;}
+
     if(req.method==="POST"&&url.pathname==="/api/tenant/cases"){const payload=await bodyFrom(req);const project=await ownedProject(org,String(payload.projectId||""));const caseRecord=scopeCaseToTenant(createSupportCase(payload),org.id,project.id);await store.putCase(caseRecord);return json(res,201,publicCase(caseRecord)),true;}
     if(req.method==="GET"&&url.pathname==="/api/tenant/cases"){const projectId=url.searchParams.get("projectId");if(projectId) await ownedProject(org,projectId);const cases=projectId?await store.listCasesByProject(projectId):await store.listCasesByOrganization(org.id);return json(res,200,await Promise.all(cases.map(async item=>publicCase(item,await caseContext(item))))),true;}
 
     const caseMatch=url.pathname.match(/^\/api\/tenant\/cases\/([^/]+)(?:\/(diagnostics|evidence))?$/);
-    if(caseMatch){const caseRecord=assertTenantCase(await store.getCase(decodeURIComponent(caseMatch[1])),org);const action=caseMatch[2]||null;if(req.method==="GET"&&!action){return json(res,200,publicCase(caseRecord,await caseContext(caseRecord))),true;}if(req.method==="POST"&&action==="diagnostics"){const payload=await bodyFrom(req);const result=await createCaseDiagnostic(caseRecord,payload);return json(res,201,{case:publicCase(result.caseRecord,await caseContext(result.caseRecord)),session:result.created.session.id,invitation:result.created.credentials.invitationToken?`/diagnose#invite=${encodeURIComponent(result.created.credentials.invitationToken)}`:null}),true;}if(req.method==="GET"&&action==="evidence"){return json(res,200,await evidenceFor(caseRecord,"network-identifiers")),true;}}
+    if(caseMatch){const caseRecord=assertTenantCase(await store.getCase(decodeURIComponent(caseMatch[1])),org);const action=caseMatch[2]||null;if(req.method==="GET"&&!action){return json(res,200,publicCase(caseRecord,await caseContext(caseRecord))),true;}if(req.method==="POST"&&action==="diagnostics"){const payload=await bodyFrom(req);if(payload.catalogContractId){const project=await ownedProject(org,caseRecord.projectId);payload.connectivityContract=getPublishedProjectContract(project,payload.catalogContractId,payload.catalogContractVersion).contract;}const result=await createCaseDiagnostic(caseRecord,payload);return json(res,201,{case:publicCase(result.caseRecord,await caseContext(result.caseRecord)),session:result.created.session.id,invitation:result.created.credentials.invitationToken?`/diagnose#invite=${encodeURIComponent(result.created.credentials.invitationToken)}`:null}),true;}if(req.method==="GET"&&action==="evidence"){return json(res,200,await evidenceFor(caseRecord,"network-identifiers")),true;}}
     return false;
   };
 }
