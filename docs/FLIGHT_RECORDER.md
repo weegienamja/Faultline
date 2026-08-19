@@ -259,7 +259,7 @@ prints any incident still open rather than discarding it.
 threshold does.
 
 Flags: `--interval` (seconds, 2–30), `--window` (seconds, 60–600), `--contract`,
-`--no-deep-capture`, `--capture-state-changes`, `--duration`.
+`--simulate`, `--no-deep-capture`, `--capture-state-changes`, `--duration`.
 
 ### Dashboard
 
@@ -279,6 +279,7 @@ streams live over SSE.
 | `GET /api/recorder/incidents` | Captured incidents |
 | `GET /api/recorder/incidents/{id}` | One full incident record |
 | `POST /api/recorder/incidents/{id}/bisect` | Test the candidates with Network Bisect |
+| `GET /api/recorder/scenarios` | Built-in simulation scenarios |
 | `GET /api/recorder/stream` | Live events (SSE) |
 
 All routes are admin-authenticated, matching the live and bisect routes:
@@ -289,6 +290,160 @@ path.
 
 One recorder runs per control plane. Starting a second while one is running is a
 409.
+
+---
+
+## Simulation
+
+```bash
+npm run recorder -- --simulate ipv6-path-loss
+npm run recorder -- --simulate fixtures/recorder/vpn-route-loss.json
+npm run recorder -- --simulate           # lists the built-in scenarios
+```
+
+A simulation is a **sample source**, not a second recorder. It plugs in at the
+same boundary the real sampler uses:
+
+```
+real sampler ────────┐
+                     ▼
+                recorder engine
+                     ▲
+simulation source ───┘
+                     │
+              trigger detection
+                     │
+               incident freeze
+                     │
+                comparison
+                     │
+              Bisect handoff
+```
+
+Everything downstream is production code — the ring buffer, threshold crossing,
+cooldown, trigger selection, freeze, BEFORE/DURING/AFTER assembly, the
+difference engine, axis mapping and the Bisect handoff. A demo that exercised a
+parallel implementation would prove nothing about the path that runs for real.
+
+A scenario asserts **measurements only**. It never sets a sample's state,
+classification or verdict: those come from the same functions that classify real
+samples.
+
+### The `ipv6-path-loss` demo
+
+```
+0–20 s     target healthy on IPv4 and IPv6
+21 s       IPv6 becomes unavailable locally
+21–40 s    the default connection begins failing
+           (forcing IPv4 still works)
+
+trigger    Target TCP reachability changed PASS → FAIL
+
+recorder differences
+           IPv6 capability to target   PASS → FAIL
+
+candidate axes
+           address-family
+
+restricted Network Bisect
+           IPv4 only   PASS 2/2
+           IPv6 only   FAIL 0/2
+           paired confirmation  A+ B- A+ B-  confirmed
+
+verdict    LOCAL_CAPABILITY_DEFICIENCY
+```
+
+A completely reproducible demonstration of the whole Faultline story without
+fabricating what happened in a real incident.
+
+Also shipped: `vpn-route-loss` (maps to `source-interface`) and
+`resolver-change` (maps to `resolver`).
+
+### Simulated evidence cannot be mistaken for real evidence
+
+Provenance is stamped by the sampler, never read from the scenario file, and
+propagates to every layer a record can reach:
+
+```json
+{
+  "source": "simulation",
+  "simulated": true,
+  "scenario": "ipv6-path-loss",
+  "evidenceClass": "simulated"
+}
+```
+
+| Layer | Marking |
+|---|---|
+| Every sample | `source: "simulation"`, `simulated: true`, `scenario` |
+| Incident record | top-level `simulated`, `source`, `scenario`, `evidenceClass: "simulated"` |
+| `epistemics.observed` | "SIMULATED. These samples were generated from a scenario file." |
+| Incident list summary | `simulated`, `scenario` |
+| Dashboard | `SIMULATED` badge on the view, the incident title and the list row, plus a banner. The source chip reads "Scenario source", never "Measured locally" |
+| Persisted record | survives the round trip to the store |
+| Analyst projection | `simulated: true` and an explicit instruction never to present it as evidence about the user's network |
+
+The incident builder derives this from the samples themselves rather than from a
+caller-supplied flag, so a simulated incident cannot be constructed as a real one
+by a caller that forgets to say so. A scenario that tries to declare itself real
+is overridden.
+
+**A simulated incident never embeds a real measurement.** The deep capture is
+suppressed, because mixing a genuine diagnostic into a fabricated record is
+exactly what must not happen.
+
+The **Bisect handoff is the deliberate exception**, and it is labelled: the
+incident is simulated, the Bisect run is real, and the response says both
+(`incidentSimulated`, `bisectSimulated`) so neither half can be mistaken for the
+other.
+
+### Writing a scenario
+
+```json
+{
+  "scenario": "my-scenario",
+  "title": "…",
+  "description": "…",
+  "target": "example.com",
+  "port": 443,
+  "intervalMs": 2000,
+  "phases": [
+    { "label": "healthy", "durationMs": 20000,
+      "targetTcp": "PASS", "targetDns": "PASS", "targetDnsV4": 1, "targetDnsV6": 2,
+      "ipv4": "PASS", "ipv6": "PASS" },
+    { "label": "broken",  "durationMs": 20000,
+      "targetTcp": "FAIL", "targetDns": "PASS", "targetDnsV4": 1, "targetDnsV6": 2,
+      "ipv4": "PASS", "ipv6": "FAIL" }
+  ]
+}
+```
+
+**A scenario must be internally consistent, and DNS is where that bites.**
+`targetDnsV4` / `targetDnsV6` state how many A and AAAA records the target
+publishes. The `ipv6-path-loss` demo keeps `targetDnsV6: 2` in *every* phase,
+including the failing one — that is the entire point: the target still publishes
+AAAA while this machine loses the ability to use it. A sample claiming
+`ipv6: PASS` alongside zero AAAA records would contradict itself and destroy the
+distinction between a local capability deficiency and a target property.
+
+If a family's count is omitted it is derived from that family's own connectivity
+result rather than assumed absent: only `INAPPLICABLE` yields zero, because
+`INAPPLICABLE` is precisely the state meaning "the target publishes none".
+
+A simulation is **bound to its scenario's target and port**. The CLI refuses a
+positional target alongside `--simulate` rather than silently ignoring it, so
+scripted samples for one host can never be recorded as an incident against
+another — which would also point a later Bisect handoff at a host the scenario
+never described.
+
+Every field is validated against an allow-list with bounded lengths and enum
+checks; unknown fields are discarded rather than reaching a sample. Phase states
+are `PASS`, `FAIL`, `INAPPLICABLE`, `UNSTABLE`, `UNKNOWN` or `not-sampled`.
+
+The HTTP API (`POST /api/recorder/start` with `simulate`) accepts **built-in
+scenario names only** — never a filesystem path, so a request can never name a
+file on the server. The CLI accepts a path, because there the operator chose it.
+`GET /api/recorder/scenarios` lists what is available.
 
 ---
 

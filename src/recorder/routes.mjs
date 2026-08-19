@@ -11,6 +11,7 @@
 
 import { createRecorder, DEFAULTS, RECORDER_STATE } from "./recorder.mjs";
 import { summariseIncident } from "./incident.mjs";
+import { createSimulationSampler, listScenarios, loadScenario } from "./simulate.mjs";
 import { createDeepCapture } from "./deep-capture.mjs";
 import { parseLiveTarget } from "../live/measure.mjs";
 import { assertLiteralTargetAllowed } from "../security/target.mjs";
@@ -99,6 +100,15 @@ export function createRecorderRouter({
     if (!url.pathname.startsWith("/api/recorder")) return false;
     requireAdmin(req);
 
+    // --- available simulation scenarios ------------------------------------
+    if (req.method === "GET" && url.pathname === "/api/recorder/scenarios") {
+      json(res, 200, {
+        scenarios: await listScenarios(),
+        note: "A simulation feeds scripted samples into the real recorder engine. Incidents it produces are marked simulated at every layer and are not evidence about any real network."
+      });
+      return true;
+    }
+
     // --- start -------------------------------------------------------------
     if (req.method === "POST" && url.pathname === "/api/recorder/start") {
       if (recorder && recorder.state !== RECORDER_STATE.STOPPED) {
@@ -108,14 +118,23 @@ export function createRecorderRouter({
       }
 
       const payload = await bodyFrom(req);
-      if (!payload.target) {
+
+      // A simulation names a built-in scenario. The API deliberately does NOT
+      // accept a filesystem path: a request must never be able to name a file
+      // on the server. The CLI, where the operator chose the file, may.
+      const simulation = payload.simulate ? await loadScenario(payload.simulate) : null;
+
+      const requestedTarget = simulation ? simulation.target : payload.target;
+      if (!requestedTarget) {
         const error = new Error("A target hostname, IP address or URL is required.");
         error.statusCode = 400;
         throw error;
       }
 
-      // The same public-target boundary every other outbound path uses.
-      const target = parseLiveTarget(String(payload.target), payload.port);
+      const target = parseLiveTarget(String(requestedTarget), simulation ? simulation.port : payload.port);
+      // A simulation makes no outbound connections at all, but the target still
+      // goes through the same boundary so a scenario cannot smuggle in a host
+      // the product would otherwise refuse to name.
       const scope = payload.scope === "private" ? "private" : "public";
       assertLiteralTargetAllowed(target.input, target.port, scope);
 
@@ -124,14 +143,21 @@ export function createRecorderRouter({
       recorder = makeRecorder({
         target,
         contract,
-        intervalMs: clamp(payload.intervalMs, DEFAULTS.intervalMs, MIN_INTERVAL_MS, MAX_INTERVAL_MS),
+        // A scenario defines its own cadence so its phase timings play out as
+        // written; an explicit request still wins.
+        intervalMs: clamp(payload.intervalMs ?? simulation?.intervalMs, DEFAULTS.intervalMs, MIN_INTERVAL_MS, MAX_INTERVAL_MS),
         windowMs: clamp(payload.windowMs, DEFAULTS.windowMs, MIN_WINDOW_MS, MAX_WINDOW_MS),
         afterWindowMs: clamp(payload.afterWindowMs, DEFAULTS.afterWindowMs, 10_000, 5 * 60_000),
         captureOnStateChange: payload.captureOnStateChange === true,
         // Off unless asked for: it is the only contact the recorder makes
         // beyond the target itself.
-        publicIpUrl: payload.samplePublicIp === true ? (payload.publicIpUrl || undefined) : null,
-        deepCapture: payload.deepCapture === false ? null : deepCapture,
+        publicIpUrl: simulation ? null : (payload.samplePublicIp === true ? (payload.publicIpUrl || undefined) : null),
+        // The scripted source replaces the real sampler at the same boundary.
+        sampler: simulation ? createSimulationSampler(simulation) : undefined,
+        simulation,
+        // A simulated incident must not carry a real measurement inside it:
+        // that would mix genuine evidence into a fabricated record.
+        deepCapture: simulation || payload.deepCapture === false ? null : deepCapture,
         onEvent: broadcast,
         logger
       });
@@ -237,8 +263,15 @@ export function createRecorderRouter({
       json(res, 201, {
         incidentId: incident.id,
         requestedAxes: axes,
+        // The incident may be simulated, but this Bisect run is not: it made
+        // real connections from this machine. Saying so prevents the two halves
+        // of the chain being mistaken for each other in either direction.
+        incidentSimulated: incident.simulated === true,
+        bisectSimulated: false,
         report: { ...report, id: report.id || runId },
-        note: "Network Bisect tested the conditions the recorder observed changing. A confirmed discriminator establishes association, not cause."
+        note: incident.simulated
+          ? "The incident was simulated; this Network Bisect run was not. It made real connections from this machine to test the conditions the scenario demonstrated. A confirmed discriminator establishes association, not cause."
+          : "Network Bisect tested the conditions the recorder observed changing. A confirmed discriminator establishes association, not cause."
       });
       return true;
     }

@@ -53,7 +53,11 @@ export function createRecorder({
   captureOnStateChange = DEFAULTS.captureOnStateChange,
   publicIpUrl = DEFAULTS.publicIpUrl,
   deepCapture = null,
+  // A simulation supplies an alternative sampler. Everything downstream -
+  // buffer, triggers, freeze, comparison, handoff - is unchanged production
+  // code, which is the only way a demo proves anything about the real path.
   sampler = takeSample,
+  simulation = null,
   now = () => Date.now(),
   clock = { setTimeout, clearTimeout },
   onEvent = null,
@@ -310,6 +314,9 @@ export function createRecorder({
         startedAt,
         coverage: buffer.coverage(),
         config: { intervalMs, windowMs, slowEveryTicks, afterWindowMs, cooldownMs, captureOnStateChange, publicIpSampling: Boolean(publicIpUrl) },
+        // Surfaced at the top of status so no consumer has to dig for it.
+        simulated: Boolean(simulation),
+        simulation: simulation ? { scenario: simulation.scenario, title: simulation.title, description: simulation.description, phases: simulation.phases.length, durationMs: simulation.totalMs } : null,
         latest: buffer.latest(),
         activeIncident: active ? { id: active.id, trigger: active.trigger.type, openedAt: new Date(active.openedAt).toISOString() } : null,
         incidents: incidents.map(summariseIncident),

@@ -79,7 +79,9 @@ export function projectIncident(incident) {
   return {
     artefact: "flight_recorder_incident",
     // Observed, not deterministic: the recorder watched, it did not experiment.
-    evidenceClass: "observed",
+    evidenceClass: incident.simulated ? "simulated" : "observed",
+    simulated: incident.simulated === true,
+    scenario: incident.scenario ?? null,
     id: incident.id,
     target: incident.target ? { host: incident.target.host, port: incident.target.port } : null,
     trigger: {
@@ -128,7 +130,9 @@ export function projectIncident(incident) {
       : { available: false, reason: trim(incident.deepCapture?.reason, 200) },
     epistemics: {
       ...incident.epistemics,
-      forTheAnalyst: "This is a comparison of two observed windows. Do not describe any difference as the cause of the failure. Network Bisect is what can test a candidate condition."
+      forTheAnalyst: incident.simulated
+        ? "THIS INCIDENT IS SIMULATED. It was generated from a scenario file and is not a measurement of any real network. Say so explicitly in your answer, and never present it as evidence about the user's network."
+        : "This is a comparison of two observed windows. Do not describe any difference as the cause of the failure. Network Bisect is what can test a candidate condition."
     },
     refs
   };

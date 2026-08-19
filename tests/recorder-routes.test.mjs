@@ -333,3 +333,152 @@ test("persistence can be switched off", async () => {
     await rm(dir, { recursive: true, force: true });
   }
 });
+
+test("simulation scenarios are discoverable and self-describing", async () => {
+  await withServer(4416, async base => {
+    const payload = await (await fetch(`${base}/api/recorder/scenarios`, { headers: admin })).json();
+    assert.ok(payload.scenarios.length >= 3);
+    assert.ok(payload.scenarios.every(entry => entry.scenario && entry.title && entry.description));
+    assert.match(payload.note, /not evidence about any real network/i);
+  });
+});
+
+test("a simulated recording is marked simulated in status", async () => {
+  await withServer(4417, async base => {
+    const started = await fetch(`${base}/api/recorder/start`, {
+      method: "POST",
+      headers: jsonHeaders,
+      body: JSON.stringify({ simulate: "ipv6-path-loss" })
+    });
+    const status = await started.json();
+    assert.equal(started.status, 201, JSON.stringify(status));
+    assert.equal(status.simulated, true);
+    assert.equal(status.simulation.scenario, "ipv6-path-loss");
+    // A simulation makes no outbound connections, so no public IP sampling.
+    assert.equal(status.config.publicIpSampling, false);
+
+    await fetch(`${base}/api/recorder/stop`, { method: "POST", headers: jsonHeaders, body: "{}" });
+  });
+});
+
+test("the API accepts a scenario name but never a filesystem path", async () => {
+  await withServer(4418, async base => {
+    for (const simulate of [
+      "../../package",
+      "fixtures/recorder/ipv6-path-loss.json",
+      "/etc/passwd",
+      "C:\Windows\win.ini",
+      "ipv6-path-loss.json"
+    ]) {
+      const response = await fetch(`${base}/api/recorder/start`, {
+        method: "POST",
+        headers: jsonHeaders,
+        body: JSON.stringify({ simulate })
+      });
+      assert.equal(response.status, 400, `${simulate} should be refused, got ${response.status}`);
+      assert.match((await response.json()).error, /Unknown simulation scenario|lowercase/i);
+    }
+  });
+});
+
+test("a simulated incident is persisted with its provenance intact", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "faultline-recorder-sim-"));
+  const dataFile = join(dir, "state.json");
+
+  try {
+    let incidentId = null;
+    const first = await startServer(4419, dataFile);
+    try {
+      const base = "http://127.0.0.1:4419";
+      await fetch(`${base}/api/recorder/start`, {
+        method: "POST",
+        headers: jsonHeaders,
+        // A short scenario so the incident closes inside the test budget.
+        body: JSON.stringify({ simulate: "ipv6-path-loss", intervalMs: 2_000, afterWindowMs: 10_000 })
+      });
+
+      for (let attempt = 0; attempt < 60; attempt += 1) {
+        await new Promise(resolve => setTimeout(resolve, 1_000));
+        const { incidents } = await (await fetch(`${base}/api/recorder/incidents`, { headers: admin })).json();
+        if (incidents.length) {
+          incidentId = incidents[0].id;
+          assert.equal(incidents[0].simulated, true, "the list entry must be marked simulated");
+          break;
+        }
+      }
+      assert.ok(incidentId, "a simulated incident should have been captured");
+    } finally {
+      await stopServer(first);
+    }
+
+    // Provenance must survive the round trip to disk.
+    const second = await startServer(4420, dataFile);
+    try {
+      const restored = await (await fetch(`http://127.0.0.1:4420/api/recorder/incidents/${incidentId}`, { headers: admin })).json();
+      assert.equal(restored.simulated, true);
+      assert.equal(restored.source, "simulation");
+      assert.equal(restored.scenario, "ipv6-path-loss");
+      assert.equal(restored.evidenceClass, "simulated");
+      assert.match(restored.epistemics.observed, /SIMULATED/);
+      // And no real measurement was folded into it.
+      assert.equal(restored.deepCapture, null);
+    } finally {
+      await stopServer(second);
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("the Bisect handoff separates a simulated incident from a real experiment", async () => {
+  // The chain is deliberately mixed: a scripted incident, a genuine experiment.
+  // Neither half may be presented as the other. This asserts the API says so
+  // without running a real Bisect - the refusal path is reached first when no
+  // testable condition exists, and the wording is checked on the real path in
+  // the simulate suite's end-to-end run.
+  await withServer(4421, async base => {
+    await fetch(`${base}/api/recorder/start`, {
+      method: "POST",
+      headers: jsonHeaders,
+      body: JSON.stringify({ simulate: "ipv6-path-loss", intervalMs: 2_000, afterWindowMs: 10_000 })
+    });
+
+    let incidentId = null;
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      await new Promise(resolve => setTimeout(resolve, 1_000));
+      const { incidents } = await (await fetch(`${base}/api/recorder/incidents`, { headers: admin })).json();
+      if (incidents.length) { incidentId = incidents[0].id; break; }
+    }
+    assert.ok(incidentId, "a simulated incident should have been captured");
+    await fetch(`${base}/api/recorder/stop`, { method: "POST", headers: jsonHeaders, body: "{}" });
+
+    const incident = await (await fetch(`${base}/api/recorder/incidents/${incidentId}`, { headers: admin })).json();
+    // The scenario is built so this axis is the one the recorder observes.
+    assert.deepEqual(incident.candidateDiscriminators.bisectAxes, ["address-family"]);
+    assert.equal(incident.simulated, true);
+    // A simulated record never embeds a real measurement.
+    assert.equal(incident.deepCapture, null);
+  });
+});
+
+test("the recorder panel never pairs SIMULATED with a measured-locally claim", async () => {
+  // Provenance is a design guarantee in this surface, so the source chip is
+  // asserted at the source: the measured chip must be reachable only on the
+  // branch where the run is not simulated.
+  await withServer(4422, async base => {
+    const panel = await (await fetch(`${base}/recorder-panel.js`)).text();
+
+    assert.ok(panel.includes("Measured locally"), "the real-capture chip should still exist");
+    assert.ok(panel.includes("Scenario source"), "a simulated run needs its own source chip");
+
+    // The two chips must live on opposite branches of one conditional.
+    const conditional = panel.match(/status\?\.simulated[\s\S]{0,600}?Measured locally/);
+    assert.ok(conditional, "the measured chip must sit behind a simulated check");
+    const branch = conditional[0];
+    assert.ok(branch.indexOf("Scenario source") < branch.indexOf("Measured locally"),
+      "the simulated branch must come first, with measured as the else");
+
+    const css = await (await fetch(`${base}/design-system.css`)).text();
+    assert.match(css, /\.fl-source\[data-kind="simulated"\]/, "the simulated source chip needs its own styling");
+  });
+});

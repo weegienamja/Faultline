@@ -80,8 +80,13 @@ test("the buffer enforces a hard sample cap regardless of window", () => {
   assert.equal(buffer.size(), 10);
 });
 
+// The fixture timestamps are fixed, so these buffers must be given a clock
+// anchored to them. Using the wall clock would make the tests pass only within
+// one window of the fixture time and fail forever after.
+const FIXTURE_NOW = () => Date.parse("2026-08-19T20:46:20.000Z");
+
 test("freeze returns copies that later eviction cannot mutate", () => {
-  const buffer = createSampleBuffer({ windowMs: 60_000 });
+  const buffer = createSampleBuffer({ windowMs: 60_000, now: FIXTURE_NOW });
   buffer.push(sampleAt("2026-08-19T20:45:51.000Z"));
   const frozen = buffer.freeze();
   buffer.clear();
@@ -93,7 +98,7 @@ test("freeze returns copies that later eviction cannot mutate", () => {
 });
 
 test("freezeBefore captures only the pre-trigger window", () => {
-  const buffer = createSampleBuffer({ windowMs: 600_000 });
+  const buffer = createSampleBuffer({ windowMs: 600_000, now: FIXTURE_NOW });
   buffer.push(sampleAt("2026-08-19T20:45:51.000Z"));
   buffer.push(sampleAt("2026-08-19T20:46:06.000Z"));
   buffer.push(failing("2026-08-19T20:46:18.000Z"));
