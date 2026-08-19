@@ -1,5 +1,7 @@
 import { analyseIncidents as analyseCore } from "./intelligence.js";
 
+if (typeof window !== "undefined") import("./case-room.js");
+
 export function analyseEvidencePatterns(incidents, options = {}) {
   const evidenceOnly = incidents.map(incident => ({
     ...incident,
