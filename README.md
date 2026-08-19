@@ -121,6 +121,11 @@ PeeringDB — all credential-free.
 is produced by deterministic rules over observed measurements and is traceable
 to the evidence that produced it.
 
+An optional **[Faultline Analyst](docs/LOCAL_ANALYST.md)** explains that evidence
+in natural language. It runs locally through Ollama, reads through read-only
+tools, produces no findings of its own, and no cloud AI is involved. Faultline
+works identically without it.
+
 ---
 
 ## Implemented previews
@@ -139,7 +144,10 @@ to the evidence that produced it.
 - **Live data:** real DNS/TCP/TLS/HTTP/ICMP/path measurement plus public routing, outage and network-ownership context
 - **Network Bisect:** adaptive fault isolation — competing hypotheses, deterministic experiment selection, reproducibility gating and paired confirmation
 
-Faultline does **not** use an AI/LLM API in diagnosis or Incident Intelligence.
+- **Faultline Analyst:** optional local-only AI that explains evidence, cites it, and is architecturally barred from producing findings
+
+Faultline does **not** use an AI/LLM API in diagnosis or Incident Intelligence,
+and never uses a cloud AI service anywhere.
 
 ## Live network and Internet data
 
@@ -258,6 +266,7 @@ Platform / tenant control plane
 - [Incident Intelligence](docs/INCIDENT_INTELLIGENCE.md)
 - [Multi-Tenancy](docs/MULTI_TENANCY.md)
 - [Network Bisect](docs/NETWORK_BISECT.md)
+- [Faultline Analyst (local AI)](docs/LOCAL_ANALYST.md)
 - [Live Internet Data](docs/LIVE_INTERNET_DATA.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Deployment](docs/DEPLOYMENT.md)
@@ -291,6 +300,11 @@ Registered probe token    one remote worker identity
 Case-room token            one shared case and role
 ```
 
+The optional Analyst adds no credential. Its routes reuse the platform admin
+token, its only outbound destination is a validated loopback Ollama endpoint,
+its tools are read-only, and cloud-backed models are excluded from use. See
+[Faultline Analyst](docs/LOCAL_ANALYST.md#security-boundaries).
+
 SDK credentials belong in the support application's backend. The user-facing widget receives only a one-time invitation URL. Service-desk credentials are not stored by Faultline.
 
 ## Tests
@@ -304,7 +318,9 @@ CI also builds the Docker image and separately builds and executes the packaged 
 
 ## Current limitations
 
-This remains a portfolio/research implementation rather than production SaaS. Persistence is a single-writer JSON store, tenant identity is credential-based rather than named-user SSO/RBAC, v1 API authentication is not yet service-account scoped, vendor service-desk transports are adapter boundaries rather than live OAuth integrations, the Connectivity Contract evaluator remains target-scoped, deep v1.4 collection is currently in the Node endpoint agent rather than the packaged client, change-assurance regression labels are deterministic evidence comparisons rather than causal inference, and the packaged Windows client is unsigned.
+This remains a portfolio/research implementation rather than production SaaS. Persistence is a single-writer JSON store, tenant identity is credential-based rather than named-user SSO/RBAC, v1 API authentication is not yet service-account scoped, vendor service-desk transports are adapter boundaries rather than live OAuth integrations, the Connectivity Contract evaluator remains target-scoped, deep v1.4 collection is currently in the Node endpoint agent rather than the packaged client, change-assurance regression labels are deterministic evidence comparisons rather than causal inference, the packaged Windows client is unsigned, and the optional local Analyst
+explains evidence rather than determining anything — its retained evidence is
+per-process and its suggestions are hypotheses, not findings.
 
 ## Roadmap
 
