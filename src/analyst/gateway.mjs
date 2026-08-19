@@ -21,6 +21,7 @@ import { RESPONSE_SCHEMA, extractPartialAnswer, parseAnalystResponse } from "./s
 import { executeTool, readOnlyStore, toolDeclarations } from "./tools.mjs";
 import { DEFAULT_MODEL, assertModelName } from "./lifecycle.mjs";
 import { AnalystTransportError } from "./ollama.mjs";
+import { buildEvidenceInventory, renderEvidenceInventory } from "./inventory.mjs";
 
 /** Screens the drawer may claim to be on. An unknown view is not trusted. */
 export const KNOWN_VIEWS = Object.freeze({
@@ -131,8 +132,14 @@ export function createAnalystGateway({
     const context = normaliseViewContext(view);
     const toolContext = { view: context, store: reader, registry, docs };
 
+    // Tell the model what exists before it picks tools. Availability only -
+    // never contents; see inventory.mjs.
+    const inventory = renderEvidenceInventory(
+      await buildEvidenceInventory({ registry, store: reader, view: context })
+    );
+
     const messages = [
-      { role: "system", content: buildSystemPrompt({ view: context, model: modelName }) },
+      { role: "system", content: buildSystemPrompt({ view: context, model: modelName, inventory }) },
       ...(conversationId ? conversations.history(conversationId) : []),
       { role: "user", content: asked }
     ];

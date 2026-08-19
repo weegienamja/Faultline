@@ -11,6 +11,7 @@ import { extractPartialAnswer, parseAnalystResponse } from "../src/analyst/schem
 import { projectBisectRun, projectLiveDiagnostic } from "../src/analyst/evidence.mjs";
 import { buildDocIndex, lookupTerm } from "../src/analyst/docs.mjs";
 import { buildSystemPrompt } from "../src/analyst/prompt.mjs";
+import { buildEvidenceInventory, renderEvidenceInventory } from "../src/analyst/inventory.mjs";
 
 // Gateway, tools, schema and conversation state. No Ollama, no network.
 
@@ -424,6 +425,135 @@ test("the system prompt carries the epistemic rules", () => {
     assert.ok(prompt.includes(phrase), `system prompt is missing: ${phrase}`);
   }
   assert.ok(prompt.includes("Network Bisect"), "prompt should carry the current view");
+});
+
+// --- evidence inventory -----------------------------------------------------
+//
+// The inventory exists because an 8B model answers honestly but does not always
+// notice that relevant evidence exists. These tests pin both halves of the
+// contract: it must say what is retrievable, and it must never leak results.
+
+async function inventoryFor(registry, store = fakeStore) {
+  return buildEvidenceInventory({
+    registry,
+    store: readOnlyStore(store),
+    view: normaliseViewContext({ view: "bisect", target: "example.com" })
+  });
+}
+
+test("the inventory reports what is retrievable right now", async () => {
+  const inventory = await inventoryFor(fixtureRegistry());
+  const byKey = Object.fromEntries(inventory.entries.map(entry => [entry.key, entry.available]));
+
+  assert.equal(byKey.target, true);
+  assert.equal(byKey.bisect, true);
+  assert.equal(byKey.live, true);
+  assert.equal(byKey.diagnosis, true);
+  assert.equal(byKey.topology, true, "the fixture live run has a measured path");
+  assert.equal(byKey.cases, true);
+  assert.equal(byKey.docs, true, "documentation ships with the product");
+});
+
+test("the inventory reports absent evidence as unavailable", async () => {
+  const inventory = await inventoryFor(createEvidenceRegistry());
+  const byKey = Object.fromEntries(inventory.entries.map(entry => [entry.key, entry.available]));
+
+  assert.equal(byKey.bisect, false);
+  assert.equal(byKey.live, false);
+  assert.equal(byKey.diagnosis, false);
+  assert.equal(byKey.topology, false);
+  // Documentation does not depend on a run having happened.
+  assert.equal(byKey.docs, true);
+});
+
+test("the inventory names the tool that retrieves each available artefact", async () => {
+  const rendered = renderEvidenceInventory(await inventoryFor(fixtureRegistry()));
+  for (const tool of ["get_current_target", "get_latest_bisect_run", "get_live_diagnostic", "get_topology"]) {
+    assert.ok(rendered.includes(tool), `inventory should name ${tool}`);
+  }
+});
+
+test("the inventory carries availability, never evidence contents", async () => {
+  const rendered = renderEvidenceInventory(await inventoryFor(fixtureRegistry()));
+
+  // Every one of these is a real value in the fixtures. None may appear: the
+  // inventory must not become an unvalidated, uncitable evidence channel.
+  for (const leak of [
+    "LOCAL_CAPABILITY_DEFICIENCY",
+    "IPv6",
+    "FAILED_BASELINE",
+    "access_path",
+    "93.184.216.34",
+    "192.168.1.1",
+    "Teams drops",
+    "EXP-01",
+    "CONF-01",
+    "ISOLATED"
+  ]) {
+    assert.ok(!rendered.includes(leak), `inventory leaked evidence content: ${leak}`);
+  }
+
+  // The target is the one permitted value, because it is the subject itself.
+  assert.ok(rendered.includes("example.com"));
+});
+
+test("the inventory names what cannot be retrieved at all", async () => {
+  const rendered = renderEvidenceInventory(await inventoryFor(fixtureRegistry()));
+  assert.match(rendered, /Change Assurance/);
+  assert.match(rendered, /Connectivity Contract/);
+  assert.match(rendered, /Flight Recorder/);
+});
+
+test("a store failure degrades the inventory rather than failing the ask", async () => {
+  const broken = { listCases: async () => { throw new Error("disk gone"); }, listProbes: async () => { throw new Error("disk gone"); } };
+  const inventory = await buildEvidenceInventory({
+    registry: fixtureRegistry(),
+    store: broken,
+    view: normaliseViewContext({ view: "bisect" })
+  });
+  const cases = inventory.entries.find(entry => entry.key === "cases");
+  assert.equal(cases.available, false);
+  assert.equal(cases.detail, "unknown");
+});
+
+test("the system prompt carries the inventory above the working rules", () => {
+  const prompt = buildSystemPrompt({
+    view: { view: "bisect", label: "Network Bisect" },
+    model: "qwen3:8b",
+    inventory: "AVAILABLE FAULTLINE EVIDENCE\n- Latest Network Bisect run — available (get_latest_bisect_run)"
+  });
+  assert.ok(prompt.includes("AVAILABLE FAULTLINE EVIDENCE"));
+  assert.ok(prompt.indexOf("AVAILABLE FAULTLINE EVIDENCE") < prompt.indexOf("HOW TO WORK"),
+    "the inventory must precede tool-selection guidance");
+  assert.match(prompt, /Never report something as unavailable if the inventory above says it is available/);
+});
+
+test("the gateway sends the inventory to the model before it selects tools", async () => {
+  const sent = [];
+  const client = createOllamaClient({
+    fetchImpl: async (url, init) => {
+      const body = JSON.parse(init.body);
+      sent.push(body.messages);
+      if (body.stream === false) return { ok: true, status: 200, text: async () => JSON.stringify({ message: { content: "" } }) };
+      return {
+        ok: true, status: 200,
+        body: Readable.from([`${JSON.stringify({ message: { content: '{"answer":"x","observations":[],"possibleProblems":[],"recommendedChecks":[],"limitations":[]}' } })}\n`])
+      };
+    }
+  });
+
+  const gateway = createAnalystGateway({
+    client, store: fakeStore, registry: fixtureRegistry(), conversations: createConversationStore(), model: "qwen3:8b"
+  });
+
+  await collect(gateway.ask({ question: "What does Faultline know about this target?", view: { view: "bisect", target: "example.com" } }));
+
+  const systemPrompt = sent[0].find(message => message.role === "system").content;
+  assert.ok(systemPrompt.includes("AVAILABLE FAULTLINE EVIDENCE"));
+  assert.ok(systemPrompt.includes("Latest Network Bisect run"));
+  assert.ok(systemPrompt.includes("get_latest_bisect_run"));
+  // Still no contents.
+  assert.ok(!systemPrompt.includes("LOCAL_CAPABILITY_DEFICIENCY"));
 });
 
 // --- conversation state -----------------------------------------------------

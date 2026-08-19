@@ -103,11 +103,46 @@ screen it is on; the server decides everything else.
 | `src/analyst/evidence.mjs` | Compact projections and stable evidence references. |
 | `src/analyst/tools.mjs` | The read-only tool gateway. |
 | `src/analyst/docs.mjs` | Documentation index and engine glossary. |
+| `src/analyst/inventory.mjs` | Per-request inventory of retrievable evidence (availability only). |
 | `src/analyst/prompt.mjs` | System prompt and epistemic rules. |
 | `src/analyst/schema.mjs` | Response schema, safe parsing, citation validation. |
 | `src/analyst/conversation.mjs` | Bounded, memory-only conversation state. |
 | `src/analyst/gateway.mjs` | Two-phase orchestration. |
 | `src/analyst/routes.mjs` | `/api/analyst/*`. |
+
+### Evidence inventory
+
+Before the model selects any tool, the system prompt receives a generated
+inventory of what is retrievable right now:
+
+```
+AVAILABLE FAULTLINE EVIDENCE
+- Current target: example.com — available (get_current_target)
+- Latest live diagnostic — unavailable
+- Latest Network Bisect run — available (get_latest_bisect_run)
+- Measured path and inferred topology — unavailable
+- Support cases — unavailable
+- Faultline documentation and engine vocabulary — available (search_faultline_docs, get_faultline_term)
+
+Not retrievable by you in this version: Change Assurance comparisons;
+Connectivity Contract results; Flight Recorder history (not implemented).
+```
+
+This exists because an 8B model answers honestly but does not always notice
+that relevant evidence exists. Asked *"what does Faultline know about this
+target?"*, it would call `get_current_target`, receive a hostname, and stop —
+never retrieving a completed Network Bisect run one call away.
+
+**The inventory carries availability and the tool that fetches it, never the
+contents.** Putting results here would reintroduce exactly what the tool gateway
+prevents: evidence arriving in the prompt unvalidated, uncited and unbounded,
+letting the model describe a run it never retrieved with no reference table to
+check its citations against. The target name is the single permitted value,
+because it is the subject of the question rather than a measurement.
+
+Artefacts with no read-only tool are listed as unretrievable rather than
+omitted, so the model knows they are out of reach instead of guessing that some
+tool might return them.
 
 ### Two-phase request
 
@@ -245,6 +280,24 @@ the corpus outgrows it.
 
 ---
 
+## Tests
+
+The Analyst's test suite runs without Ollama, a model, a GPU or the Internet —
+the transport is injected. `npm test` covers transport, lifecycle, tool
+validation, schema safety, citation integrity, conversation bounds, prompt
+injection and the HTTP surface.
+
+Two retrieval-breadth regressions run against a real local model and are skipped
+by default:
+
+```bash
+FAULTLINE_ANALYST_LIVE_TEST=1 node --test tests/analyst-live-model.test.mjs
+```
+
+They pin the behaviour the evidence inventory exists to fix. Removing the
+inventory makes the first one fail with
+`expected get_latest_bisect_run, got: get_current_target`.
+
 ## Troubleshooting
 
 | Symptom | Meaning | Fix |
@@ -270,8 +323,14 @@ Analyst entirely, stop Ollama; to remove the runtime, uninstall Ollama.
 
 ## Limitations
 
-* An 8B model does not always retrieve every relevant artefact. When it
-  retrieves nothing, it produces no findings and says so, rather than guessing.
+* An 8B model does not always retrieve every relevant artefact. The evidence
+  inventory closes the common case (a question about the target now also
+  retrieves the isolation run — see `tests/analyst-live-model.test.mjs`), but
+  retrieval remains model-dependent. When it retrieves nothing, it produces no
+  findings and says so, rather than guessing.
+* Change Assurance and Connectivity Contract results have no read-only tool in
+  this version, so the Analyst declares them unretrievable rather than
+  answering about them.
 * Answers are explanations, not determinations. Anything under **Analyst
   interpretation** is a hypothesis.
 * Flight Recorder is not implemented, so no tool reports pre-fault history and
