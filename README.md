@@ -8,46 +8,68 @@ Faultline is an incident-first portfolio/research prototype for connectivity fai
 endpoint -> LAN/Wi-Fi -> VPN/firewall -> ISP/Internet -> application/service
 ```
 
-Faultline collects scoped evidence from affected endpoints and independent vantages, applies deterministic fault-domain reasoning, preserves evidence in support cases, identifies statistically similar incidents, and supports controlled sharing across organisations.
+Faultline collects scoped evidence from affected endpoints and independent vantages, applies deterministic fault-domain reasoning, preserves evidence in support cases, identifies statistically similar incidents, supports controlled sharing across organisations and can compare network behaviour before and after a planned change.
 
 ## Implemented previews
 
 - v0.1-v0.7: deterministic diagnosis, Windows telemetry, remote correlation, probe fleet, one-time diagnostics, topology and Connectivity Contracts
 - Data Science: standardisation, evidence similarity, DBSCAN clustering and explicit outliers
-- **v0.8:** support cases, multiple runs, provenance, before/after comparison and evidence exports
+- **v0.8:** support cases, multiple runs, provenance and evidence exports
 - **v0.9:** cross-party incident rooms with scoped external contributions
 - **v1.0:** organisation/project tenancy with isolated cases and credential lifecycle
 - **v1.1:** project-scoped Connectivity Contract catalog with version lifecycle and provenance
 - **v1.2:** embedded diagnostics API, JavaScript SDK and end-user launch widget
 - **v1.3:** service-desk ticket correlation and provenance-preserving update envelopes
 - **v1.4:** dual-stack, explicit TLS, HTTP stage timing and bounded Windows path-MTU evidence
+- **v1.5:** named change windows, pinned baseline/post-change runs, regression detection and integrity-tagged assurance packages
 
 Faultline does **not** use an AI/LLM API in diagnosis or Incident Intelligence.
 
-## v1.4 Deeper diagnostics
+## v1.5 Network Change Assurance
 
-The Node endpoint agent now adds `telemetry.deepDiagnostics` by default. It independently records A/AAAA resolution and IPv4/IPv6 TCP reachability, explicit TLS handshake/certificate/protocol evidence, client-side HTTP stage timings including TTFB, and a bounded Windows IPv4 path-MTU estimate.
-
-Summary metrics include:
+Faultline can now treat repeated diagnostic runs as an explicit pre-change/post-change workflow rather than simply comparing the oldest and newest case evidence.
 
 ```text
-ipv4Reachable
-ipv6Reachable
-tlsHandshakeOk
-tlsHandshakeMs
-targetTtfbMs
-pathMtuBytes
+Create change window
+      |
+Select baseline diagnostic
+      |
+Make network change
+      |
+Select post-change diagnostic
+      |
+Compare required behaviours
+      |
+Regression / improvement result
+      |
+Export change-assurance package
 ```
 
-Use `--no-deep` to skip this layer. The existing deterministic fault-domain rules remain authoritative; v1.4 adds evidence rather than inventing a second root-cause model.
+The comparison includes Connectivity Contract check transitions, IPv4/IPv6/TLS state changes, latency/loss/TLS/TTFB/path-MTU deltas, observed route changes and inferred topology changes. A worsening measurement is reported as a regression candidate, not proof of causation.
 
-The standalone packaged `Faultline.exe` still uses its self-contained collector and does not yet import this modular v1.4 collector. This limitation is explicit rather than claiming measurements the binary does not produce.
+```text
+POST /api/cases/:caseId/change-windows
+POST /api/cases/:caseId/change-windows/:changeId/baseline
+POST /api/cases/:caseId/change-windows/:changeId/post-change
+GET  /api/cases/:caseId/change-windows/:changeId/comparison
+GET  /api/cases/:caseId/change-windows/:changeId/evidence
+```
+
+The JavaScript SDK exposes the same change workflow. Change-assurance packages contain a SHA-256 integrity digest and the audit stream records creation, baseline selection and comparison outcome.
+
+See [Network Change Assurance](docs/CHANGE_ASSURANCE.md).
+
+## v1.4 Deeper diagnostics
+
+The Node endpoint agent adds `telemetry.deepDiagnostics` by default: independent A/AAAA and IPv4/IPv6 TCP evidence, explicit TLS handshake/certificate/protocol data, HTTP stage timing/TTFB, and bounded Windows IPv4 path-MTU discovery. Use `--no-deep` to skip it.
+
+The standalone packaged `Faultline.exe` still uses its self-contained collector and does not yet import this modular v1.4 collector. This limitation is explicit.
 
 See [Deeper Diagnostics](docs/DEEP_DIAGNOSTICS.md).
 
 ## v1.3 Service Desk Integrations
 
-Faultline can associate a case with ServiceNow, Jira Service Management, Zendesk, HaloPSA, Freshservice, ConnectWise or a generic webhook integration intent. Generated update envelopes include the external ticket ID, deterministic fault-domain summary, evidence link and evidence-package digest. No third-party credential is persisted and this preview does not claim live vendor certification.
+Faultline can correlate a case with ServiceNow, Jira Service Management, Zendesk, HaloPSA, Freshservice, ConnectWise or a generic webhook integration intent. Generated update envelopes preserve the external ticket ID, deterministic fault-domain summary, evidence link and package digest. No third-party service-desk credential is persisted and this preview does not claim live vendor certification.
 
 See [Service Desk Integrations](docs/SERVICE_DESK_INTEGRATIONS.md).
 
@@ -67,6 +89,7 @@ Support portal / service desk
 Platform / tenant control plane
         |
         +--> Contracts / cases / integrations
+        +--> Change windows
         |
   endpoint agent + independent probes
         |
@@ -74,11 +97,17 @@ Platform / tenant control plane
         |
  deterministic fault-domain diagnosis
         |
- evidence packages / Incident Intelligence / cross-party room
+ evidence / Incident Intelligence / assurance comparison
+        |
+ cross-party escalation
 ```
 
-## Other design notes
+## Design notes
 
+- [Change Assurance](docs/CHANGE_ASSURANCE.md)
+- [Deeper Diagnostics](docs/DEEP_DIAGNOSTICS.md)
+- [Service Desk Integrations](docs/SERVICE_DESK_INTEGRATIONS.md)
+- [Embedded Diagnostics](docs/EMBEDDED_DIAGNOSTICS.md)
 - [Contract Catalog](docs/CONTRACT_CATALOG.md)
 - [Cases & Evidence Packages](docs/CASES_AND_EVIDENCE.md)
 - [Cross-Party Incident Rooms](docs/CROSS_PARTY_ROOMS.md)
@@ -124,7 +153,7 @@ CI also builds the Docker image and separately builds and executes the packaged 
 
 ## Current limitations
 
-This remains a portfolio/research implementation rather than production SaaS. Persistence is a single-writer JSON store, tenant identity is credential-based rather than named-user SSO/RBAC, v1 API authentication is not yet service-account scoped, vendor service-desk transports are adapter boundaries rather than live OAuth integrations, the Connectivity Contract evaluator remains target-scoped, deep v1.4 collection is currently in the Node endpoint agent rather than the packaged client, and the packaged Windows client is unsigned.
+This remains a portfolio/research implementation rather than production SaaS. Persistence is a single-writer JSON store, tenant identity is credential-based rather than named-user SSO/RBAC, v1 API authentication is not yet service-account scoped, vendor service-desk transports are adapter boundaries rather than live OAuth integrations, the Connectivity Contract evaluator remains target-scoped, deep v1.4 collection is currently in the Node endpoint agent rather than the packaged client, change-assurance regression labels are deterministic evidence comparisons rather than causal inference, and the packaged Windows client is unsigned.
 
 ## Roadmap
 
@@ -135,8 +164,9 @@ v1.0  Multi-Tenant MVP architecture         complete preview
 v1.1  Connectivity Contract Ecosystem       complete preview
 v1.2  Embedded Diagnostics API + SDK        complete preview
 v1.3  Service Desk Integrations             complete preview
-v1.4  Deeper Network / Protocol Diagnostics current preview
-v1.5  Network Change Assurance              next
+v1.4  Deeper Network / Protocol Diagnostics complete preview
+v1.5  Network Change Assurance              current preview
+v1.6  Incident Intelligence v2              next
 ```
 
 See [ROADMAP.md](ROADMAP.md).
