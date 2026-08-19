@@ -200,7 +200,20 @@ async function main() {
     return;
   }
 
-  const targetInput = args._[0] || simulation?.target;
+  // A simulation is inseparable from its scenario's target and port. Accepting
+  // a positional target alongside --simulate would let the scripted samples for
+  // one host be recorded as an incident against another - and a later Bisect
+  // handoff would then make real connections to a target the scenario never
+  // described. Refused rather than silently ignored, so CLI and API semantics
+  // stay identical.
+  if (simulation && args._[0]) {
+    console.error("Cannot specify a target with --simulate.");
+    console.error(`The scenario defines its target and port (${simulation.target}:${simulation.port}).`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const targetInput = simulation ? simulation.target : args._[0];
   if (!targetInput) {
     console.error("Usage: npm run recorder -- <target> [--interval 3] [--window 300] [--contract basic-reachability]");
     console.error("       npm run recorder -- --simulate <scenario|path-to.json>");
@@ -209,7 +222,9 @@ async function main() {
     return;
   }
 
-  const target = parseLiveTarget(targetInput);
+  const target = simulation
+    ? parseLiveTarget(simulation.target, simulation.port)
+    : parseLiveTarget(targetInput);
   const contract = args.flags.contract ? getConnectivityContract(String(args.flags.contract)) : null;
   const intervalMs = args.flags.interval
     ? Math.min(Math.max(Number(args.flags.interval) * 1000, 2_000), 30_000)
@@ -229,7 +244,7 @@ async function main() {
     console.log("");
   }
   console.log(`Faultline Flight Recorder  ${target.host}:${target.port}`);
-  console.log(`Sampling every ${intervalMs / 1000}s · retaining ${Math.round(windowMs / 1000)}s · in memory only`);
+  console.log(`Sampling every ${intervalMs / 1000}s · rolling window ${Math.round(windowMs / 1000)}s in memory · closed incidents persist`);
   if (contract) console.log(`Contract: ${contract.name}`);
   console.log("Press Ctrl+C to stop.");
   console.log("");
@@ -274,7 +289,7 @@ async function main() {
       console.log(renderIncident(incident));
     }
     console.log("");
-    console.log("Recording stopped. Nothing was written to disk.");
+    console.log("Recording stopped. The rolling buffer is discarded; any closed incident was kept.");
     process.exit(0);
   };
 

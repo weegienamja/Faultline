@@ -278,7 +278,12 @@ if (host) {
         <div class="fl-view-head-actions">
           ${status?.simulated ? badge("SIMULATED", "warn") : ""}
           ${recording ? badge("Recording", "ok") : badge("Not recording", "idle")}
-          <span class="fl-source" data-kind="measured">Measured locally</span>
+          ${status?.simulated
+            // Never "Measured locally" while simulating: provenance is a design
+            // guarantee here, not decoration, and the two chips side by side
+            // would say exactly the thing this feature must not say.
+            ? `<span class="fl-source" data-kind="simulated">Scenario source</span>`
+            : `<span class="fl-source" data-kind="measured">Measured locally</span>`}
         </div>
       </div>
 
@@ -296,7 +301,9 @@ if (host) {
                <button class="fl-btn fl-btn-sm" type="button" data-recorder="stop">Stop</button>`,
         flush: true,
         body: timelineTable(status.latest ? [status.latest] : []),
-        foot: `<span>${coverage ? `${coverage.samples} samples · ${Math.round(coverage.windowMs / 1000)}s window` : "starting"} · in memory only, never written to disk</span>`
+        // The rolling buffer is ephemeral; closed incidents are not. Saying only
+        // the first half was accurate before incidents persisted, and is not now.
+        foot: `<span>${coverage ? `${coverage.samples} samples · ${Math.round(coverage.windowMs / 1000)}s rolling window` : "starting"} · buffer in memory only · closed incidents ${status?.incidentsPersisted === false ? "kept in memory" : "persist"}</span>`
       }) : ""}
 
       ${recording ? panel({

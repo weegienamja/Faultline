@@ -125,6 +125,88 @@ test("a scenario asserts measurements, and the engine classifies them", async ()
   assert.ok(sample.reasons.includes("target TCP unreachable"));
 });
 
+// --- DNS evidence must not contradict connectivity --------------------------
+
+test("the ipv6-path-loss scenario shows AAAA present in every phase", async () => {
+  // The demo's whole claim is "the target publishes AAAA but this machine
+  // cannot use IPv6". A sample asserting IPv6 PASS alongside zero AAAA records
+  // would contradict itself and undermine the distinction the scenario exists
+  // to demonstrate.
+  const scenario = await loadScenario("ipv6-path-loss");
+  const clock = { value: Date.parse("2026-08-19T20:00:00.000Z") };
+  const sampler = createSimulationSampler(scenario, { now: () => clock.value });
+
+  const seen = [];
+  let elapsed = 0;
+  for (const phase of scenario.phases) {
+    clock.value += 1_000;
+    elapsed += 1_000;
+    const { sample } = await sampler({ seq: seen.length });
+    seen.push({ phase: phase.label, ipv6: sample.connectivity.ipv6.state, dns: sample.connectivity.targetDns });
+    clock.value += phase.durationMs - 1_000;
+    elapsed += phase.durationMs - 1_000;
+  }
+
+  assert.equal(seen.length, scenario.phases.length);
+  for (const entry of seen) {
+    assert.ok(entry.dns.v6 > 0, `AAAA must be present in phase "${entry.phase}", got ${entry.dns.v6}`);
+    assert.ok(entry.dns.v4 > 0, `A must be present in phase "${entry.phase}"`);
+  }
+
+  // And specifically: the healthy and broken phases both publish AAAA.
+  const healthy = seen.find(entry => entry.ipv6 === RESULT.PASS);
+  const broken = seen.find(entry => entry.ipv6 === RESULT.FAIL);
+  assert.ok(healthy && broken, "the scenario should contain both a healthy and a failing IPv6 phase");
+  assert.ok(healthy.dns.v6 > 0);
+  assert.ok(broken.dns.v6 > 0, "AAAA must still exist while local IPv6 is failing");
+});
+
+test("DNS family counts are explicit scenario measurements", async () => {
+  const sampler = createSimulationSampler(validateScenario({
+    scenario: "explicit-dns",
+    phases: [{ durationMs: 2_000, targetDns: "PASS", targetDnsV4: 3, targetDnsV6: 5, ipv4: "PASS", ipv6: "PASS" }]
+  }));
+  const { sample } = await sampler({ seq: 0 });
+  assert.equal(sample.connectivity.targetDns.v4, 3);
+  assert.equal(sample.connectivity.targetDns.v6, 5);
+});
+
+test("an unstated DNS family is derived from that family's own result, never assumed absent", async () => {
+  const sampler = createSimulationSampler(validateScenario({
+    scenario: "derived-dns",
+    phases: [{ durationMs: 2_000, targetDns: "PASS", ipv4: "PASS", ipv6: "FAIL" }]
+  }));
+  const { sample } = await sampler({ seq: 0 });
+  // IPv6 FAIL means it was attempted, so an address existed to attempt.
+  assert.ok(sample.connectivity.targetDns.v6 > 0, "a FAIL implies an address was published");
+
+  const inapplicable = createSimulationSampler(validateScenario({
+    scenario: "no-aaaa",
+    phases: [{ durationMs: 2_000, targetDns: "PASS", ipv4: "PASS", ipv6: "INAPPLICABLE" }]
+  }));
+  const { sample: second } = await inapplicable({ seq: 0 });
+  // INAPPLICABLE is the one case that genuinely means no record of that family.
+  assert.equal(second.connectivity.targetDns.v6, 0);
+});
+
+test("a failing resolver reports no answers of either family", async () => {
+  const sampler = createSimulationSampler(validateScenario({
+    scenario: "dns-down",
+    phases: [{ durationMs: 2_000, targetDns: "FAIL", ipv4: "UNKNOWN", ipv6: "UNKNOWN" }]
+  }));
+  const { sample } = await sampler({ seq: 0 });
+  assert.equal(sample.connectivity.targetDns.v4, 0);
+  assert.equal(sample.connectivity.targetDns.v6, 0);
+});
+
+test("a scenario file must name itself", async () => {
+  // The filename fallback is gone: provenance is never inferred from a path.
+  await assert.rejects(
+    () => resolveScenario("fixtures/recorder/../../package.json"),
+    ScenarioError
+  );
+});
+
 // --- the real engine, driven by simulated samples ---------------------------
 
 function fakeClock(start = Date.parse("2026-08-19T20:00:00.000Z")) {
@@ -311,4 +393,64 @@ test("recorder status advertises the simulation", async () => {
   assert.equal(status.simulated, true);
   assert.equal(status.simulation.scenario, scenario.scenario);
   assert.equal(status.simulation.phases, scenario.phases.length);
+});
+
+// --- a simulation is inseparable from its scenario's target -----------------
+
+test("a scenario's own port is used, not a default", async () => {
+  const scenario = await loadScenario("custom-port-demo");
+  assert.equal(scenario.target, "service.example");
+  assert.equal(scenario.port, 8443);
+
+  const clock = fakeClock();
+  const recorder = createRecorder({
+    // Exactly how the CLI and router construct it for a simulation.
+    target: { host: scenario.target, port: scenario.port, input: scenario.target },
+    intervalMs: scenario.intervalMs,
+    afterWindowMs: 20_000,
+    sampler: createSimulationSampler(scenario, { now: clock.now }),
+    simulation: scenario,
+    deepCapture: null,
+    now: clock.now,
+    clock: clock.api
+  });
+
+  recorder.start();
+  await clock.advance(60_000);
+  recorder.stop();
+
+  const incident = recorder.latestIncident();
+  assert.ok(incident, "the scenario should produce an incident");
+  assert.equal(incident.target.host, "service.example");
+  assert.equal(incident.target.port, 8443, "the incident must carry the scenario's port");
+});
+
+test("the CLI refuses a positional target alongside --simulate", async () => {
+  // Recording scripted samples for one host as an incident against another
+  // would detach the evidence from what it describes - and a later Bisect
+  // handoff would make real connections to a host the scenario never named.
+  const { spawnSync } = await import("node:child_process");
+  const result = spawnSync(process.execPath, ["src/recorder/cli.mjs", "google.com", "--simulate", "ipv6-path-loss"], {
+    cwd: process.cwd(),
+    encoding: "utf8",
+    timeout: 20_000
+  });
+
+  assert.equal(result.status, 1, "the run must be refused");
+  assert.match(result.stderr, /Cannot specify a target with --simulate/);
+  assert.match(result.stderr, /example\.com:443/, "the refusal should name the scenario's own target");
+  assert.ok(!/google\.com/.test(result.stdout || ""), "no recording against the supplied host may start");
+});
+
+test("the CLI binds a simulation to the scenario target and port", async () => {
+  const { spawnSync } = await import("node:child_process");
+  const result = spawnSync(process.execPath, ["src/recorder/cli.mjs", "--simulate", "custom-port-demo", "--duration", "6"], {
+    cwd: process.cwd(),
+    encoding: "utf8",
+    timeout: 40_000
+  });
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /service\.example:8443/, "the banner must show the scenario's target and port");
+  assert.match(result.stdout, /SIMULATED CAPTURE/);
 });

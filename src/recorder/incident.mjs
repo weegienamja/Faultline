@@ -267,7 +267,9 @@ export function buildCandidates(observedChange) {
     untestable,
     bisectAxes,
     invitation: testable.length
-      ? `Network Bisect can independently test ${bisectAxes.length === 1 ? "this condition" : "these conditions"} to establish whether changing it alters the outcome.`
+      ? bisectAxes.length === 1
+        ? "Network Bisect can independently test this condition to establish whether changing it alters the outcome."
+        : "Network Bisect can independently test these conditions to establish whether changing them alters the outcome."
       : null,
     note: "Candidates are differences between two observed windows. They are not causes, and Bisect may find that none of them changes the outcome."
   };

@@ -17,8 +17,13 @@
       "gatewayLossPct": 0,
       "activeInterface": "Ethernet",
       "gateway": "192.168.1.1",
-      "resolvers": ["10.20.0.53"],
-      "vpn": false
+      "resolvers": [
+        "10.20.0.53"
+      ],
+      "vpn": false,
+      "targetDns": "PASS",
+      "targetDnsV4": 1,
+      "targetDnsV6": 2
     },
     {
       "label": "IPv6 unavailable locally, default connection fails",
@@ -32,8 +37,13 @@
       "gatewayLossPct": 0,
       "activeInterface": "Ethernet",
       "gateway": "192.168.1.1",
-      "resolvers": ["10.20.0.53"],
-      "vpn": false
+      "resolvers": [
+        "10.20.0.53"
+      ],
+      "vpn": false,
+      "targetDns": "PASS",
+      "targetDnsV4": 1,
+      "targetDnsV6": 2
     },
     {
       "label": "IPv6 restored",
@@ -46,8 +56,13 @@
       "gatewayLossPct": 0,
       "activeInterface": "Ethernet",
       "gateway": "192.168.1.1",
-      "resolvers": ["10.20.0.53"],
-      "vpn": false
+      "resolvers": [
+        "10.20.0.53"
+      ],
+      "vpn": false,
+      "targetDns": "PASS",
+      "targetDnsV4": 1,
+      "targetDnsV6": 2
     }
   ]
 }

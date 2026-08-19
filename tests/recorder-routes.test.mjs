@@ -460,3 +460,25 @@ test("the Bisect handoff separates a simulated incident from a real experiment",
     assert.equal(incident.deepCapture, null);
   });
 });
+
+test("the recorder panel never pairs SIMULATED with a measured-locally claim", async () => {
+  // Provenance is a design guarantee in this surface, so the source chip is
+  // asserted at the source: the measured chip must be reachable only on the
+  // branch where the run is not simulated.
+  await withServer(4422, async base => {
+    const panel = await (await fetch(`${base}/recorder-panel.js`)).text();
+
+    assert.ok(panel.includes("Measured locally"), "the real-capture chip should still exist");
+    assert.ok(panel.includes("Scenario source"), "a simulated run needs its own source chip");
+
+    // The two chips must live on opposite branches of one conditional.
+    const conditional = panel.match(/status\?\.simulated[\s\S]{0,600}?Measured locally/);
+    assert.ok(conditional, "the measured chip must sit behind a simulated check");
+    const branch = conditional[0];
+    assert.ok(branch.indexOf("Scenario source") < branch.indexOf("Measured locally"),
+      "the simulated branch must come first, with measured as the else");
+
+    const css = await (await fetch(`${base}/design-system.css`)).text();
+    assert.match(css, /\.fl-source\[data-kind="simulated"\]/, "the simulated source chip needs its own styling");
+  });
+});

@@ -1,0 +1,40 @@
+{
+  "scenario": "custom-port-demo",
+  "title": "Custom port demonstration",
+  "description": "A scenario on a non-default port, used to prove that a simulation is bound to the port its scenario declares rather than to any default.",
+  "target": "service.example",
+  "port": 8443,
+  "intervalMs": 2000,
+  "phases": [
+    {
+      "label": "healthy",
+      "durationMs": 6000,
+      "targetTcp": "PASS",
+      "targetTcpMs": 20,
+      "targetDns": "PASS",
+      "targetDnsV4": 1,
+      "targetDnsV6": 0,
+      "ipv4": "PASS",
+      "ipv6": "INAPPLICABLE",
+      "activeInterface": "Ethernet",
+      "gateway": "192.168.1.1",
+      "resolvers": ["10.20.0.53"]
+    },
+    {
+      "label": "unreachable",
+      "durationMs": 8000,
+      "targetTcp": "FAIL",
+      "targetTcpError": "ECONNREFUSED",
+      "targetDns": "PASS",
+      "targetDnsV4": 1,
+      "targetDnsV6": 0,
+      "ipv4": "FAIL",
+      "ipv6": "INAPPLICABLE",
+      "activeInterface": "Corp VPN",
+      "gateway": "10.8.0.1",
+      "resolvers": ["10.20.0.53"],
+      "vpn": true,
+      "vpnAdapters": ["Corp VPN"]
+    }
+  ]
+}

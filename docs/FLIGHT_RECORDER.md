@@ -379,7 +379,7 @@ propagates to every layer a record can reach:
 | Incident record | top-level `simulated`, `source`, `scenario`, `evidenceClass: "simulated"` |
 | `epistemics.observed` | "SIMULATED. These samples were generated from a scenario file." |
 | Incident list summary | `simulated`, `scenario` |
-| Dashboard | `SIMULATED` badge on the view, the incident title and the list row, plus a banner |
+| Dashboard | `SIMULATED` badge on the view, the incident title and the list row, plus a banner. The source chip reads "Scenario source", never "Measured locally" |
 | Persisted record | survives the round trip to the store |
 | Analyst projection | `simulated: true` and an explicit instruction never to present it as evidence about the user's network |
 
@@ -408,11 +408,33 @@ other.
   "port": 443,
   "intervalMs": 2000,
   "phases": [
-    { "label": "healthy", "durationMs": 20000, "targetTcp": "PASS", "ipv4": "PASS", "ipv6": "PASS" },
-    { "label": "broken",  "durationMs": 20000, "targetTcp": "FAIL", "ipv4": "PASS", "ipv6": "FAIL" }
+    { "label": "healthy", "durationMs": 20000,
+      "targetTcp": "PASS", "targetDns": "PASS", "targetDnsV4": 1, "targetDnsV6": 2,
+      "ipv4": "PASS", "ipv6": "PASS" },
+    { "label": "broken",  "durationMs": 20000,
+      "targetTcp": "FAIL", "targetDns": "PASS", "targetDnsV4": 1, "targetDnsV6": 2,
+      "ipv4": "PASS", "ipv6": "FAIL" }
   ]
 }
 ```
+
+**A scenario must be internally consistent, and DNS is where that bites.**
+`targetDnsV4` / `targetDnsV6` state how many A and AAAA records the target
+publishes. The `ipv6-path-loss` demo keeps `targetDnsV6: 2` in *every* phase,
+including the failing one — that is the entire point: the target still publishes
+AAAA while this machine loses the ability to use it. A sample claiming
+`ipv6: PASS` alongside zero AAAA records would contradict itself and destroy the
+distinction between a local capability deficiency and a target property.
+
+If a family's count is omitted it is derived from that family's own connectivity
+result rather than assumed absent: only `INAPPLICABLE` yields zero, because
+`INAPPLICABLE` is precisely the state meaning "the target publishes none".
+
+A simulation is **bound to its scenario's target and port**. The CLI refuses a
+positional target alongside `--simulate` rather than silently ignoring it, so
+scripted samples for one host can never be recorded as an incident against
+another — which would also point a later Bisect handoff at a host the scenario
+never described.
 
 Every field is validated against an allow-list with bounded lengths and enum
 checks; unknown fields are discarded rather than reaching a sample. Phase states

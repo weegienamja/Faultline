@@ -22,7 +22,7 @@
 // the store, in an evidence package, or in what the Analyst is told.
 
 import { readFile, readdir } from "node:fs/promises";
-import { basename, extname, resolve } from "node:path";
+import { extname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { pathFingerprint, classifySample, NOT_SAMPLED, UNKNOWN_STATE } from "./sample.mjs";
@@ -115,6 +115,12 @@ export function validateScenario(input) {
       targetTcpMs: number(phase.targetTcpMs, `phases[${index}].targetTcpMs`, { max: 60_000 }),
       targetTcpError: text(phase.targetTcpError, `phases[${index}].targetTcpError`, 60),
       targetDns: state(phase.targetDns, `phases[${index}].targetDns`) || RESULT.PASS,
+      // Per-family answer counts are explicit measurements, not derived. A
+      // scenario demonstrating "the target publishes AAAA but this machine
+      // cannot use IPv6" has to be able to SAY that AAAA exists, otherwise the
+      // sample contradicts itself: IPv6 PASS alongside zero AAAA records.
+      targetDnsV4: number(phase.targetDnsV4, `phases[${index}].targetDnsV4`, { max: 64 }),
+      targetDnsV6: number(phase.targetDnsV6, `phases[${index}].targetDnsV6`, { max: 64 }),
       ipv4: state(phase.ipv4, `phases[${index}].ipv4`) || RESULT.PASS,
       ipv6: state(phase.ipv6, `phases[${index}].ipv6`) || RESULT.INAPPLICABLE,
       gatewayMs: number(phase.gatewayMs, `phases[${index}].gatewayMs`, { max: 10_000 }),
@@ -201,9 +207,9 @@ export async function loadScenario(name) {
  */
 export async function loadScenarioFile(path) {
   try {
-    const scenario = validateScenario(JSON.parse(await readFile(resolve(path), "utf8")));
-    // Fall back to the filename so an unnamed file still has provenance.
-    return { ...scenario, scenario: scenario.scenario || basename(path, ".json") };
+    // `scenario` is required by validateScenario, so a file always names itself
+    // and provenance can never be inferred from a path.
+    return validateScenario(JSON.parse(await readFile(resolve(path), "utf8")));
   } catch (error) {
     if (error instanceof ScenarioError) throw error;
     throw new ScenarioError(`Could not read simulation scenario at ${path}.`);
@@ -248,6 +254,8 @@ export function createSimulationSampler(scenario, { now = () => Date.now() } = {
     const phase = phaseAt(elapsedMs);
     const iso = new Date(at).toISOString();
 
+    const dnsAnswered = phase.targetDns === RESULT.PASS;
+
     const targetTcp = phase.targetTcp === RESULT.PASS
       ? { state: RESULT.PASS, ms: phase.targetTcpMs ?? 30 }
       : phase.targetTcp === RESULT.FAIL
@@ -287,7 +295,15 @@ export function createSimulationSampler(scenario, { now = () => Date.now() } = {
         gateway: phase.gatewayMs === null && phase.gatewayLossPct === null
           ? { state: NOT_SAMPLED }
           : { state: RESULT.PASS, averageMs: phase.gatewayMs ?? 2, lossPct: phase.gatewayLossPct ?? 0, jitterMs: 0 },
-        targetDns: { state: phase.targetDns, v4: phase.targetDns === RESULT.PASS ? 1 : 0, v6: 0, error: null },
+        targetDns: {
+          state: phase.targetDns,
+          // Explicit when the scenario states them. The fallback derives each
+          // family from its own connectivity result rather than assuming zero
+          // AAAA, so an IPv6 PASS can never sit next to "no IPv6 addresses".
+          v4: phase.targetDnsV4 ?? (dnsAnswered && phase.ipv4 !== RESULT.INAPPLICABLE ? 1 : 0),
+          v6: phase.targetDnsV6 ?? (dnsAnswered && phase.ipv6 !== RESULT.INAPPLICABLE ? 1 : 0),
+          error: null
+        },
         targetTcp,
         contract: null
       },

@@ -17,10 +17,14 @@
       "gatewayMs": 2,
       "activeInterface": "Wi-Fi",
       "gateway": "192.168.1.1",
-      "resolvers": ["10.20.0.53"],
+      "resolvers": [
+        "10.20.0.53"
+      ],
       "wifiSsid": "office-5g",
       "wifiBssid": "aa:bb:cc:dd:ee:01",
-      "vpn": false
+      "vpn": false,
+      "targetDnsV4": 1,
+      "targetDnsV6": 0
     },
     {
       "label": "resolvers replaced, target no longer resolves",
@@ -33,10 +37,14 @@
       "gatewayMs": 2,
       "activeInterface": "Wi-Fi",
       "gateway": "192.168.1.1",
-      "resolvers": ["192.0.2.53"],
+      "resolvers": [
+        "192.0.2.53"
+      ],
       "wifiSsid": "office-5g",
       "wifiBssid": "aa:bb:cc:dd:ee:01",
-      "vpn": false
+      "vpn": false,
+      "targetDnsV4": 0,
+      "targetDnsV6": 0
     }
   ]
 }

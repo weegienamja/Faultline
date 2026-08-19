@@ -483,6 +483,9 @@ a:hover { text-decoration: underline; }
 .fl-source[data-kind="inferred"] { color: var(--fl-warn); border-color: var(--fl-warn-line); background: var(--fl-warn-soft); }
 .fl-source[data-kind="external"] { color: var(--fl-accent); border-color: var(--fl-accent-line); background: var(--fl-accent-soft); }
 .fl-source[data-kind="demo"] { color: var(--fl-text-3); border-style: dashed; }
+/* Scripted, not measured. Warn-coloured and dashed so it can never be mistaken
+   for a measurement at a glance. */
+.fl-source[data-kind="simulated"] { color: var(--fl-warn); border-color: var(--fl-warn-line); background: var(--fl-warn-soft); border-style: dashed; }
 
 /* ==========================================================================
    Tables

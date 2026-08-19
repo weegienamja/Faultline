@@ -17,9 +17,19 @@
       "gatewayLossPct": 0,
       "activeInterface": "Ethernet",
       "gateway": "192.168.1.1",
-      "route": { "destination": "0.0.0.0/0", "nextHop": "192.168.1.1", "interfaceAlias": "Ethernet", "metric": 25 },
-      "resolvers": ["10.20.0.53"],
-      "vpn": false
+      "route": {
+        "destination": "0.0.0.0/0",
+        "nextHop": "192.168.1.1",
+        "interfaceAlias": "Ethernet",
+        "metric": 25
+      },
+      "resolvers": [
+        "10.20.0.53"
+      ],
+      "vpn": false,
+      "targetDnsV4": 1,
+      "targetDnsV6": 0,
+      "targetDns": "PASS"
     },
     {
       "label": "VPN takes the default route, target unreachable",
@@ -32,10 +42,22 @@
       "gatewayLossPct": 0,
       "activeInterface": "Corp VPN",
       "gateway": "10.8.0.1",
-      "route": { "destination": "0.0.0.0/0", "nextHop": "10.8.0.1", "interfaceAlias": "Corp VPN", "metric": 5 },
-      "resolvers": ["10.20.0.53"],
+      "route": {
+        "destination": "0.0.0.0/0",
+        "nextHop": "10.8.0.1",
+        "interfaceAlias": "Corp VPN",
+        "metric": 5
+      },
+      "resolvers": [
+        "10.20.0.53"
+      ],
       "vpn": true,
-      "vpnAdapters": ["Corp VPN"]
+      "vpnAdapters": [
+        "Corp VPN"
+      ],
+      "targetDnsV4": 1,
+      "targetDnsV6": 0,
+      "targetDns": "PASS"
     },
     {
       "label": "previous route restored",
@@ -48,9 +70,19 @@
       "gatewayLossPct": 0,
       "activeInterface": "Ethernet",
       "gateway": "192.168.1.1",
-      "route": { "destination": "0.0.0.0/0", "nextHop": "192.168.1.1", "interfaceAlias": "Ethernet", "metric": 25 },
-      "resolvers": ["10.20.0.53"],
-      "vpn": false
+      "route": {
+        "destination": "0.0.0.0/0",
+        "nextHop": "192.168.1.1",
+        "interfaceAlias": "Ethernet",
+        "metric": 25
+      },
+      "resolvers": [
+        "10.20.0.53"
+      ],
+      "vpn": false,
+      "targetDnsV4": 1,
+      "targetDnsV6": 0,
+      "targetDns": "PASS"
     }
   ]
 }
