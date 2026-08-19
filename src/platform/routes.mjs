@@ -18,6 +18,7 @@ import {
 } from "../cases/participants.mjs";
 import { createTenantRouter } from "../tenancy/routes.mjs";
 import { createDeveloperRouter } from "../developer/routes.mjs";
+import { createChangeAssuranceRouter } from "../change/routes.mjs";
 
 function notFound(message) { const error = new Error(message); error.statusCode = 404; throw error; }
 function unauthorized(message = "Case-room participant credential required.") { const error = new Error(message); error.statusCode = 401; throw error; }
@@ -32,6 +33,7 @@ export function createPlatformRouter({ store, requireAdmin, bodyFrom, json, crea
 
   const handleTenant = createTenantRouter({ store, requireAdmin, bodyFrom, json, caseContext, evidenceFor, createCaseDiagnostic });
   const developer = createDeveloperRouter({ store, requireAdmin, bodyFrom, json, createSession, publicSession, evidenceFor });
+  const changeAssurance = createChangeAssuranceRouter({ store, requireAdmin, bodyFrom, json });
 
   async function participantContext(req) {
     const access = findParticipantAccess(await store.listCases(), bearer(req));
@@ -54,11 +56,12 @@ export function createPlatformRouter({ store, requireAdmin, bodyFrom, json, crea
     if (await handleParticipantRoom(req, res, url)) return true;
     if (await developer.handle(req, res, url)) return true;
     if (await handleTenant(req, res, url)) return true;
+    if (await changeAssurance.handle(req, res, url)) return true;
     if (!url.pathname.startsWith("/api/cases")) return false;
     requireAdmin(req);
 
     if (req.method === "POST" && url.pathname === "/api/cases") { const payload = await bodyFrom(req); const caseRecord = createSupportCase(payload); await store.putCase(caseRecord); await store.appendAudit({ at: new Date().toISOString(), type: "case.created", probeId: null, details: { caseId: caseRecord.id, severity: caseRecord.severity } }); json(res, 201, publicCase(caseRecord)); return true; }
-    if (req.method === "GET" && url.pathname === "/api/cases") { const cases = await store.listCases(); const sessions = await store.listSessions(); const runs = await store.listRuns(5000); json(res, 200, cases.map(caseRecord => ({ ...publicCase(caseRecord, { sessions: sessions.filter(session => session.caseId === caseRecord.id), runs: runs.filter(run => (caseRecord.sessionIds || []).includes(run.sessionId || run.id)) }), participants: (caseRecord.participantInvitations || []).map(item => publicParticipant(item)), contributionCount: (caseRecord.contributions || []).length }))); return true; }
+    if (req.method === "GET" && url.pathname === "/api/cases") { const cases = await store.listCases(); const sessions = await store.listSessions(); const runs = await store.listRuns(5000); json(res, 200, cases.map(caseRecord => ({ ...publicCase(caseRecord, { sessions: sessions.filter(session => session.caseId === caseRecord.id), runs: runs.filter(run => (caseRecord.sessionIds || []).includes(run.sessionId || run.id)) }), participants: (caseRecord.participantInvitations || []).map(item => publicParticipant(item)), contributionCount: (caseRecord.contributions || []).length, changeWindows: structuredClone(caseRecord.changeWindows || []) }))); return true; }
 
     const revokeMatch = url.pathname.match(/^\/api\/cases\/([^/]+)\/participants\/([^/]+)\/revoke$/);
     if (req.method === "POST" && revokeMatch) { const caseRecord = await getCase(decodeURIComponent(revokeMatch[1])); const updated = revokeCaseParticipant(caseRecord, decodeURIComponent(revokeMatch[2])); await store.putCase(updated); json(res, 200, { participants: (updated.participantInvitations || []).map(item => publicParticipant(item)) }); return true; }
@@ -66,7 +69,7 @@ export function createPlatformRouter({ store, requireAdmin, bodyFrom, json, crea
     const match = url.pathname.match(/^\/api\/cases\/([^/]+)(?:\/(notes|diagnostics|evidence|report|compare|participants|contributions))?$/);
     if (!match) return false;
     const id = decodeURIComponent(match[1]); const action = match[2] || null; const caseRecord = await getCase(id);
-    if (req.method === "GET" && !action) { json(res, 200, { ...publicCase(caseRecord, await caseContext(caseRecord)), participants: (caseRecord.participantInvitations || []).map(item => publicParticipant(item)), contributions: structuredClone(caseRecord.contributions || []) }); return true; }
+    if (req.method === "GET" && !action) { json(res, 200, { ...publicCase(caseRecord, await caseContext(caseRecord)), participants: (caseRecord.participantInvitations || []).map(item => publicParticipant(item)), contributions: structuredClone(caseRecord.contributions || []), changeWindows: structuredClone(caseRecord.changeWindows || []) }); return true; }
     if (req.method === "PATCH" && !action) { const payload = await bodyFrom(req); const updated = updateSupportCase(caseRecord, payload); await store.putCase(updated); json(res, 200, publicCase(updated, await caseContext(updated))); return true; }
     if (req.method === "POST" && action === "notes") { const payload = await bodyFrom(req); const result = addCaseNote(caseRecord, payload); await store.putCase(result.caseRecord); json(res, 201, { note: result.note, case: publicCase(result.caseRecord, await caseContext(result.caseRecord)) }); return true; }
     if (req.method === "POST" && action === "participants") { const payload = await bodyFrom(req); const result = createCaseParticipantInvitation(caseRecord, payload); await store.putCase(result.caseRecord); json(res, 201, { participant: result.invitation, credential: result.token, roomPath: `/case-room#token=${encodeURIComponent(result.token)}` }); return true; }
