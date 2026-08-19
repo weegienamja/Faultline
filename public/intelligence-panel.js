@@ -1,3 +1,4 @@
+import "./cases-panel.js";
 import { analyseEvidencePatterns } from "./evidence-patterns.js";
 
 const strip = document.getElementById("incident-list");
