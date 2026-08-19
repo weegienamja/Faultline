@@ -10,6 +10,7 @@ import { bisect } from "./engine.mjs";
 import { isolate } from "./adaptive.mjs";
 import { assertLiteralTargetAllowed } from "../security/target.mjs";
 import { parseLiveTarget } from "../live/measure.mjs";
+import { EVIDENCE_KIND, evidenceRegistry } from "../analyst/registry.mjs";
 
 const MAX_REPEAT = 10;
 const MAX_CONFIRM = 10;
@@ -49,7 +50,11 @@ export function createBisectRouter({ requireAdmin, bodyFrom, json }) {
         ? await bisect(target.input, { ...shared, includeSourceInterface: payload.includeSourceInterface !== false })
         : await isolate(target.input, { ...shared, maxExperiments: clamp(payload.maxExperiments, 12, 40) });
 
-      json(res, 201, report);
+      // Retained in memory only, so the Analyst can be asked about the run
+      // that was just produced. Nothing is written to disk.
+      const runId = evidenceRegistry.record(EVIDENCE_KIND.BISECT, report);
+
+      json(res, 201, { ...report, id: report.id || runId });
       return true;
     }
 

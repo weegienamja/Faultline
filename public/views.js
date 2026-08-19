@@ -8,7 +8,7 @@
 // operator's trust, and Faultline's whole argument is that every value on
 // screen is traceable to a measurement.
 
-import { mount, panel, tile, state, badge, source, disclose, auth, goTo, currentView } from "./shell.js";
+import { mount, panel, tile, state, badge, source, disclose, auth, goTo, currentView, escapeHtml } from "./shell.js";
 
 // ---------------------------------------------------------------------------
 // Rail credential indicator
@@ -285,7 +285,24 @@ function renderSettings() {
         ${panel({
           label: "Reasoning",
           title: "Diagnosis policy",
-          body: `<p class="fl-body">Faultline does not use an AI or LLM API anywhere in diagnosis. Every conclusion comes from deterministic rules over observed measurements and is traceable to the evidence that produced it.</p>`
+          body: `<p class="fl-body">Faultline does not use an AI or LLM API anywhere in diagnosis. Every conclusion comes from deterministic rules over observed measurements and is traceable to the evidence that produced it.</p>
+            <p class="fl-body" style="margin-top:10px">The optional Faultline Analyst explains that evidence in natural language. It runs locally, reads through read-only tools, and produces no findings of its own.</p>`
+        })}
+        ${panel({
+          label: "Inference",
+          title: "Faultline Analyst",
+          body: `
+            <dl class="fl-kv">
+              <div><dt>Provider</dt><dd id="analyst-settings-provider">—</dd></div>
+              <div><dt>Model</dt><dd id="analyst-settings-model">—</dd></div>
+              <div><dt>Endpoint</dt><dd id="analyst-settings-endpoint">—</dd></div>
+              <div><dt>Status</dt><dd id="analyst-settings-status">—</dd></div>
+              <div><dt>Cloud inference</dt><dd>${badge("Never", "ok")}</dd></div>
+              <div><dt>Conversations</dt><dd>not persisted</dd></div>
+            </dl>
+            <p class="fl-body" style="margin-top:12px">
+              Optional. Faultline's measurement and diagnosis work identically without it.
+            </p>`
         })}
       </div>
     </div>`;
@@ -296,6 +313,49 @@ function renderSettings() {
 function paintSettingsAuth() {
   const cell = document.getElementById("settings-auth");
   if (cell) cell.innerHTML = auth.unlocked ? badge("Unlocked", "ok") : badge("Locked", "idle");
+  void paintAnalystSettings();
+}
+
+// Runtime detail belongs here rather than in the drawer, which stays product-level.
+const ANALYST_STATE_LABEL = {
+  MODEL_READY: ["Ready", "ok"],
+  MODEL_LOADING: ["Loading", "warn"],
+  MODEL_NOT_INSTALLED: ["Model not installed", "warn"],
+  OLLAMA_UNAVAILABLE: ["Runtime not running", "idle"],
+  MODEL_ERROR: ["Error", "crit"]
+};
+
+async function paintAnalystSettings() {
+  const statusCell = document.getElementById("analyst-settings-status");
+  if (!statusCell) return;
+
+  const set = (id, html) => {
+    const cell = document.getElementById(id);
+    if (cell) cell.innerHTML = html;
+  };
+
+  if (!auth.unlocked) {
+    set("analyst-settings-provider", "—");
+    set("analyst-settings-model", "—");
+    set("analyst-settings-endpoint", "—");
+    set("analyst-settings-status", badge("Locked", "idle"));
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/analyst/status", { headers: { authorization: `Bearer ${auth.token}` } });
+    if (!response.ok) throw new Error("unavailable");
+    const status = await response.json();
+    const [label, tone] = ANALYST_STATE_LABEL[status.state] || ["Unavailable", "idle"];
+    set("analyst-settings-provider", escapeHtml(status.provider || "Ollama"));
+    set("analyst-settings-model", `<code>${escapeHtml(status.model || "—")}</code>`);
+    // The literal endpoint is a runtime detail, but a wrong one must be visible.
+    set("analyst-settings-endpoint", `Local · <code>${escapeHtml(status.endpoint || "—")}</code>`);
+    set("analyst-settings-status", badge(label, tone));
+  } catch {
+    set("analyst-settings-provider", "Ollama");
+    set("analyst-settings-status", badge("Unavailable", "idle"));
+  }
 }
 window.addEventListener("faultline-auth-changed", paintSettingsAuth);
 

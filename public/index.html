@@ -71,6 +71,7 @@
           <h1 class="fl-page-title" id="crumb-title">Overview</h1>
         </div>
         <div class="fl-topbar-actions">
+          <button class="fl-btn" id="analyst-toggle" type="button" aria-expanded="false" aria-controls="analyst-drawer">Analyst</button>
           <button class="fl-btn" id="auth-open" type="button">Unlock live data</button>
           <button class="fl-btn fl-btn-primary" id="invite-open" type="button">New diagnostic</button>
         </div>
@@ -373,6 +374,17 @@
         <p class="fl-meta">Faultline v1.5 preview · Capture, isolate and preserve network fault evidence · Evidence before escalation.</p>
       </footer>
     </main>
+
+    <!-- =====================================================================
+         Faultline Analyst.
+
+         A local model explains the evidence on screen. It never produces a
+         deterministic finding: the engine remains the only thing that decides
+         a fault domain. Rendered by analyst-drawer.js.
+         ===================================================================== -->
+    <aside class="fl-analyst" id="analyst-drawer" aria-label="Faultline Analyst" hidden>
+      <div data-mount="analyst"></div>
+    </aside>
   </div>
 
   <!-- ======================================================================
@@ -463,5 +475,6 @@
   <script type="module" src="/bisect-panel.js"></script>
   <script type="module" src="/app.js"></script>
   <script type="module" src="/invite-admin.js"></script>
+  <script type="module" src="/analyst-drawer.js"></script>
 </body>
 </html>

@@ -11,6 +11,7 @@ import { runLiveDiagnostic } from "./diagnostic.mjs";
 import { previewManifest, validateManifest } from "../environment/manifest.mjs";
 import { PUBLIC_PROBE_ALLOWED_PORTS } from "../security/target.mjs";
 import { isConfigured as radarConfigured } from "../integrations/cloudflare-radar.mjs";
+import { EVIDENCE_KIND, evidenceRegistry } from "../analyst/registry.mjs";
 
 export function createLiveRouter({ requireAdmin, bodyFrom, json, store, publicProbe }) {
   return async function handleLive(req, res, url) {
@@ -54,6 +55,10 @@ export function createLiveRouter({ requireAdmin, bodyFrom, json, store, publicPr
         vantages: payload.vantages,
         countryCode: payload.countryCode ? String(payload.countryCode).toUpperCase().slice(0, 2) : null
       });
+      // Retained in memory only, so the Analyst can answer questions about the
+      // diagnostic just run. Nothing is written to disk.
+      evidenceRegistry.record(EVIDENCE_KIND.LIVE, result);
+
       json(res, 201, result);
       return true;
     }
