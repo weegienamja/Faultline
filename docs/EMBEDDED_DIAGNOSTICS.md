@@ -103,3 +103,29 @@ That keeps case/session creation in the trusted support backend while giving a p
 - completion events are pull/read endpoints, not outbound webhooks yet;
 - the widget is intentionally minimal and does not create diagnostics itself;
 - no vendor-specific ticketing connector is included in v1.2.
+
+## Known gap: v1 API authentication is not service-account scoped
+
+The shipped v1 API authenticates with the platform admin credential
+(`requireAdmin`). That is adequate for a local/prototype control plane but it
+means an embedding application must hold the platform admin token, and there is
+no way to issue a narrower credential per project or per end user.
+
+An earlier, unmerged implementation of this milestone (branch
+`agent/v12-embedded-api-sdk`, draft PR #14) prototyped a credential model that
+the merged implementation does not have:
+
+- **Project-scoped API keys** — `fl_api_...`, hashed, revocable, held on the
+  project record, with explicit scopes (`diagnostics:create`,
+  `diagnostics:read`, `cases:read`, `evidence:read`) checked per request.
+- **One-use embed tokens** — `fl_embed_...`, 1-30 minute TTL, pinned to a single
+  target, consumed on first exchange, so a support portal can hand a browser a
+  bounded credential instead of an API key.
+
+That branch is deliberately retained rather than deleted. Adopting scoped
+service credentials changes the auth model of a shipped API, so it belongs in
+its own reviewed change rather than being folded in during a consolidation.
+
+Until then, treat the v1 API as an administrative interface and do not expose
+the admin credential to an end-user browser. The launch widget is designed to
+be handed a short-lived session, not the admin token.
