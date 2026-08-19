@@ -178,6 +178,7 @@ export async function isolate(targetInput, {
   trialRunner = runTrial,
   interfaceModel = null,
   answerSets = null,
+  axes = null,
   onProgress = null
 } = {}) {
   const startedAt = new Date().toISOString();
@@ -192,7 +193,7 @@ export async function isolate(targetInput, {
   const targetIsLoopback = /^(127\.|::1$|localhost$)/i.test(target.host);
 
   const context = { target, answers, resolvers, interfaces: interfaces.interfaces, targetIsLoopback };
-  const { experiments, unavailable, availableAxisIds } = buildExperiments(context);
+  const { experiments, unavailable, availableAxisIds } = buildExperiments(context, { axes });
 
   // --- Step 1: baseline -----------------------------------------------------
   report({ phase: "baseline" });

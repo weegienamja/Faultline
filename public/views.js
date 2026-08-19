@@ -94,48 +94,8 @@ window.addEventListener("faultline-incident", event => renderOverviewTiles(event
 // is designed so the capability has somewhere to land, and is explicit that it
 // is not recording.
 
-function renderRecorder() {
-  const host = mount("recorder");
-  if (!host || host.dataset.rendered) return;
-  host.dataset.rendered = "1";
-
-  host.innerHTML = `
-    <div class="fl-grid">
-      <div class="fl-col-8">
-        ${panel({
-          label: "Capture",
-          title: "Rolling evidence buffer",
-          meta: badge("Not recording", "idle"),
-          body: state({
-            icon: "⏺",
-            title: "No capture session is running",
-            body: "Flight Recorder keeps a continuous low-rate measurement window so a fault that lasts ten seconds still leaves evidence behind. It is specified but not yet implemented — a one-shot Live Diagnostic is the current way to capture evidence, and it must be run while the fault is happening.",
-            actions: `<button class="fl-btn fl-btn-primary" data-goto="live">Run a live diagnostic</button>
-                      <a class="fl-btn" href="https://github.com/weegienamja/Faultline/blob/main/ROADMAP.md">Roadmap</a>`
-          }),
-          foot: `<span>Tracked on the roadmap under <strong>Intermittent faults</strong>.</span>`
-        })}
-      </div>
-      <div class="fl-col-4">
-        ${panel({
-          label: "Specification",
-          title: "What it will capture",
-          body: `
-            <dl class="fl-kv">
-              <div><dt>Window</dt><dd>rolling, bounded</dd></div>
-              <div><dt>Rate</dt><dd>low, continuous</dd></div>
-              <div><dt>Signals</dt><dd>DNS · TCP · TLS · ICMP · path</dd></div>
-              <div><dt>Trigger</dt><dd>manual or contract breach</dd></div>
-              <div><dt>Output</dt><dd>evidence package</dd></div>
-            </dl>
-            <p class="fl-body" style="margin-top:12px">
-              The buffer is bounded by design. Faultline is not a packet-capture warehouse: it records
-              measurements and outcomes, never payloads, credentials or browsing activity.
-            </p>`
-        })}
-      </div>
-    </div>`;
-}
+// Flight Recorder now has a dedicated panel module (recorder-panel.js) which
+// owns the live capture surface. This file no longer renders the view.
 
 // ---------------------------------------------------------------------------
 // Change Assurance
@@ -381,7 +341,6 @@ function renderTopologyFallback() {
 // ---------------------------------------------------------------------------
 
 function renderForView(view) {
-  if (view === "recorder") renderRecorder();
   if (view === "change") renderChange();
   if (view === "environment") renderEnvironment();
   if (view === "settings") renderSettings();

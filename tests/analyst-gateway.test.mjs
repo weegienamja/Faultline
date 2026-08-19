@@ -12,6 +12,7 @@ import { projectBisectRun, projectLiveDiagnostic } from "../src/analyst/evidence
 import { buildDocIndex, lookupTerm } from "../src/analyst/docs.mjs";
 import { buildSystemPrompt } from "../src/analyst/prompt.mjs";
 import { buildEvidenceInventory, renderEvidenceInventory } from "../src/analyst/inventory.mjs";
+import { projectIncident } from "../src/analyst/incident-evidence.mjs";
 
 // Gateway, tools, schema and conversation state. No Ollama, no network.
 
@@ -169,10 +170,12 @@ test("view context fields are pattern-bounded", () => {
   assert.equal(hostile.activeRunId, null);
 });
 
-test("starter questions are page-aware and do not promise Flight Recorder data", () => {
+test("starter questions are page-aware", () => {
   assert.notDeepEqual(starterQuestions("bisect"), starterQuestions("cases"));
+  // The Flight Recorder is implemented, so its questions may now ask about
+  // captured history - which is exactly what it retains.
   const recorder = starterQuestions("recorder").join(" ").toLowerCase();
-  assert.ok(!recorder.includes("before this outage"), "must not imply captured history that does not exist");
+  assert.match(recorder, /changed before/);
 });
 
 // --- tool surface is read-only ---------------------------------------------
@@ -425,6 +428,115 @@ test("the system prompt carries the epistemic rules", () => {
     assert.ok(prompt.includes(phrase), `system prompt is missing: ${phrase}`);
   }
   assert.ok(prompt.includes("Network Bisect"), "prompt should carry the current view");
+});
+
+// --- Flight Recorder incidents ---------------------------------------------
+
+const INCIDENT = {
+  schema: "faultline.flight-recorder-incident",
+  id: "FLR-2026-0007",
+  evidenceClass: "observed",
+  target: { host: "api.example.com", port: 443 },
+  trigger: { type: "TARGET_REACHABILITY_TRANSITION", at: "2026-08-19T20:46:18.000Z", summary: "Target TCP reachability changed PASS → FAIL", manual: false },
+  concurrentTriggers: [{ type: "NETWORK_STATE_CHANGE", at: "2026-08-19T20:46:18.000Z", summary: "Default route changed" }],
+  windows: {
+    before: { samples: [{ at: "2026-08-19T20:45:51.000Z", state: "healthy", connectivity: { targetTcp: { state: "PASS", ms: 31 } }, local: { activeInterface: "Ethernet" } }], from: "2026-08-19T20:45:51.000Z", to: "2026-08-19T20:45:51.000Z" },
+    during: { samples: [{ at: "2026-08-19T20:46:18.000Z", state: "failed", connectivity: { targetTcp: { state: "FAIL" } }, local: { activeInterface: "Corp VPN" }, reasons: ["target TCP unreachable"] }], from: "2026-08-19T20:46:18.000Z", to: "2026-08-19T20:46:18.000Z" },
+    after: { samples: [], from: null, to: null }
+  },
+  observedChange: {
+    comparable: true,
+    hadFailure: true,
+    statement: "The target became unreachable at 20:46:18. Compared with the last healthy sample, the failing window differs by active interface.",
+    differences: [
+      { key: "activeInterface", label: "Active interface", from: "Ethernet", to: "Corp VPN", bisectAxis: "source-interface", testable: true },
+      { key: "publicIp", label: "Public IP", from: "203.0.113.9", to: "198.51.100.4", bisectAxis: null, testable: false }
+    ],
+    unchanged: [{ key: "resolvers" }],
+    recovery: null,
+    classification: "temporal_association",
+    note: "This is an observed temporal association, not proof that any listed change caused the failure."
+  },
+  candidateDiscriminators: {
+    available: true,
+    testable: [{ condition: "Active interface", axis: "source-interface", healthyValue: "Ethernet", failingValue: "Corp VPN" }],
+    untestable: [{ condition: "Public IP", reason: "Network Bisect has no experiment that varies this condition." }],
+    bisectAxes: ["source-interface"],
+    note: "Candidates are differences between two observed windows. They are not causes."
+  },
+  deepCapture: { available: true, stages: [{ name: "TCP", state: "fail", ms: null, detail: "timed out" }], external: { state: "reachable" }, deterministic: { faultDomain: "access_path" } },
+  epistemics: { limit: "Temporal association is not causation." }
+};
+
+test("an incident projection keeps the association framing intact", () => {
+  const projected = projectIncident(INCIDENT);
+  assert.equal(projected.evidenceClass, "observed");
+  assert.equal(projected.observedChange.classification, "temporal_association");
+  assert.match(projected.observedChange.note, /not proof/);
+  assert.match(projected.epistemics.forTheAnalyst, /Do not describe any difference as the cause/);
+});
+
+test("an incident projection separates testable from untestable differences", () => {
+  const projected = projectIncident(INCIDENT);
+  const testable = projected.observedChange.differences.filter(entry => entry.testableByBisect);
+  assert.equal(testable.length, 1);
+  assert.equal(testable[0].bisectAxis, "source-interface");
+  assert.equal(projected.candidateDiscriminators.untestable[0].condition, "Public IP");
+});
+
+test("an incident projection sheds sample bulk but keeps window boundaries", () => {
+  const projected = projectIncident(INCIDENT);
+  assert.equal(projected.windows.before.count, 1);
+  assert.equal(projected.windows.before.first.targetTcp, "PASS");
+  assert.equal(projected.windows.during.first.targetTcp, "FAIL");
+  // The full sample arrays must not survive into the model's context.
+  assert.equal(projected.windows.before.samples, undefined);
+});
+
+test("incident references are minted and resolvable", () => {
+  const projected = projectIncident(INCIDENT);
+  const refs = projected.refs.map(entry => entry.ref);
+  assert.ok(refs.includes("FLR-2026-0007"));
+  assert.ok(refs.includes("CHG-01"));
+  assert.ok(refs.includes("DEEP-01"));
+  assert.ok(projected.refs.every(entry => entry.view === "recorder"));
+});
+
+test("the incident tools retrieve from the registry and refuse unknown ids", async () => {
+  const registry = createEvidenceRegistry();
+  registry.record(EVIDENCE_KIND.INCIDENT, INCIDENT, { id: INCIDENT.id });
+  const context = toolContext({ registry });
+
+  const latest = await executeTool("get_latest_recorder_incident", {}, context);
+  assert.equal(latest.ok, true);
+  assert.equal(latest.result.id, "FLR-2026-0007");
+
+  const byId = await executeTool("get_recorder_incident", { incidentId: "FLR-2026-0007" }, context);
+  assert.equal(byId.ok, true);
+
+  const missing = await executeTool("get_recorder_incident", { incidentId: "FLR-2026-9999" }, context);
+  assert.equal(missing.ok, true);
+  assert.equal(missing.result.available, false);
+
+  const hostile = await executeTool("get_recorder_incident", { incidentId: "../../etc/passwd" }, context);
+  assert.equal(hostile.ok, false);
+  assert.equal(hostile.error, "INVALID_ARGUMENT");
+});
+
+test("the inventory advertises a captured incident and no longer calls the recorder unimplemented", async () => {
+  const registry = createEvidenceRegistry();
+  registry.record(EVIDENCE_KIND.INCIDENT, INCIDENT, { id: INCIDENT.id });
+  const rendered = renderEvidenceInventory(await buildEvidenceInventory({
+    registry,
+    store: readOnlyStore(fakeStore),
+    view: normaliseViewContext({ view: "recorder" })
+  }));
+
+  assert.match(rendered, /Flight Recorder incident/);
+  assert.match(rendered, /get_latest_recorder_incident/);
+  assert.ok(!/Flight Recorder history \(not implemented\)/.test(rendered), "the recorder is implemented now");
+  // Still availability only.
+  assert.ok(!rendered.includes("Corp VPN"));
 });
 
 // --- evidence inventory -----------------------------------------------------

@@ -168,12 +168,29 @@ export const AXES = [
 /**
  * Expand the catalogue into concrete experiments for this run.
  * Each experiment is one axis set to one value.
+ *
+ * `axes` restricts the run to named axes. Flight Recorder uses it to test only
+ * the conditions it actually observed changing, rather than re-deriving the
+ * whole matrix. An unknown or unavailable name is reported in `unavailable`
+ * like any other axis - a restriction that silently matched nothing would look
+ * identical to a run that found nothing.
  */
-export function buildExperiments(context) {
+export function buildExperiments(context, { axes = null } = {}) {
   const experiments = [];
   const unavailable = [];
+  const requested = Array.isArray(axes) && axes.length ? new Set(axes.map(String)) : null;
+
+  if (requested) {
+    const known = new Set(AXES.map(axis => axis.id));
+    for (const name of requested) {
+      if (!known.has(name)) {
+        unavailable.push({ axisId: name, axisLabel: name, reason: "No Network Bisect experiment varies this condition." });
+      }
+    }
+  }
 
   for (const axis of AXES) {
+    if (requested && !requested.has(axis.id)) continue;
     const applicability = axis.applicability(context);
     if (!applicability.applicable) {
       unavailable.push({ axisId: axis.id, axisLabel: axis.label, reason: applicability.reason });

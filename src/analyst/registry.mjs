@@ -77,5 +77,6 @@ export const evidenceRegistry = createEvidenceRegistry();
 
 export const EVIDENCE_KIND = {
   BISECT: "bisect",
-  LIVE: "live"
+  LIVE: "live",
+  INCIDENT: "incident"
 };

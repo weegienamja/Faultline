@@ -14,6 +14,7 @@
 // Tool results are compact projections (see evidence.mjs), not internal state.
 
 import { projectBisectRun, projectCase, projectLiveDiagnostic } from "./evidence.mjs";
+import { projectIncident } from "./incident-evidence.mjs";
 import { EVIDENCE_KIND } from "./registry.mjs";
 import { lookupTerm } from "./docs.mjs";
 
@@ -331,6 +332,36 @@ export const TOOLS = [
           maintenance: Boolean(probe.maintenance)
         }))
       };
+    }
+  },
+
+  {
+    name: "get_latest_recorder_incident",
+    why: "Answers 'what changed before this broke' - the Flight Recorder holds the only record of the healthy state that preceded a failure.",
+    description: "Return the most recent Flight Recorder incident: the before/during/after windows, what differed between the healthy and failing samples, and which differences Network Bisect can test.",
+    parameters: { type: "object", properties: {}, required: [] },
+    parse: () => ({}),
+    run: (_args, ctx) => {
+      const incident = ctx.registry.latest(EVIDENCE_KIND.INCIDENT);
+      if (!incident) return NOT_AVAILABLE("No Flight Recorder incident has been captured in this session.");
+      return { available: true, ...projectIncident(incident) };
+    }
+  },
+
+  {
+    name: "get_recorder_incident",
+    why: "Lets a question about an earlier capture be answered without re-recording.",
+    description: "Return a specific retained Flight Recorder incident by id (for example FLR-2026-0001).",
+    parameters: {
+      type: "object",
+      properties: { incidentId: { type: "string", description: "The incident id." } },
+      required: ["incidentId"]
+    },
+    parse: args => ({ incidentId: requiredId(args, "incidentId") }),
+    run: ({ incidentId }, ctx) => {
+      const incident = ctx.registry.get(EVIDENCE_KIND.INCIDENT, incidentId);
+      if (!incident) return NOT_AVAILABLE(`No Flight Recorder incident ${incidentId} is retained.`);
+      return { available: true, ...projectIncident(incident) };
     }
   },
 

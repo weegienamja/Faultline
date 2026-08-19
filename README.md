@@ -108,6 +108,7 @@ control plane: run `npm start` and open <http://localhost:3000>.
 ```bash
 npm start                          # dashboard on :3000
 npm run bisect -- example.com      # condition isolation, no server needed
+npm run recorder -- example.com    # rolling capture of a transient fault
 ```
 
 It also does real live measurement (DNS across four resolvers, TCP, TLS
@@ -144,6 +145,7 @@ works identically without it.
 - **Live data:** real DNS/TCP/TLS/HTTP/ICMP/path measurement plus public routing, outage and network-ownership context
 - **Network Bisect:** adaptive fault isolation — competing hypotheses, deterministic experiment selection, reproducibility gating and paired confirmation
 
+- **Flight Recorder:** bounded in-memory capture of the minutes around a fault — before/during/after windows, observed differences, and candidate conditions handed to Network Bisect
 - **Faultline Analyst:** optional local-only AI that explains evidence, cites it, and is architecturally barred from producing findings
 
 Faultline does **not** use an AI/LLM API in diagnosis or Incident Intelligence,
@@ -266,6 +268,7 @@ Platform / tenant control plane
 - [Incident Intelligence](docs/INCIDENT_INTELLIGENCE.md)
 - [Multi-Tenancy](docs/MULTI_TENANCY.md)
 - [Network Bisect](docs/NETWORK_BISECT.md)
+- [Flight Recorder](docs/FLIGHT_RECORDER.md)
 - [Faultline Analyst (local AI)](docs/LOCAL_ANALYST.md)
 - [Live Internet Data](docs/LIVE_INTERNET_DATA.md)
 - [Architecture](docs/ARCHITECTURE.md)
