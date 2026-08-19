@@ -14,15 +14,12 @@ test("creates draft, publishes immutable version and resolves published contract
  assert.throws(()=>publishProjectContract(published.project,created.entry.id),/Only draft/);
 });
 
-test("clones a new version without modifying the published snapshot",()=>{
- const first=publishProjectContract(createProjectContract(project,{contract}).project,createProjectContract(project,{contract}).entry?.id);
-});
-
 test("version lifecycle supports clone publish and deprecate",()=>{
  const draft=createProjectContract(project,{contract});
  const pub=publishProjectContract(draft.project,draft.entry.id);
  const clone=cloneProjectContractVersion(pub.project,draft.entry.id,{notes:"Add later checks"});
  assert.equal(clone.entry.contract.version,2); assert.equal(clone.entry.status,"draft");
+ assert.equal(pub.entry.contract.version,1);
  const pub2=publishProjectContract(clone.project,clone.entry.id);
  assert.equal(getPublishedProjectContract(pub2.project,"voice-web").contract.version,2);
  const dep=deprecateProjectContract(pub2.project,draft.entry.id);
