@@ -9,8 +9,8 @@ It is built around one question:
 > What changed, which condition actually changes the outcome, and what evidence can I hand to the next person?
 
 ```bash
-git clone https://github.com/weegienamja/Faultline.git
-cd Faultline
+git clone https://github.com/weegienamja/Faultline-Network-Diagnostics.git
+cd Faultline-Network-Diagnostics
 npm install
 npm run bisect -- github.com
 ```
