@@ -1,246 +1,334 @@
 # Faultline roadmap
 
-Faultline is an incident-first, evidence-based network support platform for diagnosing faults that cross ownership boundaries.
+Faultline is a local-first, evidence-based network diagnostics project focused on one hard support problem:
 
-> **Core question:** when a network-dependent service is failing, where does the evidence show the fault begins, who owns that boundary, and what evidence can be handed to the responsible team?
+> Find the network condition that breaks a connection, capture the evidence around it, and preserve enough context for another engineer to reproduce and inspect the result.
 
-The deterministic diagnosis path remains separate from statistical/ML analysis. Observed measurements, inferred topology, deterministic conclusions and statistical similarity remain distinct evidence classes.
+The roadmap is organised by capability rather than by release number. The repository has already moved beyond the old v1.5 sequence, and forcing every new idea into v1.6, v1.7 and v1.8 would make the roadmap less useful.
+
+## Product loop
+
+```text
+CAPTURE
+Flight Recorder
+   |
+   v
+ISOLATE
+Network Bisect
+   |
+   v
+EXPLAIN
+Faultline Analyst
+   |
+   v
+PRESERVE
+Portable Incident Capsule
+```
+
+The deterministic path remains separate from interpretation. Observed measurements, deterministic comparisons, deterministic rule findings, deterministic experiments, simulated evidence and Analyst interpretation are distinct classes.
 
 ## Product principles
 
 1. Incident-first, not monitoring-first.
 2. Evidence before blame.
-3. Cross-boundary support without requiring shared administration.
-4. No false certainty about topology, ownership or causation.
-5. Privacy by default.
-6. No AI/LLM dependency in root-cause reasoning.
-7. Interoperability over vendor lock-in.
+3. Local use should remain useful without an account.
+4. Do not reconfigure the host when a per-connection experiment can answer the question.
+5. No false certainty about topology, ownership or causation.
+6. No cloud AI dependency in diagnosis.
+7. Analyst output can explain evidence but cannot become a finding.
+8. Preserve enough provenance that another person can inspect what happened.
+9. Prefer a small number of unusually useful diagnostic capabilities over a broad monitoring feature list.
+10. Interoperability over vendor lock-in.
 
 ---
 
-# Completed foundation
+# Delivered on current main
 
-| Version | Main capability | Status |
+| Capability | What is implemented | Status |
 |---|---|---|
-| v0.1 | Deterministic fault-domain diagnosis | ✅ |
-| v0.2 | Windows endpoint telemetry | ✅ |
-| v0.3 | Endpoint + remote-vantage correlation | ✅ |
-| v0.4 | Persistent authenticated control plane | ✅ |
-| v0.5 | Registered probe fleet | ✅ |
-| v0.6 | Ephemeral support workflow, topology, fleet safety, packaged Windows client | ✅ preview |
-| v0.7 | Versioned Connectivity Contracts | ✅ preview |
-| Data Science | Similarity scoring, DBSCAN clustering, explicit outliers | ✅ preview |
-| v0.8 | Cases, multiple runs, evidence provenance and export packages | ✅ preview |
-| v0.9 | Cross-party incident rooms and scoped evidence contribution | ✅ preview |
-| v1.0 | Organisation/project tenancy and isolated case architecture | ✅ preview |
-| v1.1 | Project Connectivity Contract catalog and immutable published versions | ✅ preview |
-| v1.2 | Embedded diagnostics API, JavaScript SDK and launch widget | ✅ preview |
-| v1.3 | Service-desk correlation and provenance-preserving update envelopes | ✅ preview |
-| v1.4 | Dual-stack, TLS, HTTP-stage and path-MTU diagnostics | ✅ preview |
-| v1.5 | Network Change Assurance | ✅ preview |
-| Live data | Real local measurement, public Internet intelligence and bring-your-own-network | ✅ preview |
-| Network Bisect | Per-connection condition isolation with reproducibility gating and paired confirmation | ✅ |
+| Deterministic diagnosis | Fault-domain conclusions from observed measurements | Delivered |
+| Windows endpoint telemetry | Adapter, route, gateway, Wi-Fi, VPN and resolver evidence | Delivered |
+| Registered probes | Authenticated independent vantage points | Delivered preview |
+| One-time diagnostics | Short-lived endpoint invitations and scoped collection | Delivered preview |
+| Connectivity Contracts | Versioned, project-scoped connectivity requirements | Delivered preview |
+| Cases and evidence | Multi-run cases, provenance, redaction and integrity-tagged exports | Delivered preview |
+| Cross-party rooms | Scoped external contributions without control-plane access | Delivered preview |
+| Organisation/project isolation | Tenant and project boundaries | Delivered preview |
+| Embedded API and SDK | v1 API, JavaScript SDK and launch widget | Delivered preview |
+| Service-desk correlation | Ticket correlation and provenance-preserving update envelopes | Delivered preview |
+| Deeper diagnostics | Dual-stack, TLS, HTTP timing and bounded Windows path-MTU evidence | Delivered preview |
+| Network Change Assurance | Named change windows and pinned baseline/post-change comparison | Delivered preview |
+| Live Diagnostics | Real local measurement plus public Internet context | Delivered |
+| Data Science | Similarity scoring, DBSCAN clustering and explicit outliers | Delivered preview |
+| **Network Bisect** | Adaptive per-connection condition isolation with reproducibility gating and paired confirmation | **Delivered** |
+| **Flight Recorder** | Bounded rolling capture, freeze-on-trigger, deep capture and before/during/after incident windows | **Delivered** |
+| Recorder simulation | Reproducible scenarios using the same Recorder engine with explicit simulated provenance | Delivered |
+| **Faultline Analyst** | Optional local Ollama explanation layer with read-only evidence tools and citation validation | **Delivered** |
+| **Portable Incident Capsule** | Self-contained offline HTML incident package with evidence, experiments, provenance, redaction and integrity digest | **Delivered** |
+| Modern evidence UI | Cascade layers, container queries, chronology-first Recorder UI and explicit evidence semantics | Delivered |
+
+The previous roadmap still described intermittent capture and portable evidence as future gaps. Those gaps are now filled by Flight Recorder and Portable Incident Capsule.
 
 ---
 
-# v1.5 - Network Change Assurance ✅ preview
+# Current centre of gravity
 
-**Goal:** state exactly which measured application/network behaviours changed after a planned configuration change.
+Faultline should not compete with broad NMS, APM or observability suites on feature count.
 
-Implemented:
+Its strongest wedge is:
 
-- named change windows stored with a support case;
-- explicit pre-change baseline session;
-- explicit post-change session;
-- Connectivity Contract check-state comparison;
-- IPv4, IPv6, TLS and contract pass/fail state transitions;
-- gateway/upstream loss and latency deltas;
-- DNS/TCP/HTTP/TLS/TTFB timing deltas;
-- path-MTU comparison where v1.4 evidence exists;
-- route-sequence difference detection;
-- inferred topology signature comparison;
-- deterministic regression/improvement lists;
-- SHA-256 integrity-tagged change-assurance evidence package;
-- audit events for change creation, baseline selection and comparison;
-- SDK methods for the complete workflow.
+> **Find the condition that breaks a connection, then show the evidence that makes that conclusion reproducible.**
 
-Workflow:
+The next work should deepen that investigation rather than expand sideways into generic monitoring.
+
+---
+
+# Priority 1: Path Diff
+
+**Problem:** Network Bisect can establish that a condition such as IPv4 versus IPv6 changes the outcome, but an engineer still has to manually compare what happened to the path under the working and failing conditions.
+
+**Goal:** after Bisect isolates a discriminator, collect paired path observations and show where the working and failing paths observably diverge.
+
+The first version should:
+
+- collect path evidence under the confirmed A and B conditions
+- keep the observations close together in time
+- preserve source interface, address family, resolver and resolved destination
+- compare local egress, destination address, visible hop sequence, ASN transitions and target reachability
+- treat traceroute non-response as unknown or hidden, not as a failed hop
+- handle ECMP and route variation with repeated observations rather than a single snapshot
+- compare IPv4 and IPv6 semantically rather than pretending their literal address paths should match
+- expose resolver-driven destination changes without attributing the path difference to the resolver alone
+- label outcomes such as `SAME_OBSERVED_PATH`, `OBSERVED_PATH_DIFFERENCE`, `INSUFFICIENT_PATH_VISIBILITY`, `UNSTABLE_PATH` and `NOT_COMPARABLE`
+- persist the paired observation as evidence that can be included in an Incident Capsule
+
+The wording must stay conservative. "Observed path divergence" is valid. "The failure begins at hop 7" is not valid unless the evidence actually establishes that.
+
+**Why it matters:** this turns a Bisect result from "IPv6 is the discriminator" into "IPv6 is the reproducible discriminator, and here is how the visible working and failing paths differ."
+
+---
+
+# Priority 2: Faultline Witness
+
+**Problem:** many network arguments reduce to one side saying the service works and the other side saying it does not.
+
+**Goal:** reproduce the same diagnostic from two or more endpoints or vantage points in the same investigation.
+
+A first useful version should:
+
+- create a bounded witness session for a target and time window
+- let another endpoint join through a one-time scoped link
+- run the same diagnostic stages independently from every vantage
+- compare DNS, IPv4, IPv6, TCP, TLS and HTTP outcomes per vantage
+- preserve the provenance of every participant
+- state `reproduced` or `not reproduced` without inventing a LAN, ISP or service root cause
+- reuse existing invitation, probe and case boundaries rather than introducing a second auth model
+- include witness evidence in the Incident Capsule
+
+Public probes can supplement a Witness session, but a public vantage should never be treated as equivalent to the affected endpoint.
+
+---
+
+# Priority 3: Evidence Topology and time scrubber
+
+**Problem:** a static network map loses the most important dimension in a transient incident: time.
+
+**Goal:** make topology an evidence view rather than a decorative diagram.
+
+The useful shape is:
 
 ```text
-Named change window
-      |
-Pre-change diagnostic -> select baseline
-      |
-Perform network change
-      |
-Post-change diagnostic -> select validation run
-      |
-Compare contract + protocol + path evidence
-      |
-Regression / no-regression result
-      |
-Assurance package
+endpoint -> gateway -> ISP / public path -> target
 ```
 
-Current limitation: a regression is an evidence difference, not proof that the change caused it.
+with evidence state attached to the path and a time control that can move through:
 
-See [docs/CHANGE_ASSURANCE.md](docs/CHANGE_ASSURANCE.md).
+```text
+BEFORE -> TRIGGER -> DURING -> DEEP CAPTURE -> AFTER / RECOVERY -> BISECT
+```
 
----
+Requirements:
 
-# Live Internet data and bring-your-own-network ✅ preview
-
-**Goal:** let Faultline demonstrate its reasoning against real networks rather than
-only synthetic demo scenarios, without adding an AI dependency or a paid API.
-
-## Delivered
-
-- real local measurement: DNS across the system resolver plus three public resolvers
-  with agreement detection, TCP, TLS (version/cipher/certificate/chain), HTTP
-  status/TTFB/redirect chain, ICMP latency/jitter/loss, traceroute, and
-  adapter/Wi-Fi/VPN/route/DNS-server state
-- explicit `unknown` / `not-measured` / `unsupported` states instead of invented values
-- public Internet context from RIPEstat, Globalping, RIPE Atlas, IODA and PeeringDB,
-  all credential-free; Cloudflare Radar optional behind a token
-- Network Map extended past the local gateway with traceroute-proven public segments,
-  labelled OBSERVED versus PUBLIC ROUTING METADATA
-- Network Manifest import with preview, and enforcement that private targets require
-  an authorised private probe
-- privacy boundary: only globally routable addresses ever leave the control plane
-
-## Boundary
-
-Only observed measurements reach the deterministic engine. Globalping is wired to the
-existing independent-vantage input because it is a genuine measurement; RIPEstat,
-IODA, PeeringDB, RIPE Atlas and Cloudflare Radar are context and can never move a
-fault domain.
+- show OBSERVED and INFERRED relationships distinctly
+- allow the Recorder incident chronology to drive the topology state
+- keep confirmed Bisect experiments visually separate from the earlier temporal association
+- support long IPv6 addresses, missing hops and unstable paths
+- avoid a generic 3D router-map aesthetic
+- preserve the current rule that ASN and ownership labels are public routing metadata, not proof of fault ownership
 
 ---
 
-# Direction
+# Priority 4: Handshake Microscope
 
-The version-numbered plan below v1.5 has been delivered. What follows is
-organised by **capability**, not by release number, because the useful question
-for an open-source network tool is "what can it isolate that I cannot isolate
-easily today", not "what version is it".
+**Problem:** Wireshark is powerful, but it is much broader than the question Faultline is trying to answer.
 
-Each theme states the problem it exists to solve. None of them require a hosted
-product to be valuable.
+**Goal:** optionally capture only the diagnostic flow and turn the relevant packet-level events into a compact connection timeline.
+
+Useful evidence could include:
+
+- SYN, SYN-ACK and ACK progression
+- retransmissions and timeouts
+- resets
+- TLS ClientHello properties
+- SNI
+- TLS version and ALPN
+- TLS alerts
+- ICMP and ICMPv6 signals relevant to the tested flow
+- Packet Too Big / MTU evidence where available
+
+This should not become a packet-capture warehouse. Capture must be bounded, optional, privacy-aware and tied to one diagnostic flow.
 
 ---
 
-## Intermittent faults
+# Priority 5: Fault Lab
 
-**Problem:** the fault clears before anyone can look at it. Continuous graphs
-show *that* something happened; they rarely show *what changed*.
+**Problem:** an open-source diagnostic tool is easier to evaluate when users can reproduce meaningful faults without waiting for a real outage.
 
-- bounded local ring buffer of network metadata (gateway, Wi-Fi, DNS, route,
-  VPN state, loss, jitter, target reachability, path fingerprint)
-- trigger on threshold breach, contract failure or an explicit hotkey
-- freeze BEFORE / DURING / AFTER into one incident
-- flake-rate measurement as a first-class result, not a footnote
+**Goal:** expand the Recorder simulation model into a deterministic diagnostic lab that exercises the same capture, isolation and evidence pipeline as real incidents.
 
-Network Bisect already refuses to draw conclusions from an unstable baseline
-and reports the flake rate instead. Capturing the unstable window is the next
-step.
+Candidate scenarios:
 
-## Condition isolation — the current centre of gravity
+- IPv6 black hole
+- broken AAAA path
+- resolver failure
+- split DNS
+- slow DNS
+- VPN route takeover
+- MTU black hole
+- TLS version intolerance
+- SNI failure
+- certificate expiry
+- intermittent loss
+- flapping gateway
+- connection reset
+- asymmetric reachability
 
-**Problem:** "works on my machine" and "try your hotspot" are guesswork.
+Simulation must remain visually and structurally distinct from measured evidence. If a scenario does not model path evidence, Faultline should not fabricate path evidence for it.
 
-Delivered as **Network Bisect**, now an adaptive isolation engine rather than a
-sweep. It forms explicit competing explanations, scores each candidate
-experiment by how well it partitions them, runs the best one, eliminates the
-explanations that no longer fit, and stops when the evidence has isolated a
-boundary. Routing data decides whether a source interface can even reach the
-target, so an unreachable adapter is `INAPPLICABLE` rather than a false `FAIL`.
+---
 
-Worth extending, in roughly this order:
+# Priority 6: Multi-platform and private-network parity
 
-- MTU / DF-bit as an axis, so black holes surface as a condition rather than as
-  "weirdness". The experiment registry is already shaped to accept it.
-- proxy vs direct where a proxy is configured
-- combination search when no single factor explains the difference
-- bisecting from a registered private probe as well as the local machine
-- Linux and macOS route lookup, so interface classification is not Windows-only
+**Problem:** the most useful faults often happen on systems and inside networks the current Windows-oriented collection path does not fully cover.
 
-## Path reasoning
+Work includes:
 
-**Problem:** several traceroutes are not an analysis.
+- Linux local collector parity
+- macOS local collector parity
+- route lookup and source-interface classification on each platform
+- private-probe Network Bisect
+- Connectivity Contract execution from private probes
+- convergence between the packaged Windows collector and the modular Node collector
 
-- determine where working and failing paths meaningfully diverge
-- attribute divergence to a shared network rather than a shared hop address
-- distinguish OBSERVED hops from PUBLIC ROUTING METADATA (already enforced in
-  the Network Map)
-- treat a shared AS across failing paths as an escalation signal, never as proof
+The aim is capability parity, not merely making the process start on another OS.
 
-## Portable evidence
+---
 
-**Problem:** evidence dies inside whoever ran the tool.
+# Priority 7: Incident recurrence fingerprints
 
-- single-file incident capsule containing measurements, timeline, path
-  fingerprints, deterministic conclusion, contract results and an integrity
-  manifest
-- offline viewer so a recipient needs no access to the originating control plane
-- evidence packages and integrity digests already exist; portability is the gap
+**Problem:** engineers repeatedly investigate incidents that look familiar but have no deterministic way to ask whether the evidence pattern has appeared before.
 
-## Private and multi-platform collection
+**Goal:** provide a transparent "have I seen this before?" comparison.
 
-**Problem:** the interesting faults are inside networks the tool cannot reach,
-on machines that are not Windows.
+It should show:
 
-- Linux and macOS local collectors at parity with the Windows collector
-- private-probe bisect and contract execution inside a customer network
-- the packaged client currently carries its own self-contained collector rather
-  than the modular one; converging them is outstanding
+- which evidence fields matched
+- which fields differed
+- whether the same discriminator was previously confirmed
+- whether the previous incident was only temporally similar
+- exact links back to the source incidents
 
-## Deterministic reasoning quality
+This should build on the existing evidence similarity work without becoming an opaque ML root-cause score.
 
-**Problem:** confident wrong answers are worse than no answer.
+---
 
-- keep every conclusion traceable to the measurement that produced it
-- keep OBSERVED, INFERRED, CORRELATED, EXTERNAL CONTEXT and DETERMINISTIC
-  CONCLUSION distinct in the data model, not only in the wording
-- continue to say "evidence supports", never "this caused the fault"
-- no LLM in the diagnosis path, ever
+# Network Bisect extensions
+
+These remain useful, but they are secondary to Path Diff and Witness because the current Bisect engine is already a complete usable feature.
+
+Potential extensions:
+
+- MTU / DF-bit as a controlled condition where the platform supports it safely
+- proxy versus direct when a proxy is explicitly configured
+- combination search when no single condition explains the outcome
+- Bisect execution from a registered private probe
+- broader source-interface semantics on Linux and macOS
+
+Any new axis must preserve the current rule that the experiment changes only the connection under test and does not reconfigure the host.
+
+---
+
+# Existing supporting capabilities that should be hardened, not expanded for their own sake
+
+## Cases and cross-party workflow
+
+Keep improving provenance, redaction, retention and portability. Do not turn Faultline into a ticketing system.
+
+## Connectivity Contracts
+
+Keep them useful as reproducible expected-behaviour definitions. Do not turn the project into a generic policy platform.
+
+## Change Assurance
+
+Keep the distinction between "changed after the maintenance" and "caused by the maintenance" explicit.
+
+## Faultline Analyst
+
+Keep it local, optional and read-only. Improve explanation quality only when it makes deterministic evidence easier to understand. Do not expand it into an autonomous root-cause agent.
+
+## Public Internet context
+
+Continue treating RIPEstat, IODA, PeeringDB, RIPE Atlas and Cloudflare Radar as context. Only genuine measurement evidence should feed a deterministic comparison.
+
+---
+
+# Epistemic rules
+
+These are product requirements, not wording preferences.
+
+1. Observed measurement is authoritative for what was measured, not for why it happened.
+2. A temporal difference is a deterministic comparison, not causation.
+3. A deterministic rule finding is a reproducible derivation, not a controlled experiment.
+4. A controlled experiment earns stronger wording only when Faultline deliberately varied a condition and reproduced the outcome difference.
+5. Simulated evidence is never presented as measured evidence.
+6. Analyst interpretation is never allowed to outrank deterministic evidence.
+7. A hidden traceroute hop is unknown, not failed.
+8. ASN ownership is routing metadata, not proof of fault ownership.
+9. Evidence must remain traceable and reproducible.
+
+---
+
+# What Faultline should not become
+
+- generic SNMP/NMS
+- SIEM
+- packet-capture warehouse
+- full APM suite
+- generic chatbot
+- LLM root-cause engine
+- continuous-observability clone
+- speculative SaaS shell whose useful features only exist on a future roadmap
+
+The test for a new feature is simple:
+
+> Would a network engineer, sysadmin, support engineer or developer install this locally because it answers a painful question that is currently annoying to answer manually?
+
+If the answer is no, it is probably not the right next feature.
 
 ---
 
 # At a glance
 
-**Delivered**
-
-| Capability | Outcome |
-|---|---|
-| Deterministic diagnosis | Fault-domain reasoning from observed measurements, no model in the path |
-| Endpoint + remote vantage | Windows telemetry, registered public/private probe fleet, correlation |
-| Connectivity Contracts | Versioned, project-scoped application connectivity requirements |
-| Cases and evidence | Multi-run cases, provenance, redaction, integrity-tagged export packages |
-| Cross-party rooms | Scoped external contribution without control-plane access |
-| Deeper diagnostics | Dual-stack, TLS, HTTP stage timing, bounded path-MTU |
-| Change assurance | Named change windows, pinned baseline/post-change comparison |
-| Live Internet data | Real local measurement plus RIPEstat, Globalping, RIPE Atlas, IODA, PeeringDB |
-| **Network Bisect** | **Adaptive fault isolation: competing hypotheses, deterministic experiment selection, pruning and paired confirmation** |
-
-**Next, by capability rather than release number**
-
-| Theme | The question it answers |
-|---|---|
-| Intermittent faults | What was happening in the seconds before it broke? |
-| Condition isolation | Which single condition makes the difference? **(delivered — adaptive planner)** |
-| Path reasoning | Where do working and failing paths actually diverge? |
-| Portable evidence | Can someone else inspect this without my server? |
-| Private / multi-platform | Can it run inside the network that is actually broken, on any OS? |
-| Deterministic quality | Is every conclusion still traceable to a measurement? |
-
-## What Faultline should not become
-
-- generic SNMP/NMS;
-- SIEM;
-- packet-capture warehouse;
-- full APM suite;
-- generic chatbot;
-- LLM root-cause engine;
-- clone of continuous-observability platforms.
-
-The project stays centred on one support question: **what does the evidence show, where does the fault most likely begin, who owns that boundary, and what should happen next?**
+| State | Capability | Question answered |
+|---|---|---|
+| Delivered | Flight Recorder | What happened around the transient fault? |
+| Delivered | Network Bisect | Which condition reproducibly changes the outcome? |
+| Delivered | Faultline Analyst | How can the collected evidence be explained without changing the finding? |
+| Delivered | Portable Incident Capsule | Can another person inspect the investigation offline? |
+| **Next** | **Path Diff** | **How do the working and failing paths observably differ?** |
+| Planned | Faultline Witness | Does the same failure reproduce from another vantage point? |
+| Planned | Evidence Topology + time | How did the visible network state change through the incident? |
+| Planned | Handshake Microscope | What happened inside the diagnostic connection itself? |
+| Planned | Fault Lab | Can the full investigation be reproduced safely on demand? |
+| Planned | Multi-platform parity | Can the same investigation run on the affected OS and network? |
+| Planned | Incident recurrence fingerprints | Have we seen materially the same evidence pattern before? |
