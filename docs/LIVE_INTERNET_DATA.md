@@ -34,7 +34,7 @@ network-metadata field can reach it.
 Globalping measurements **do** feed the deterministic engine, via the
 `externalProbeHealthy` / `externalProbeLatencyMs` inputs that the correlation
 engine already defines for an independent second vantage. This is a genuine ICMP
-measurement from an independent network, not "intelligence" — it is exactly the
+measurement from an independent network, not "intelligence". It is exactly the
 kind of evidence the two-vantage design was built for. RIPEstat, IODA, PeeringDB,
 RIPE Atlas and Cloudflare Radar are **never** wired into diagnosis.
 
@@ -50,11 +50,11 @@ RIPE Atlas and Cloudflare Radar are **never** wired into diagnosis.
 | [RIPE Atlas](https://atlas.ripe.net/docs/apis/rest-api-manual/) | **none** for public probe metadata | connected public probes near the target network | 30 min | external |
 | [IODA](https://api.ioda.inetintel.cc.gatech.edu/v2) | **none** | outage/anomaly alerts for an ASN or country | 5 min | external |
 | [PeeringDB](https://www.peeringdb.com/apidocs/) | **none** for read | self-published network metadata, IX presence | 60 min | external |
-| [Cloudflare Radar](https://developers.cloudflare.com/radar/) | **required — optional integration** | outage annotations | 10 min | external |
+| [Cloudflare Radar](https://developers.cloudflare.com/radar/) | **required, optional integration** | outage annotations | 10 min | external |
 
 **Only Cloudflare Radar needs a credential.** Set
 `FAULTLINE_CLOUDFLARE_RADAR_TOKEN` to enable it. Without it the panel shows
-`Cloudflare Radar — Not configured` and no request is made. Everything else works
+`Cloudflare Radar - Not configured` and no request is made. Everything else works
 with no account, no key and no cost.
 
 ### Data-call detail
@@ -96,7 +96,7 @@ local topology / neighbour tables
 ```
 
 The check is `isPubliclyEnrichable()`, which reuses `classifyAddress()` from
-`src/security/target.mjs` — the same classifier that guards public probe
+`src/security/target.mjs`, the same classifier that guards public probe
 targeting. A target that resolves to a private address is reported as
 `enriched: false` with an explicit reason, and **no outbound request is made at
 all**. Traceroute hops inside your own network are marked
@@ -208,11 +208,11 @@ blocked reason.
 
 ## Attribution
 
-- RIPEstat and RIPE Atlas data — © RIPE NCC
-- IODA data — © Georgia Tech Research Corporation
-- PeeringDB — © PeeringDB
-- Globalping — © jsDelivr / Globalping contributors
-- Cloudflare Radar — © Cloudflare
+- RIPEstat and RIPE Atlas data - © RIPE NCC
+- IODA data - © Georgia Tech Research Corporation
+- PeeringDB - © PeeringDB
+- Globalping - © jsDelivr / Globalping contributors
+- Cloudflare Radar - © Cloudflare
 
 Faultline queries these services as a client. It does not redistribute bulk data,
 and it caches responses to keep request volume low. Globalping measurements are
