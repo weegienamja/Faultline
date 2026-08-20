@@ -8,7 +8,7 @@
 // operator's trust, and Faultline's whole argument is that every value on
 // screen is traceable to a measurement.
 
-import { mount, panel, tile, state, badge, source, disclose, auth, goTo, currentView, escapeHtml } from "./shell.js";
+import { mount, panel, tile, state, badge, source, disclose, auth, goTo, currentView, escapeHtml, runtime, words } from "./shell.js";
 
 // ---------------------------------------------------------------------------
 // Rail credential indicator
@@ -19,7 +19,7 @@ function paintAuthIndicator() {
   const text = document.getElementById("rail-auth-text");
   if (!dot || !text) return;
   dot.dataset.status = auth.unlocked ? "ok" : "idle";
-  text.textContent = auth.unlocked ? "Live data unlocked" : "Live data locked";
+  text.textContent = auth.unlocked ? words.railUnlocked : words.railLocked;
 }
 window.addEventListener("faultline-auth-changed", paintAuthIndicator);
 paintAuthIndicator();

@@ -1,5 +1,9 @@
 <!doctype html>
-<html lang="en">
+<!-- The runtime attributes below are rewritten by the server as it serves this
+     file, so the first paint already knows whether this is a hosted public demo
+     or an operator's own control plane. The values here are the local-install
+     defaults and are what you get when the page is opened straight off disk. -->
+<html lang="en" data-runtime="local" data-public-demo="false" data-vantage-label="LOCAL" data-vantage-region="">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -24,6 +28,12 @@
       </a>
 
       <nav class="fl-nav" aria-label="Primary">
+        <!-- Present only on a hosted public demo, and first, because it is the
+             one surface a visitor with no Faultline of their own can use. -->
+        <div class="fl-nav-group" data-demo-only>
+          <a class="fl-nav-item" href="#/demo"><span class="fl-nav-icon" aria-hidden="true">◐</span><span>Hosted Demo</span></a>
+        </div>
+
         <div class="fl-nav-group">
           <a class="fl-nav-item" href="#/overview"><span class="fl-nav-icon" aria-hidden="true">▦</span><span>Overview</span></a>
         </div>
@@ -80,6 +90,10 @@
 
       <header class="fl-topbar">
         <div class="fl-crumb">
+          <!-- Never hidden and never softened. A visitor should know within a
+               second that this is a demonstration deployment; precision about
+               what it is buys credibility for everything it then claims. -->
+          <span class="fl-demo-flag" data-demo-only>Hosted demo</span>
           <span class="fl-label" id="crumb-group"></span>
           <span class="fl-crumb-sep" aria-hidden="true">/</span>
           <h1 class="fl-page-title" id="crumb-title">Overview</h1>
@@ -87,11 +101,23 @@
         <div class="fl-topbar-actions">
           <button class="fl-btn" id="analyst-toggle" type="button" aria-expanded="false" aria-controls="analyst-drawer">Analyst</button>
           <button class="fl-btn" id="auth-open" type="button">Unlock live data</button>
-          <button class="fl-btn fl-btn-primary" id="invite-open" type="button">New diagnostic</button>
+          <button class="fl-btn fl-btn-primary" id="invite-open" type="button" data-local-only>New diagnostic</button>
+          <a class="fl-btn fl-btn-primary" data-demo-only href="#/demo">Run a diagnostic</a>
         </div>
       </header>
 
       <div class="fl-content">
+
+        <!-- =================================================================
+             HOSTED DEMO — the landing surface of the public deployment
+
+             Rendered entirely by demo-panel.js. It exists in the markup on a
+             local install too, but the rail entry is hidden and nothing routes
+             to it, so an operator's own control plane is unchanged.
+             ================================================================= -->
+        <section class="fl-view" data-view="demo" data-view-title="Hosted Demo" data-view-group="Faultline">
+          <div data-mount="demo"></div>
+        </section>
 
         <!-- =================================================================
              OVERVIEW — what is the state of the current investigation
@@ -404,7 +430,7 @@
     <form id="auth-form">
       <div class="fl-dialog-head">
         <span class="fl-label">Control plane</span>
-        <h2 class="fl-panel-title fl-mt-1">Unlock live data</h2>
+        <h2 class="fl-panel-title fl-mt-1" id="auth-dialog-title">Unlock live data</h2>
       </div>
       <div class="fl-dialog-body">
         <p class="fl-body">
@@ -479,6 +505,7 @@
   </dialog>
 
   <script type="module" src="/shell.js"></script>
+  <script type="module" src="/demo-panel.js"></script>
   <script type="module" src="/views.js"></script>
   <script type="module" src="/live-panel.js"></script>
   <script type="module" src="/bisect-panel.js"></script>

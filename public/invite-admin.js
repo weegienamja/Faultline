@@ -1,4 +1,5 @@
 import "./intelligence-panel.js";
+import { words } from "./shell.js";
 
 const openButton = document.getElementById("invite-open");
 const dialog = document.getElementById("invite-dialog");
@@ -22,7 +23,7 @@ function adminToken() {
 async function request(path, { method = "GET", body } = {}) {
   const token = adminToken();
   if (!token) {
-    const error = new Error("Unlock live data with the Faultline admin credential first.");
+    const error = new Error(words.lockedBody("Creating a diagnostic invitation"));
     error.status = 401;
     throw error;
   }

@@ -12,7 +12,7 @@
 // to this screen.
 
 import {
-  escapeHtml, mount, panel, tile, state, badge, stateBadge, disclose, auth, statusOf
+  escapeHtml, mount, panel, tile, state, badge, stateBadge, disclose, auth, statusOf, runtime, words
 } from "./shell.js";
 
 // ---------------------------------------------------------------------------
@@ -379,7 +379,9 @@ form?.addEventListener("submit", async event => {
   const exhaustive = mode === "exhaustive";
 
   if (!auth.unlocked) {
-    setStatus(`Unlock live data with the Faultline admin credential first. The CLI needs no credential: npm run bisect -- ${target}`, "error");
+    setStatus(runtime.isPublicDemo
+      ? `${words.lockedBody("Network Bisect")} The recorded investigations on the hosted demo show a full isolation run.`
+      : `Unlock live data with the Faultline admin credential first. The CLI needs no credential: npm run bisect -- ${target}`, "error");
     document.getElementById("auth-open")?.click();
     return;
   }

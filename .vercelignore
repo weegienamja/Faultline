@@ -1,0 +1,19 @@
+# What the hosted deployment does NOT need.
+#
+# Kept explicit rather than inherited, because the hosted public demo READS
+# fixtures/recorder/*.json at runtime: the recorded investigations are replayed
+# from those scenario files through the production Flight Recorder. Excluding
+# them - which .npmignore does, correctly, for a packaged install - would leave
+# the demo with three cards and nothing behind them.
+
+.github/
+build/
+docs/
+tests/
+coverage/
+data/
+Dockerfile
+.dockerignore
+docker-compose.yml
+ROADMAP.md
+.vercel/

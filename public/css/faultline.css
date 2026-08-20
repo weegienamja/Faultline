@@ -13,12 +13,16 @@
 @import url("./chronology.css");
 @import url("./features.css");
 @import url("./evidence.css");
+@import url("./demo.css");
 @import url("./utilities.css");
 
 /* First-paint resilience. The router marks one view active as soon as shell.js
-   evaluates. Until then, keep Overview visible rather than showing an empty
-   workspace. */
-.fl-content:not(:has(.fl-view.is-active)) .fl-view[data-view="overview"] {
+   evaluates. Until then, keep the landing view visible rather than showing an
+   empty workspace — which view that is depends on the runtime the server
+   stamped onto <html>, so a hosted demo never flashes an operator surface it
+   is about to navigate away from. */
+html:not([data-public-demo="true"]) .fl-content:not(:has(.fl-view.is-active)) .fl-view[data-view="overview"],
+html[data-public-demo="true"] .fl-content:not(:has(.fl-view.is-active)) .fl-view[data-view="demo"] {
   display: block;
 }
 
