@@ -48,7 +48,7 @@ specificity back are gone.
 
 | Role | Where it may appear | Token |
 |---|---|---|
-| **Chrome** | brand mark, primary action, active nav, focus ring, experiment evidence | `--fl-chrome` |
+| **Chrome** | brand mark, primary action, active nav, focus ring, and Faultline's own deterministic conclusions | `--fl-chrome` |
 | **Status** | only where it reports a measured or decided state | `--fl-ok`, `--fl-warn`, `--fl-crit`, `--fl-idle` |
 | **Everything else** | neutral | `--fl-text*`, `--fl-surface*`, `--fl-line*` |
 
@@ -136,12 +136,29 @@ region rather than like a phone, and what lets the same panel render correctly
 in a wide dashboard column and in the 400px Analyst drawer with no
 page-specific rule.
 
+**There are no breakpoint tokens.** Three of them used to exist, documented as
+the single source of truth for the layout thresholds, and they were referenced
+zero times — a media or container query condition cannot consume a custom
+property. They were documentation dressed as configuration, and the thresholds
+had already drifted behind them. The real values are written literally at each
+query with the reason beside them:
+
+| Threshold | Container | Transition |
+|---|---|---|
+| 60rem | `fl-region` | main + aside side by side (`.fl-split`) |
+| 42rem | `fl-panel` | chronology phases side by side |
+| 40rem | `fl-panel` | two-pane master/detail (cases, intelligence) |
+| 34rem | `fl-panel` | tables stack; evidence rows go four-track |
+| 30rem | `fl-panel` | timeline drops its fixed timestamp column |
+| 18rem | `fl-panel` | key/value pairs go two-column |
+| 7rem / 5.5rem | `fl-node` | topology node drops its glyph, then its subtitle |
+
 Named containers, because they nest:
 
 | Container | On | Queried by |
 |---|---|---|
 | `fl-region` | `.fl-content`, `.fl-analyst`, page shells | `.fl-split` |
-| `fl-panel` | every `.fl-panel`, `.panel`, `.live-card` | tables, timelines, chronology, `.kv` |
+| `fl-panel` | every `.fl-panel`, `.panel`, `.live-card` | tables, timelines, chronology, `.live-kv` |
 | `fl-topology` | `.topology-canvas` | node padding |
 | `fl-node` | `.topology-node` | its own icon and subtitle |
 
@@ -204,13 +221,32 @@ into one:
 |---|---|---|---|---|
 | **Observed** | solid, solid rule | surface | `◉` | normal |
 | **Deterministic comparison** | solid, **dotted** rule | surface | `≠` | normal |
-| **Deterministic experiment** | solid, **double** rule | raised | `⑂` | strongest |
+| **Deterministic rule finding** | solid, **chrome** rule | surface | `⊢` | strong |
+| **Deterministic experiment** | solid, **double** rule | **raised** | `⑂` | strongest |
 | **Simulated** | **dashed all round** | **diagonal hatch** | `⟲` | normal |
 | **Interpretation** | dashed, **no rule** | transparent | `~` | quietest |
 
-Authority runs one way: **experiment > observed > comparison > interpretation**.
+Authority runs one way:
+**experiment > rule finding > observed > comparison > interpretation**.
 Simulated sits outside that ordering entirely, because it is not evidence about
 the user's network at all.
+
+**The two easiest to conflate are `deterministic` and `experiment`, and they are
+the two it matters most to keep apart.** Both are Faultline's own conclusions and
+both are reproducible, but only one of them established that *changing* a
+condition changes the outcome:
+
+```
+deterministic   observed measurements -> fixed rules -> fault domain
+experiment      condition varied -> outcome measured -> discriminator
+```
+
+Live Diagnostics runs a rule engine. Network Bisect runs experiments. The double
+rule, the raised ground and the filled chrome chip belong to Bisect and to
+nothing else; a rule-engine verdict that borrowed them would be claiming a
+controlled experiment that never happened. Every class differs from every other
+on **at least two** of the four signals — verified by computed style, not by
+eye.
 
 - The **inline-start rule** is what says "Faultline asserts this". Interpretation
   has none.
@@ -290,6 +326,14 @@ and how to fill it, or it reads as broken.
   footer does not, and gets a real target.
 - Tables restack rather than dropping columns; the `<thead>` stays in the
   accessibility tree.
+- Every control that opens a region reports that region's state. `setOpen()` in
+  the Analyst drawer writes `aria-expanded` to *all* `[aria-controls]` controls,
+  not just the one it was written for — the rail and the topbar both open the
+  drawer, and a control that declares `aria-controls` while never updating
+  `aria-expanded` tells assistive technology the region is permanently collapsed.
+- `touch-action` is claimed by the smallest element that needs it. The topology
+  canvas is `pan-y` so a swipe over empty space still scrolls the page; only the
+  draggable nodes take `none`.
 
 ## 12. Extending it
 
@@ -301,5 +345,15 @@ and how to fill it, or it reads as broken.
 4. Prefer a container query to a media query. Reach for a viewport query only
    when the *shell* has to change shape.
 5. Do not add an `!important`. The two in `reset.css` are the whole budget.
-6. New surfaces get `data-evidence` if they display anything that is not a
-   direct measurement. That is not optional; it is the product's argument.
+6. Do not put a font-size below `--fl-fs-micro`. The 11px floor is enforced by
+   there being no smaller literal anywhere in the stylesheet; where text does
+   not fit at 11px, the answer is to stop rendering it, not to shrink it.
+7. Prefer a prefixed class name to a scoping mechanism. Live Diagnostics' inner
+   classes were held apart with `@scope`, which worked but made a large surface
+   depend on that feature being supported — where it is not, the whole block is
+   discarded. `.live-*` achieves the same containment with ordinary selectors.
+8. New surfaces get `data-evidence` if they display anything that is not a
+   direct measurement. That is not optional; it is the product's argument. If
+   the surface is a conclusion, be exact about which kind: a rule engine reading
+   measurements is `deterministic`, and only a controlled variation is
+   `experiment`.

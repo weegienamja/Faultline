@@ -172,14 +172,19 @@
   --fl-topbar-h: 3.25rem;
   --fl-drawer-w: 25rem;
   --fl-content-max: 120rem;
-
-  /* Layout thresholds. Named here so a component and the shell that hosts it
-     cannot drift apart, and so the numbers are reviewable in one place instead
-     of being scattered through nine media queries. */
-  --fl-bp-split: 60rem;      /* a region wide enough for main + aside */
-  --fl-bp-wide: 42rem;       /* a panel wide enough for horizontal detail */
-  --fl-bp-mid: 30rem;        /* a panel wide enough for two columns */
 }
+
+/* There are deliberately NO breakpoint tokens here.
+   --------------------------------------------------------------------------
+   Three of them used to be, described as the single source of truth for the
+   layout thresholds. They were referenced zero times, because a media or
+   container query condition cannot consume a custom property — so they were
+   documentation dressed up as configuration, and the thresholds had already
+   drifted behind them (40rem, 42rem and 44rem all in use for what was
+   essentially one decision).
+
+   The real thresholds are written literally at each query, and the reason for
+   each is in a comment beside it. See the table in docs/DESIGN_SYSTEM.md. */
 
 /* Density. Applied on a container, not globally, so a sidebar can run tighter
    than the main column without every component learning about sidebars. */

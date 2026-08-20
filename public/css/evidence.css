@@ -23,12 +23,24 @@
      GLYPH     a distinct mark
      LABEL     a word, always present, never abbreviated to a colour
 
-                 frame            ground        glyph  weight
-     observed    solid, solid rule surface        ◉     normal
-     comparison  solid, dotted rule surface       ≠     normal
-     experiment  solid, double rule raised        ⑂     strongest
-     simulated   DASHED all round  HATCHED        ⟲     normal
-     interpret.  dashed, no rule   transparent    ~     quietest
+                    frame             ground       glyph  weight
+     observed       solid, solid rule surface       ◉     normal
+     comparison     solid, dotted rule surface      ≠     normal
+     deterministic  solid, CHROME rule surface      ⊢     strong
+     experiment     solid, DOUBLE rule raised       ⑂     strongest
+     simulated      DASHED all round  HATCHED       ⟲     normal
+     interpret.     dashed, no rule   transparent   ~     quietest
+
+   `deterministic` and `experiment` are the two that are easiest to conflate,
+   and the two it matters most to keep apart. Both are Faultline's own
+   conclusions and both are reproducible, but only one of them established that
+   CHANGING a condition changes the outcome:
+
+     deterministic  observed measurements -> fixed rules -> fault domain
+     experiment     condition varied -> outcome measured -> discriminator
+
+   A rule engine reading a set of measurements has not run an experiment, and
+   must not borrow the visual language of one. The double rule is reserved.
 
    The two that must never be mistaken for a measurement — simulated and
    interpretation — are the two that are dashed. The hatch on simulated is a
@@ -36,7 +48,7 @@
    there is no measured surface anywhere in the product that carries it.
 
    Authority runs in one direction only:
-     experiment  >  observed  >  comparison  >  interpretation
+     experiment  >  deterministic  >  observed  >  comparison  >  interpretation
    and simulated sits outside that ordering entirely, because it is not
    evidence about the user's network at all.
    ========================================================================== */
@@ -60,7 +72,7 @@
   background: var(--fl-surface-2);
   color: var(--fl-text-3);
   font-family: var(--fl-mono);
-  font-size: 0.625rem;
+  font-size: var(--fl-fs-micro);
   letter-spacing: 0.05em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -96,11 +108,22 @@
   border-color: var(--fl-line-strong);
 }
 
-/* DETERMINISTIC EXPERIMENT — Faultline varied a condition and measured the
-   outcome. The only chip that takes the product's own colour, because it is
-   the only evidence class Faultline itself produces. */
-.fl-source[data-kind="experiment"],
+/* DETERMINISTIC RULE FINDING — fixed rules over observed measurements. A real
+   Faultline conclusion, reproducible and explainable, but not an experiment.
+   The turnstile is the logic symbol for "derives", which is exactly what the
+   engine did. */
 .fl-source[data-kind="deterministic"],
+.fl-provenance[data-evidence="deterministic"] {
+  --fl-ev-glyph: "\22A2";
+  color: var(--fl-chrome);
+  border-color: var(--fl-chrome-line);
+  background: transparent;
+}
+
+/* DETERMINISTIC EXPERIMENT — Faultline varied a condition and measured the
+   outcome. The filled chrome ground and the heavier weight are reserved for
+   this, the strongest claim the product makes. */
+.fl-source[data-kind="experiment"],
 .fl-provenance[data-evidence="experiment"] {
   --fl-ev-glyph: "\2442";
   color: var(--fl-chrome);
@@ -176,7 +199,7 @@
   background: var(--fl-surface-2);
   color: var(--fl-text-3);
   font-family: var(--fl-mono);
-  font-size: 0.625rem;
+  font-size: var(--fl-fs-micro);
   letter-spacing: 0.05em;
   text-transform: uppercase;
   line-height: 1.6;
@@ -197,13 +220,14 @@
   color: var(--fl-text-2);
 }
 
-/* Faultline's own deterministic engine. */
+/* Faultline's own rule engine. A derivation, not an experiment — Live
+   Diagnostics does not vary conditions, so it does not get the experiment
+   chip's filled ground. */
 .src-deterministic {
-  --fl-ev-glyph: "\2442";
+  --fl-ev-glyph: "\22A2";
   color: var(--fl-chrome);
   border-color: var(--fl-chrome-line);
-  background: var(--fl-chrome-soft);
-  font-weight: 600;
+  background: transparent;
 }
 
 /* Measured, but from somebody else's vantage point — a different question from
@@ -292,6 +316,22 @@
   border-inline-start-width: 3px;
 }
 
+/* --- deterministic rule finding ------------------------------------------- */
+/* Authoritative: a solid rule in the product's own colour. Distinct from
+   interpretation (which has no rule at all) and from an experiment (which
+   doubles the rule and lifts the ground). Faultline stands behind this; it just
+   did not vary anything to get it. */
+.fl-evidence[data-evidence="deterministic"] {
+  --fl-ev-tone: var(--fl-chrome);
+  --fl-ev-rule: var(--fl-chrome);
+
+  border-inline-start-width: 3px;
+
+  & .fl-evidence-title {
+    color: var(--fl-text);
+  }
+}
+
 /* --- deterministic experiment -------------------------------------------- */
 /* The one block in the product that is allowed to look authoritative: raised
    ground, the product's colour, and a doubled inline-start rule that nothing
@@ -372,7 +412,7 @@
   content: "SIMULATED";
   margin-inline-start: auto;
   font-family: var(--fl-mono);
-  font-size: 0.625rem;
+  font-size: var(--fl-fs-micro);
   letter-spacing: 0.08em;
   color: var(--fl-warn);
   border: 1px dashed var(--fl-warn-line);
@@ -415,7 +455,8 @@
   margin: 0;
 
   /* A deterministic conclusion is stated flatly and carries weight. */
-  &[data-evidence="experiment"] {
+  &[data-evidence="experiment"],
+  &[data-evidence="deterministic"] {
     font-weight: 600;
   }
 
@@ -472,7 +513,7 @@
    are references TO evidence, not evidence, and stay chip-sized. */
 .fl-ref {
   font-family: var(--fl-mono);
-  font-size: 0.625rem;
+  font-size: var(--fl-fs-micro);
   letter-spacing: 0.04em;
   padding: 1px 5px;
   border-radius: var(--fl-r-chip);

@@ -436,7 +436,13 @@ async function newConversation() {
 function setOpen(open) {
   drawer.hidden = !open;
   app.dataset.analyst = open ? "open" : "closed";
-  toggle.setAttribute("aria-expanded", String(open));
+  // Every control that opens the drawer reports the drawer's state, not just
+  // the one in the topbar. The rail gained a second control, and a control that
+  // declares aria-controls while never updating aria-expanded tells assistive
+  // technology the region is permanently collapsed.
+  for (const control of document.querySelectorAll('[aria-controls="analyst-drawer"]')) {
+    control.setAttribute("aria-expanded", String(open));
+  }
   sessionStorage.setItem("faultlineAnalystOpen", open ? "1" : "0");
   if (open) render();
 }

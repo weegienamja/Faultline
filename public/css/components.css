@@ -529,7 +529,7 @@
    Monospace because they are literal protocol vocabulary, not prose. */
 .fl-badge-code {
   font-family: var(--fl-mono);
-  font-size: 0.625rem;
+  font-size: var(--fl-fs-micro);
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -927,7 +927,7 @@
     &::before {
       content: "\25B8";
       color: var(--fl-text-3);
-      font-size: 0.625rem;
+      font-size: var(--fl-fs-micro);
       transition: rotate var(--fl-dur-2) var(--fl-ease);
     }
 
@@ -1173,7 +1173,7 @@
   border: 1px solid var(--fl-line-strong);
   color: var(--fl-text-3);
   font-family: var(--fl-mono);
-  font-size: 0.625rem;
+  font-size: var(--fl-fs-micro);
 }
 
 .fl-code {

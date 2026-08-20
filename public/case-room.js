@@ -85,13 +85,13 @@ if (location.pathname === "/case-room" || location.pathname === "/case-room/") {
             <h2 class="fl-panel-title">What Faultline established</h2>
           </div>
           <div class="fl-panel-head-actions">
-            <span class="fl-provenance" data-evidence="experiment">Deterministic</span>
+            <span class="fl-provenance" data-evidence="deterministic">Deterministic</span>
           </div>
         </header>
         <div class="fl-panel-body">
           ${conclusions.length
             ? `<div class="fl-evidence-set">${conclusions.map(item => `
-                <div class="fl-evidence" data-evidence="experiment">
+                <div class="fl-evidence" data-evidence="deterministic">
                   <div class="fl-evidence-head">
                     <h3 class="fl-evidence-title"><span class="fl-value">${escapeHtml(item.sessionId)}</span></h3>
                   </div>

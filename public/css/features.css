@@ -328,7 +328,7 @@
       display: grid;
       place-items: center;
       font-family: var(--fl-mono);
-      font-size: 0.625rem;
+      font-size: var(--fl-fs-micro);
     }
   }
 }
@@ -362,7 +362,7 @@
 
   & span {
     display: block;
-    font-size: 0.625rem;
+    font-size: var(--fl-fs-micro);
     color: var(--fl-text-3);
     margin-block-end: 3px;
     letter-spacing: 0.04em;
@@ -379,7 +379,7 @@
 }
 
 .source-live {
-  font-size: 0.625rem;
+  font-size: var(--fl-fs-micro);
   letter-spacing: 0.06em;
   color: var(--fl-text-2);
   background: var(--fl-surface-3);
@@ -427,7 +427,7 @@
 
   & small {
     color: var(--fl-text-3);
-    font-size: 0.625rem;
+    font-size: var(--fl-fs-micro);
     letter-spacing: 0.08em;
     text-transform: uppercase;
   }
@@ -504,7 +504,7 @@
 .probe-health {
   border-radius: var(--fl-r-chip);
   padding: 2px 6px;
-  font-size: 0.625rem;
+  font-size: var(--fl-fs-micro);
   letter-spacing: 0.05em;
   font-weight: 550;
   border: 1px solid var(--fl-idle-line);
@@ -545,7 +545,7 @@
   & small {
     display: block;
     color: var(--fl-text-3);
-    font-size: 0.625rem;
+    font-size: var(--fl-fs-micro);
     text-transform: uppercase;
     letter-spacing: 0.06em;
     margin-block-end: 3px;
@@ -592,7 +592,11 @@
     linear-gradient(var(--fl-line-soft) 1px, transparent 1px) 0 0 / 2rem 2rem,
     linear-gradient(90deg, var(--fl-line-soft) 1px, transparent 1px) 0 0 / 2rem 2rem,
     var(--fl-sunk);
-  touch-action: none;
+  /* Vertical page scrolling still works over the canvas. `touch-action: none`
+     on the whole surface suppressed the browser's own scroll gesture across a
+     large mostly-empty area, on a page that scrolls — but only the NODES are
+     draggable, so only the nodes need to claim the gesture. */
+  touch-action: pan-y;
   container: fl-topology / inline-size;
 }
 
@@ -676,6 +680,9 @@
   box-shadow: var(--fl-shadow-raised);
   user-select: none;
   cursor: grab;
+  /* The node, and only the node, takes the gesture — dragging it must not
+     scroll the page underneath. */
+  touch-action: none;
   z-index: 2;
   /* The node adapts to its OWN width, which is the only thing that knows how
      much room this particular box ended up with — it depends on the canvas
@@ -714,7 +721,7 @@
     display: block;
     margin-block-start: 2px;
     color: var(--fl-text-3);
-    font-size: 0.625rem;
+    font-size: var(--fl-fs-micro);
     line-height: 1.3;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -939,258 +946,263 @@
 }
 
 /* --------------------------------------------------------------------------
-   Live Diagnostics internals — scoped
+   Live Diagnostics internals
    --------------------------------------------------------------------------
-   Everything below is a generic class name (.kv, .pill, .mono, .hop, .verdict)
-   inherited from the panel's original injected stylesheet. They are only ever
-   rendered inside .live-panel, and @scope is what makes that a rule rather
-   than a coincidence: a `.kv` added anywhere else in the product will not pick
-   up live-card styling.
+   These were generic global names (.kv, .pill, .mono, .hop, .verdict)
+   inherited from the panel's original injected stylesheet, and they were held
+   apart from the rest of the product by an @scope block.
 
-   The prefixed `.live-*` rules above stay outside the scope on purpose. If this
-   ever loads somewhere @scope is unsupported the whole block is dropped, and
-   the panel keeps its frame, grid and controls rather than collapsing to
-   unstyled markup.
+   That worked, but it made a large part of Live Diagnostics depend on @scope
+   being supported: where it is not, the whole block is discarded and the panel
+   loses its inner styling. Prefixing the names achieves the same containment
+   with ordinary selectors, so nothing here rests on a feature Faultline does
+   not otherwise need.
    -------------------------------------------------------------------------- */
 
-@scope (.live-panel) {
-  /* Key/value pairs inside a live card. Stacks below the width where the value
-     column stops being usable, rather than at a viewport size. */
-  .kv {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    gap: 2px var(--fl-s3);
+/* Key/value pairs inside a live card. Stacks below the width where the value
+   column stops being usable, rather than at a viewport size. */
+.live-kv {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px var(--fl-s3);
+  font-size: var(--fl-fs-micro);
+
+  & dt {
+    color: var(--fl-text-3);
     font-size: var(--fl-fs-micro);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+  }
+
+  & dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+    font-family: var(--fl-mono);
+    font-size: var(--fl-fs-micro);
+    font-variant-numeric: tabular-nums;
+    color: var(--fl-text);
+    margin-block-end: var(--fl-s1);
+  }
+}
+
+@container fl-panel (inline-size > 18rem) {
+  .live-kv {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: baseline;
 
     & dt {
-      color: var(--fl-text-3);
-      font-size: var(--fl-fs-micro);
-      text-transform: uppercase;
-      letter-spacing: 0.07em;
+      align-self: baseline;
     }
 
     & dd {
-      margin: 0;
-      overflow-wrap: anywhere;
-      font-family: var(--fl-mono);
-      font-size: var(--fl-fs-micro);
-      font-variant-numeric: tabular-nums;
-      color: var(--fl-text);
-      margin-block-end: var(--fl-s1);
+      margin-block-end: 0;
     }
   }
+}
 
-  @container fl-panel (inline-size > 18rem) {
-    .kv {
-      grid-template-columns: auto minmax(0, 1fr);
-      align-items: baseline;
+.live-unset {
+  color: var(--fl-text-3);
+}
 
-      & dt {
-        align-self: baseline;
-      }
+.live-stage-row,
+.live-res-row,
+.live-van-row {
+  display: grid;
+  gap: var(--fl-s2);
+  align-items: center;
+  padding-block: 7px;
+  border-block-start: 1px solid var(--fl-line-soft);
+  font-size: var(--fl-fs-micro);
 
-      & dd {
-        margin-block-end: 0;
-      }
-    }
+  &:first-of-type,
+  &[data-continues] {
+    border-block-start: 0;
+    padding-block-start: 0;
+  }
+}
+
+/* The resolved-addresses line under a resolver row. It belongs to the row
+   above it, so it carries no rule of its own. */
+.live-res-row[data-continues] .live-mono {
+  grid-column: 1 / -1;
+  color: var(--fl-text-2);
+}
+
+/* Confidence figure on the deterministic verdict. */
+.live-confidence {
+  text-align: end;
+
+  & strong {
+    display: block;
+    font-size: var(--fl-fs-metric);
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--fl-text);
+    font-variant-numeric: tabular-nums;
   }
 
-  .unset {
-    color: var(--fl-text-3);
-  }
-
-  .stage-row,
-  .res-row,
-  .van-row {
-    display: grid;
-    gap: var(--fl-s2);
-    align-items: center;
-    padding-block: 7px;
-    border-block-start: 1px solid var(--fl-line-soft);
+  & span {
+    display: block;
     font-size: var(--fl-fs-micro);
-
-    &:first-of-type,
-    &[data-continues] {
-      border-block-start: 0;
-      padding-block-start: 0;
-    }
-  }
-
-  /* The resolved-addresses line under a resolver row. It belongs to the row
-     above it, so it carries no rule of its own. */
-  .res-row[data-continues] .mono {
-    grid-column: 1 / -1;
-    color: var(--fl-text-2);
-  }
-
-  /* Confidence figure on the deterministic verdict. */
-  .live-confidence {
-    text-align: end;
-
-    & strong {
-      display: block;
-      font-size: var(--fl-fs-metric);
-      font-weight: 700;
-      line-height: 1.1;
-      color: var(--fl-text);
-      font-variant-numeric: tabular-nums;
-    }
-
-    & span {
-      display: block;
-      font-size: var(--fl-fs-micro);
-      color: var(--fl-text-3);
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-    }
-  }
-
-  /* The DNS / TCP / TLS / HTTP ladder. A fixed leading column keeps the stage
-     names aligned so the sequence reads as a sequence. */
-  .stage-row {
-    grid-template-columns: 3.25rem minmax(0, 1fr) auto;
-  }
-
-  .res-row,
-  .van-row {
-    grid-template-columns: minmax(0, 1fr) auto auto;
-  }
-
-  .pill {
-    border-radius: var(--fl-r-chip);
-    padding: 2px 6px;
-    font-size: 0.625rem;
+    color: var(--fl-text-3);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    border: 1px solid var(--fl-idle-line);
-    color: var(--fl-text-3);
-    white-space: nowrap;
+    letter-spacing: 0.08em;
+  }
+}
 
-    &.pass {
-      color: var(--fl-ok);
-      border-color: var(--fl-ok-line);
-      background: var(--fl-ok-soft);
-    }
+/* The DNS / TCP / TLS / HTTP ladder. A fixed leading column keeps the stage
+   names aligned so the sequence reads as a sequence. */
+.live-stage-row {
+  grid-template-columns: 3.25rem minmax(0, 1fr) auto;
+}
 
-    &.fail {
-      color: var(--fl-crit);
-      border-color: var(--fl-crit-line);
-      background: var(--fl-crit-soft);
-    }
+.live-res-row,
+.live-van-row {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
 
-    &.warn {
-      color: var(--fl-warn);
-      border-color: var(--fl-warn-line);
-      background: var(--fl-warn-soft);
-    }
+.live-pill {
+  border-radius: var(--fl-r-chip);
+  padding: 2px 6px;
+  font-size: var(--fl-fs-micro);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid var(--fl-idle-line);
+  color: var(--fl-text-3);
+  white-space: nowrap;
 
-    &.na {
-      color: var(--fl-text-3);
-    }
+  &.pass {
+    color: var(--fl-ok);
+    border-color: var(--fl-ok-line);
+    background: var(--fl-ok-soft);
   }
 
-  .mono {
-    font-family: var(--fl-mono);
+  &.fail {
+    color: var(--fl-crit);
+    border-color: var(--fl-crit-line);
+    background: var(--fl-crit-soft);
+  }
+
+  &.warn {
+    color: var(--fl-warn);
+    border-color: var(--fl-warn-line);
+    background: var(--fl-warn-soft);
+  }
+
+  &.na {
+    color: var(--fl-text-3);
+  }
+}
+
+.live-mono {
+  font-family: var(--fl-mono);
+  font-size: var(--fl-fs-micro);
+  color: var(--fl-text-2);
+  overflow-wrap: anywhere;
+}
+
+.live-hop-list {
+  max-block-size: 14.5rem;
+  overflow: auto;
+  overscroll-behavior: contain;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.live-hop {
+  display: grid;
+  grid-template-columns: 1.625rem minmax(0, 1fr) auto;
+  gap: var(--fl-s2);
+  padding-block: 6px;
+  border-block-start: 1px solid var(--fl-line-soft);
+  font-size: var(--fl-fs-micro);
+  align-items: center;
+
+  &:first-child {
+    border-block-start: 0;
+  }
+
+  & small {
+    color: var(--fl-text-3);
+    display: block;
     font-size: var(--fl-fs-micro);
-    color: var(--fl-text-2);
     overflow-wrap: anywhere;
   }
+}
 
-  .hop-list {
-    max-block-size: 14.5rem;
-    overflow: auto;
-    overscroll-behavior: contain;
+/* The deterministic verdict.
+   --------------------------------------------------------------------------
+   A conclusion Faultline stands behind, so it gets a solid rule in the
+   product's colour — the DETERMINISTIC RULE FINDING treatment.
+
+   It previously used the double rule and raised ground, which are reserved for
+   a deterministic EXPERIMENT. Live Diagnostics runs fixed rules over observed
+   measurements; it does not vary a condition and re-measure. Borrowing Network
+   Bisect's visual language would have claimed a controlled experiment that
+   never happened, in the one product that exists to keep those apart. */
+.live-verdict {
+  border: 1px solid var(--fl-line);
+  border-inline-start: 3px solid var(--fl-chrome);
+  border-radius: var(--fl-r-control);
+  padding: var(--fl-s4);
+  background: var(--fl-surface);
+  margin-block-start: var(--fl-s4);
+
+  & h3 {
+    margin: 4px 0 6px;
+    font-size: var(--fl-fs-md);
+  }
+
+  & p {
     margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .hop {
-    display: grid;
-    grid-template-columns: 1.625rem minmax(0, 1fr) auto;
-    gap: var(--fl-s2);
-    padding-block: 6px;
-    border-block-start: 1px solid var(--fl-line-soft);
-    font-size: var(--fl-fs-micro);
-    align-items: center;
-
-    &:first-child {
-      border-block-start: 0;
-    }
-
-    & small {
-      color: var(--fl-text-3);
-      display: block;
-      font-size: 0.625rem;
-      overflow-wrap: anywhere;
-    }
-  }
-
-  /* The deterministic verdict. It is a conclusion Faultline stands behind, so it
-     takes the experiment treatment rather than a generic tinted box. */
-  .verdict {
-    border: 1px solid var(--fl-chrome-line);
-    border-inline-start: 4px double var(--fl-chrome);
-    border-radius: var(--fl-r-control);
-    padding: var(--fl-s4);
-    background: var(--fl-surface-2);
-    margin-block-start: var(--fl-s4);
-
-    & h3 {
-      margin: 4px 0 6px;
-      font-size: var(--fl-fs-md);
-    }
-
-    & p {
-      margin: 0;
-      color: var(--fl-text-2);
-      font-size: var(--fl-fs-micro);
-      line-height: var(--fl-lh-body);
-    }
-  }
-
-  .src-list {
-    display: flex;
-    gap: var(--fl-s1);
-    flex-wrap: wrap;
-    margin-block-start: var(--fl-s3);
-  }
-
-  .disclaimer {
-    color: var(--fl-text-3);
+    color: var(--fl-text-2);
     font-size: var(--fl-fs-micro);
     line-height: var(--fl-lh-body);
-    margin: var(--fl-s3) 0 0;
-    border-block-start: 1px solid var(--fl-line-soft);
-    padding-block-start: var(--fl-s3);
   }
+}
 
-  .env-actions {
-    display: flex;
-    gap: var(--fl-s2);
-    flex-wrap: wrap;
-    margin-block-start: var(--fl-s3);
-  }
+.live-src-list {
+  display: flex;
+  gap: var(--fl-s1);
+  flex-wrap: wrap;
+  margin-block-start: var(--fl-s3);
+}
 
-  .manifest-box {
-    margin-block-start: var(--fl-s3);
+.live-disclaimer {
+  color: var(--fl-text-3);
+  font-size: var(--fl-fs-micro);
+  line-height: var(--fl-lh-body);
+  margin: var(--fl-s3) 0 0;
+  border-block-start: 1px solid var(--fl-line-soft);
+  padding-block-start: var(--fl-s3);
+}
 
-    & textarea {
-      inline-size: 100%;
-      border: 1px solid var(--fl-line-strong);
-      border-radius: var(--fl-r-control);
-      background: var(--fl-sunk);
-      color: var(--fl-text);
-      padding: var(--fl-s3);
-      font-family: var(--fl-mono);
-      font-size: var(--fl-fs-micro);
-      min-block-size: 8rem;
-      outline: none;
+.live-env-actions {
+  display: flex;
+  gap: var(--fl-s2);
+  flex-wrap: wrap;
+  margin-block-start: var(--fl-s3);
+}
 
-      &:focus {
-        border-color: var(--fl-chrome);
-        box-shadow: 0 0 0 3px var(--fl-chrome-soft);
-      }
+.live-manifest-box {
+  margin-block-start: var(--fl-s3);
+
+  & textarea {
+    inline-size: 100%;
+    border: 1px solid var(--fl-line-strong);
+    border-radius: var(--fl-r-control);
+    background: var(--fl-sunk);
+    color: var(--fl-text);
+    padding: var(--fl-s3);
+    font-family: var(--fl-mono);
+    font-size: var(--fl-fs-micro);
+    min-block-size: 8rem;
+    outline: none;
+
+    &:focus {
+      border-color: var(--fl-chrome);
+      box-shadow: 0 0 0 3px var(--fl-chrome-soft);
     }
   }
 }
@@ -1227,6 +1239,10 @@
   margin-block-start: var(--fl-s4);
 }
 
+/* 40rem is the two-pane threshold: a ~15rem list beside a usable detail pane.
+   `.intelligence-layout` makes the same decision and uses the same number. The
+   chronology stays at 42rem because its transition is a different shape — five
+   phase columns side by side, not two panes. */
 @container fl-panel (inline-size > 40rem) {
   .case-layout {
     grid-template-columns: minmax(14rem, 0.8fr) minmax(0, 1.2fr);
@@ -1296,7 +1312,7 @@
   border-radius: var(--fl-r-chip);
   padding: 2px 6px;
   color: var(--fl-text-3);
-  font-size: 0.625rem;
+  font-size: var(--fl-fs-micro);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   white-space: nowrap;
@@ -1372,7 +1388,7 @@
   background: var(--fl-surface-2);
   border-radius: var(--fl-r-chip);
   padding: 2px 6px;
-  font-size: 0.625rem;
+  font-size: var(--fl-fs-micro);
   letter-spacing: 0.05em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -1399,7 +1415,9 @@
   margin-block-start: var(--fl-s4);
 }
 
-@container fl-panel (inline-size > 44rem) {
+/* Same two-pane decision as .case-layout, so the same 40rem. It was 44rem,
+   which is the drift the deleted breakpoint tokens claimed to prevent. */
+@container fl-panel (inline-size > 40rem) {
   .intelligence-layout {
     grid-template-columns: minmax(0, 1.1fr) minmax(15rem, 0.9fr);
   }
@@ -1537,28 +1555,15 @@
 }
 
 /* ==========================================================================
-   Analyst drawer
+   Analyst drawer — internals
    --------------------------------------------------------------------------
-   A third shell column, not an overlay. Design intent, stated because it is
-   easy to erode: this is an operations surface, not a chat product. No
-   avatars, no bubbles, no gradients, no typing animation, no AI iconography.
+   The drawer's BOX is a shell fact and lives in layout.css with the rest of
+   the frame. Only what is inside it is here.
+
+   Design intent, stated because it is easy to erode: this is an operations
+   surface, not a chat product. No avatars, no bubbles, no gradients, no
+   typing animation, no AI iconography.
    ========================================================================== */
-
-.fl-analyst {
-  position: sticky;
-  inset-block-start: 0;
-  block-size: 100dvh;
-  display: none;
-  flex-direction: column;
-  background: var(--fl-sunk);
-  border-inline-start: 1px solid var(--fl-line);
-  min-inline-size: 0;
-  container: fl-region / inline-size;
-
-  .fl-app[data-analyst="open"] & {
-    display: flex;
-  }
-}
 
 .fl-analyst-head {
   display: flex;
@@ -1702,7 +1707,7 @@
         counter-increment: fl-a;
         content: counter(fl-a);
         font-family: var(--fl-mono);
-        font-size: 0.625rem;
+        font-size: var(--fl-fs-micro);
         color: var(--fl-text-3);
         padding-block-start: 2px;
       }
@@ -1716,7 +1721,7 @@
 
   & code {
     font-family: var(--fl-mono);
-    font-size: 0.625rem;
+    font-size: var(--fl-fs-micro);
     color: var(--fl-text-2);
   }
 

@@ -53,8 +53,8 @@
 
 /* The Analyst is a third column rather than an overlay: it exists to be read
    beside the evidence it describes, and a floating panel covers exactly the
-   panel being asked about. Below --fl-bp-split of viewport it floats instead,
-   because taking a column there would squeeze the evidence to nothing. */
+   panel being asked about. Below 75rem of viewport it floats instead, because
+   taking a column there would squeeze the evidence to nothing. */
 .fl-app[data-analyst="open"] {
   grid-template-columns: var(--fl-rail-w) minmax(0, 1fr) var(--fl-drawer-w);
 }
@@ -114,7 +114,7 @@
 
 .fl-brand-env {
   margin-inline-start: auto;
-  font-size: 0.625rem;
+  font-size: var(--fl-fs-micro);
   letter-spacing: 0.07em;
   text-transform: uppercase;
   color: var(--fl-text-3);
@@ -136,7 +136,7 @@
 
 .fl-nav-group-label {
   display: block;
-  font-size: 0.625rem;
+  font-size: var(--fl-fs-micro);
   font-weight: 700;
   letter-spacing: 0.13em;
   text-transform: uppercase;
@@ -191,7 +191,7 @@
 
 .fl-nav-count {
   margin-inline-start: auto;
-  font-size: 0.625rem;
+  font-size: var(--fl-fs-micro);
   color: var(--fl-text-3);
   font-variant-numeric: tabular-nums;
 }
@@ -209,6 +209,30 @@
   gap: var(--fl-s3);
   font-size: var(--fl-fs-micro);
   color: var(--fl-text-3);
+}
+
+/* --- Analyst drawer: the third column ------------------------------------ */
+/* The drawer's box. Its internals are in features.css.
+
+   This lives in `layout` rather than with the drawer's internals in `features`
+   precisely so the responsive overrides below can reach it: `features` is
+   ordered after `layout`, so a `position` declared there outranks anything the
+   shell tries to say about it. */
+
+.fl-analyst {
+  position: sticky;
+  inset-block-start: 0;
+  block-size: 100dvh;
+  display: none;
+  flex-direction: column;
+  background: var(--fl-sunk);
+  border-inline-start: 1px solid var(--fl-line);
+  min-inline-size: 0;
+  container: fl-region / inline-size;
+
+  .fl-app[data-analyst="open"] & {
+    display: flex;
+  }
 }
 
 /* --- main column --------------------------------------------------------- */
@@ -407,11 +431,26 @@
     padding-inline: var(--fl-s2);
   }
 
+  /* "PRESERVE" does not fit a 52px track at a legible size, and the 9px it was
+     rendered at is below the floor this design system claims. It is hidden from
+     the eye and kept for assistive technology, and the grouping the label
+     carried is taken over by a separator — the rail still teaches the product
+     model, it just stops pretending to do it in 9px type. */
   .fl-nav-group-label {
-    text-align: center;
-    padding-inline: 0;
-    font-size: 0.5625rem;
-    letter-spacing: 0.06em;
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .fl-nav-group + .fl-nav-group {
+    margin-block-start: var(--fl-s3);
+    padding-block-start: var(--fl-s3);
+    border-block-start: 1px solid var(--fl-line);
   }
 
   .fl-nav-item {
@@ -472,8 +511,14 @@
     gap: var(--fl-s1);
   }
 
+  /* The rail is horizontal here, so the group separator has to turn with it —
+     the block-direction border and padding inherited from the icon-rail rules
+     above would otherwise sit across the top of every group and add 13px to a
+     bar that should be exactly as tall as its icons. */
   .fl-nav-group + .fl-nav-group {
     margin-block-start: 0;
+    padding-block-start: 0;
+    border-block-start: 0;
     /* The group boundary still has to read once the labels are gone, or the
        four verbs collapse into one undifferentiated strip of icons. */
     border-inline-start: 1px solid var(--fl-line);
@@ -481,7 +526,6 @@
     margin-inline-start: var(--fl-s1);
   }
 
-  .fl-nav-group-label,
   .fl-rail-foot {
     display: none;
   }
@@ -495,14 +539,18 @@
   }
 }
 
-/* The Analyst drawer stops being a column. Viewport-scoped because it is a
-   shell decision: the drawer is a sibling of the content column, so no
-   container inside the content can know about it. */
-@media (width <= 75rem) {
-  .fl-app[data-analyst="open"] {
-    grid-template-columns: var(--fl-rail-w) minmax(0, 1fr);
-  }
+/* The Analyst drawer stops being a column and floats instead. Viewport-scoped
+   because it is a shell decision: the drawer is a sibling of the content
+   column, so no container inside the content can know about it.
 
+   Note the range on the grid rule. `width <= 75rem` also matches every mobile
+   width, and this block comes after the <= 52rem one — so with the drawer open
+   it was putting the single-column mobile shell BACK into two columns, and the
+   horizontal rail was then squeezed into a 60px track where its twelve items
+   wrapped into a 4000px-tall strip. The float applies everywhere below 75rem;
+   only the two-column grid is confined to the range where a rail column
+   actually exists. */
+@media (width <= 75rem) {
   .fl-app[data-analyst="open"] .fl-analyst {
     position: fixed;
     inset-block-start: 0;
@@ -510,5 +558,11 @@
     inline-size: min(25rem, 100vw);
     z-index: 40;
     box-shadow: var(--fl-shadow-float);
+  }
+}
+
+@media (52rem < width <= 75rem) {
+  .fl-app[data-analyst="open"] {
+    grid-template-columns: var(--fl-rail-w) minmax(0, 1fr);
   }
 }
