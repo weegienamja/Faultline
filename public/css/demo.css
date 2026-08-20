@@ -338,3 +338,25 @@ html[data-public-demo="true"] [data-local-only] { display: none !important; }
     margin-inline: 0;
   }
 }
+
+/* The topbar at rail-collapse width.
+
+   Three nowrap actions plus the demo flag do not fit beside a page title at
+   390px, and the actions do not shrink — so the demo call to action is the one
+   that goes. It costs nothing here: the rail's first item is Hosted Demo, and
+   on the hosted deployment the demo IS the landing view, so the button is only
+   ever a shortcut to where the visitor already is.
+
+   The flag stays. It is the smallest element in the bar and the one carrying
+   the claim that this is a demonstration deployment, which is exactly the thing
+   that must not be the first casualty of a narrow screen. */
+@media (width <= 52rem) {
+  .fl-topbar-actions [data-demo-only] {
+    display: none;
+  }
+
+  .fl-demo-flag {
+    padding-inline: var(--fl-s1);
+    letter-spacing: 0.04em;
+  }
+}

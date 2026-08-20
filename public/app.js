@@ -80,7 +80,7 @@ function renderProbeFleet() {
     els["probe-fleet"].innerHTML = `<div class="fl-state" data-tone="locked">
       <div class="fl-state-icon" aria-hidden="true">◌</div>
       <p class="fl-state-title">${runtime.isPublicDemo ? "Operator surface" : "Fleet health is locked"}</p>
-      <p class="fl-state-body">${words.lockedBody("Registered probe identities and heartbeat health")}</p>
+      <p class="fl-state-body">${words.lockedBody("Registered probe health")}</p>
       <div class="fl-state-actions">${words.lockedAction}</div>
     </div>`;
     return;
@@ -454,7 +454,7 @@ function renderEmptyOverview() {
         icon: "◌",
         tone: "locked",
         title: "Live data is locked",
-        body: words.lockedBody("Collected diagnostics"),
+        body: words.lockedBody("The collected diagnostics archive"),
         actions: words.lockedAction
       })}</section>`;
 

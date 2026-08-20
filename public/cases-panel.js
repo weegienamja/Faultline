@@ -24,7 +24,7 @@ function token() {
 }
 
 async function request(path, options = {}) {
-  if (!token()) throw new Error(lockedMessage("Case workspaces"));
+  if (!token()) throw new Error(lockedMessage("The case workspace"));
   const response = await fetch(path, {
     method: options.method || "GET",
     cache: "no-store",
@@ -149,7 +149,7 @@ async function renderDetail() {
 }
 
 function renderList() {
-  summary.textContent = token() ? `${cases.length} support case${cases.length === 1 ? "" : "s"}. Evidence exports redact local network identifiers by default in the dashboard.` : lockedMessage("Support cases");
+  summary.textContent = token() ? `${cases.length} support case${cases.length === 1 ? "" : "s"}. Evidence exports redact local network identifiers by default in the dashboard.` : lockedMessage("The support case workspace");
   list.innerHTML = cases.length ? cases.map(item => `<button class="case-card ${item.id === activeCaseId ? "active" : ""}" data-case-id="${escapeHtml(item.id)}"><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.customer)} · ${escapeHtml(item.status)} · ${item.diagnosticCount} diagnostics</small></button>`).join("") : '<p class="cases-muted">No support cases yet.</p>';
   list.querySelectorAll("[data-case-id]").forEach(button => button.addEventListener("click", async () => { activeCaseId = button.dataset.caseId; renderList(); await renderDetail(); }));
 }
