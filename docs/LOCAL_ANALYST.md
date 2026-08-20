@@ -76,8 +76,8 @@ The drawer is page-aware and offers starter questions per screen.
 * *What does `TARGET_PROPERTY` mean?*
 * *Summarise this incident.*
 
-Answers about the current network cite evidence references — `BASE-01`,
-`EXP-01`, `CONF-01`, `DIAG-01`, `STG-TCP`, `PATH-01`, `CASE-…` — which are
+Answers about the current network cite evidence references - `BASE-01`,
+`EXP-01`, `CONF-01`, `DIAG-01`, `STG-TCP`, `PATH-01`, `CASE-…` - which are
 clickable and navigate to the panel holding the record.
 
 ---
@@ -117,13 +117,13 @@ inventory of what is retrievable right now:
 
 ```
 AVAILABLE FAULTLINE EVIDENCE
-- Current target: example.com — available (get_current_target)
-- Latest live diagnostic — unavailable
-- Latest Network Bisect run — available (get_latest_bisect_run)
-- Flight Recorder incident (before/during/after) — available (get_latest_recorder_incident, get_recorder_incident)
-- Measured path and inferred topology — unavailable
-- Support cases — unavailable
-- Faultline documentation and engine vocabulary — available (search_faultline_docs, get_faultline_term)
+- Current target: example.com - available (get_current_target)
+- Latest live diagnostic - unavailable
+- Latest Network Bisect run - available (get_latest_bisect_run)
+- Flight Recorder incident (before/during/after) - available (get_latest_recorder_incident, get_recorder_incident)
+- Measured path and inferred topology - unavailable
+- Support cases - unavailable
+- Faultline documentation and engine vocabulary - available (search_faultline_docs, get_faultline_term)
 
 Not retrievable by you in this version: Change Assurance comparisons;
 Connectivity Contract results.
@@ -131,7 +131,7 @@ Connectivity Contract results.
 
 This exists because an 8B model answers honestly but does not always notice
 that relevant evidence exists. Asked *"what does Faultline know about this
-target?"*, it would call `get_current_target`, receive a hostname, and stop —
+target?"*, it would call `get_current_target`, receive a hostname, and stop -
 never retrieving a completed Network Bisect run one call away.
 
 **The inventory carries availability and the tool that fetches it, never the
@@ -147,9 +147,9 @@ tool might return them.
 
 ### Two-phase request
 
-1. **Retrieval** — tools enabled, no output schema. The model calls read-only
+1. **Retrieval** - tools enabled, no output schema. The model calls read-only
    tools; the gateway records every evidence reference the results contain.
-2. **Answer** — tools removed, JSON schema applied, response streamed. Removing
+2. **Answer** - tools removed, JSON schema applied, response streamed. Removing
    the tools makes the final turn decisive; the recorded references become the
    only citations the answer may use.
 
@@ -187,13 +187,13 @@ after someone walks away.
    and by the `:cloud` tag, and refused as configuration.
 5. **Read-only tools.** The tool table contains only getters and searches. The
    store is passed through a facade exposing read accessors only, so a write
-   method is not merely unused — it is absent.
+   method is not merely unused; it is absent.
 6. **Untrusted model output.** Tool names are looked up in a fixed table; an
    unknown name is refused, never dispatched. Every argument is parsed by that
    tool's validator. No model-supplied value becomes a path, host, URL, command
    or object key.
-7. **Prompt injection.** Text inside evidence — hostnames, banners, holder
-   names, case notes, documentation — is data. Instructions found there gain no
+7. **Prompt injection.** Text inside evidence - hostnames, banners, holder
+   names, case notes, documentation - is data. Instructions found there gain no
    privilege: the tool table is fixed and the gateway executes only registered
    names with validated arguments.
 8. **Citation integrity.** Evidence ids are validated against references
@@ -221,7 +221,7 @@ after someone walks away.
 | `FAULTLINE_ANALYST_ENDPOINT` | `http://127.0.0.1:11434` | Must be loopback. |
 | `FAULTLINE_ANALYST_MODEL` | `qwen3:8b` | Must be a local, non-cloud model. |
 
-Settings → **Inference** shows provider, model, endpoint and status.
+Settings -> **Inference** shows provider, model, endpoint and status.
 
 ## API
 
@@ -266,7 +266,7 @@ the failure recorded in `limitations`.
 There are **no write tools**. The Analyst cannot change network configuration,
 routes, DNS or VPN state; cannot run commands or scans; and cannot create,
 modify or delete cases, evidence, contracts, probes or environments. It cannot
-start a Network Bisect — it can recommend one.
+start a Network Bisect; it can recommend one.
 
 ## Documentation retrieval
 
@@ -284,7 +284,7 @@ the corpus outgrows it.
 
 ## Tests
 
-The Analyst's test suite runs without Ollama, a model, a GPU or the Internet —
+The Analyst's test suite runs without Ollama, a model, a GPU or the Internet -
 the transport is injected. `npm test` covers transport, lifecycle, tool
 validation, schema safety, citation integrity, conversation bounds, prompt
 injection and the HTTP surface.
@@ -327,7 +327,7 @@ Analyst entirely, stop Ollama; to remove the runtime, uninstall Ollama.
 
 * An 8B model does not always retrieve every relevant artefact. The evidence
   inventory closes the common case (a question about the target now also
-  retrieves the isolation run — see `tests/analyst-live-model.test.mjs`), but
+  retrieves the isolation run - see `tests/analyst-live-model.test.mjs`), but
   retrieval remains model-dependent. When it retrieves nothing, it produces no
   findings and says so, rather than guessing.
 * Change Assurance and Connectivity Contract results have no read-only tool in
