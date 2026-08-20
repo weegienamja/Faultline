@@ -1,0 +1,15 @@
+# Keep the runtime package deterministic when Faultline is installed directly
+# from Git (used by the hosted Vercel staging project).
+
+.github/
+build/
+data/
+docs/
+fixtures/
+test/
+tests/
+coverage/
+Dockerfile
+.dockerignore
+docker-compose.yml
+ROADMAP.md
