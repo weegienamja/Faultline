@@ -42,67 +42,9 @@ function ms(v) {
   return Number.isFinite(Number(v)) ? `${Number(v).toFixed(Number(v) < 10 ? 1 : 0)} ms` : null;
 }
 
-function installStyles() {
-  const style = document.createElement("style");
-  style.textContent = `
-  .live-panel{margin-bottom:13px;border-color:var(--fl-ok-line)}
-  .live-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap}
-  .live-form{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;align-items:stretch}
-  .live-form input[type=text]{flex:1 1 300px;min-width:220px;border:1px solid var(--border);border-radius:9px;background:var(--bg);color:var(--text);padding:11px 12px;font:12px ui-monospace,SFMono-Regular,Menlo,monospace;outline:none}
-  .live-form input[type=text]:focus{border-color:var(--fl-ok-line)}
-  .live-form button{white-space:nowrap}
-  .live-modes{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
-  .live-mode{border:1px solid var(--border);border-radius:999px;background:transparent;color:var(--muted);padding:6px 11px;font-size:10px;cursor:pointer}
-  .live-mode.active{border-color:var(--fl-ok-line);color:var(--accent);background:var(--accent-soft)}
-  .live-status{margin:12px 0 0;color:var(--muted);font-size:11px;line-height:1.55;min-height:16px}
-  .live-status.error{color:var(--danger)}
-  .src-badge{display:inline-block;border:1px solid var(--border);border-radius:999px;padding:3px 7px;font-size:8px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
-  .src-live,.src-local,.src-deterministic{border-color:var(--fl-ok-line);color:var(--accent);background:var(--accent-soft)}
-  .src-ripestat,.src-globalping,.src-atlas,.src-ioda,.src-peeringdb,.src-radar{border-color:var(--fl-accent-line);color:var(--fl-accent);background:var(--fl-accent-soft)}
-  .src-inferred{border-color:rgba(241,184,91,.36);color:var(--warn);background:rgba(241,184,91,.07)}
-  .src-demo{border-color:rgba(139,160,154,.35);color:var(--fl-text-2);background:rgba(139,160,154,.06)}
-  .live-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:11px;margin-top:16px}
-  .live-card{border:1px solid var(--border-soft);border-radius:11px;padding:14px;background:rgba(255,255,255,.012);min-width:0}
-  .live-card h4{margin:0 0 3px;font-size:12px}
-  .live-card-head{display:flex;justify-content:space-between;gap:8px;align-items:flex-start;margin-bottom:10px}
-  .live-card .note{color:var(--fl-text-3);font-size:9px;line-height:1.5;margin:9px 0 0}
-  .kv{display:grid;grid-template-columns:auto 1fr;gap:5px 12px;font-size:11px}
-  .kv dt{color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:.07em;align-self:center}
-  .kv dd{margin:0;overflow-wrap:anywhere;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px}
-  .unset{color:var(--fl-text-3);font-style:normal}
-  .stage-row,.res-row,.van-row{display:grid;gap:8px;align-items:center;padding:7px 0;border-top:1px solid var(--border-soft);font-size:11px}
-  .stage-row{grid-template-columns:52px 1fr auto}
-  .res-row{grid-template-columns:1fr auto auto}
-  .van-row{grid-template-columns:1fr auto auto}
-  .stage-row:first-of-type,.res-row:first-of-type,.van-row:first-of-type{border-top:0}
-  .pill{border-radius:999px;padding:3px 7px;font-size:8px;text-transform:uppercase;letter-spacing:.08em;border:1px solid var(--border);color:var(--muted);white-space:nowrap}
-  .pill.pass{color:var(--accent);border-color:var(--fl-ok-line);background:var(--accent-soft)}
-  .pill.fail{color:var(--danger);border-color:rgba(255,122,104,.36);background:rgba(255,122,104,.06)}
-  .pill.warn{color:var(--warn);border-color:rgba(241,184,91,.36);background:rgba(241,184,91,.07)}
-  .pill.na{color:var(--fl-text-3)}
-  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10px;color:var(--fl-text-2)}
-  .hop-list{max-height:230px;overflow:auto;margin:0;padding:0;list-style:none}
-  .hop{display:grid;grid-template-columns:26px 1fr auto;gap:8px;padding:6px 0;border-top:1px solid var(--border-soft);font-size:10px;align-items:center}
-  .hop:first-child{border-top:0}
-  .hop small{color:var(--muted);display:block;font-size:9px}
-  .verdict{border:1px solid var(--fl-ok-line);border-radius:11px;padding:14px;background:var(--accent-soft);margin-top:16px}
-  .verdict h3{margin:4px 0 6px;font-size:17px}
-  .verdict p{margin:0;color:#bbcbc6;font-size:11px;line-height:1.55}
-  .src-list{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
-  .disclaimer{color:var(--fl-text-3);font-size:9px;line-height:1.55;margin:12px 0 0;border-top:1px solid var(--border-soft);padding-top:10px}
-  .env-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px}
-  .manifest-box{margin-top:11px}
-  .manifest-box textarea{width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:9px;background:var(--bg);color:var(--text);padding:10px;font:10px ui-monospace,SFMono-Regular,Menlo,monospace;min-height:130px;outline:none}
-  @media(max-width:760px){.live-grid{grid-template-columns:1fr}}
-  `;
-  document.head.appendChild(style);
-}
-
 // --------------------------------------------------------------------------
 // Panel construction
 // --------------------------------------------------------------------------
-
-installStyles();
 
 // Mounted into the Live Diagnostics view rather than located by probing the
 // DOM for a neighbouring element.
@@ -114,14 +56,14 @@ panel.innerHTML = `
   <div class="live-head">
     <div>
       <span class="section-label">REAL NETWORK EVIDENCE</span>
-      <h3 style="margin:4px 0 0">Test a real target</h3>
-      <p style="margin:6px 0 0;color:var(--muted);font-size:11px;line-height:1.55;max-width:70ch">
+      <h2 class="fl-panel-title fl-mt-1">Test a real target</h2>
+      <p class="fl-body fl-prose fl-mt-2">
         Runs genuine DNS, TCP, TLS, HTTP, ICMP and path measurements from this machine, then adds public routing,
         outage and network-ownership context. Everything below is measured or retrieved live. The
         <span class="src-badge src-demo">sample</span> incidents on the Overview remain synthetic.
       </p>
     </div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+    <div class="fl-row-end">
       ${badge("local")}${badge("live")}${badge("ripestat")}${badge("globalping")}${badge("ioda")}${badge("peeringdb")}
     </div>
   </div>
@@ -210,7 +152,7 @@ function renderStages(result) {
   const tls = result.observed.tls;
   const cert = tls?.certificate;
   const certBlock = tls?.ok && cert ? `
-    <dl class="kv" style="margin-top:11px">
+    <dl class="kv fl-mt-3">
       <dt>TLS</dt><dd>${value(tls.protocol)} · ${value(tls.cipher)}</dd>
       <dt>Subject</dt><dd>${value(cert.subject)}</dd>
       <dt>Issuer</dt><dd>${value(cert.issuer)}</dd>
@@ -219,7 +161,7 @@ function renderStages(result) {
     </dl>` : "";
 
   return `<article class="live-card">
-    <div class="live-card-head"><div><h4>Connection stages</h4><span class="mono">${escapeHtml(result.target.host)}:${escapeHtml(result.target.port)}</span></div>${badge("local")}</div>
+    <div class="live-card-head"><div><h3>Connection stages</h3><span class="mono">${escapeHtml(result.target.host)}:${escapeHtml(result.target.port)}</span></div>${badge("local")}</div>
     ${rows}${certBlock}
   </article>`;
 }
@@ -228,7 +170,7 @@ function renderDns(result) {
   const dns = result.observed.dns;
   if (!dns.measured) {
     return `<article class="live-card">
-      <div class="live-card-head"><div><h4>DNS resolvers</h4></div>${badge("local")}</div>
+      <div class="live-card-head"><div><h3>DNS resolvers</h3></div>${badge("local")}</div>
       <p class="note">${escapeHtml(dns.reason || "Not measured.")}</p></article>`;
   }
   const sys = dns.system.a;
@@ -236,11 +178,11 @@ function renderDns(result) {
     `<div class="res-row"><div><strong>System resolver</strong><br><span class="mono">${escapeHtml((dns.systemResolvers || []).join(", ") || "unknown")}</span></div>
       <span class="pill ${sys.ok ? "pass" : "fail"}">${sys.ok ? "pass" : "fail"}</span>
       <span class="mono">${escapeHtml(ms(sys.elapsedMs) || "-")}</span></div>
-     <div class="res-row" style="border-top:0;padding-top:0"><span class="mono" style="grid-column:1/-1;color:var(--fl-text-2)">${escapeHtml(sys.ok ? sys.addresses.join(", ") : sys.error || "no answer")}</span></div>`,
+     <div class="res-row" data-continues><span class="mono">${escapeHtml(sys.ok ? sys.addresses.join(", ") : sys.error || "no answer")}</span></div>`,
     ...dns.comparisons.map(c => `<div class="res-row"><div><strong>${escapeHtml(c.label)}</strong></div>
       <span class="pill ${c.ok ? "pass" : "fail"}">${c.ok ? "pass" : "fail"}</span>
       <span class="mono">${escapeHtml(ms(c.elapsedMs) || "-")}</span></div>
-      <div class="res-row" style="border-top:0;padding-top:0"><span class="mono" style="grid-column:1/-1;color:var(--fl-text-2)">${escapeHtml(c.ok ? c.addresses.join(", ") : c.error || "no answer")}</span></div>`)
+      <div class="res-row" data-continues><span class="mono">${escapeHtml(c.ok ? c.addresses.join(", ") : c.error || "no answer")}</span></div>`)
   ].join("");
 
   const agree = dns.agreement;
@@ -249,9 +191,9 @@ function renderDns(result) {
       : '<span class="pill na">not compared</span>';
 
   return `<article class="live-card">
-    <div class="live-card-head"><div><h4>DNS resolvers</h4><span class="mono">A records · ${escapeHtml(result.target.host)}</span></div>${badge("local")}</div>
+    <div class="live-card-head"><div><h3>DNS resolvers</h3><span class="mono">A records · ${escapeHtml(result.target.host)}</span></div>${badge("local")}</div>
     ${rows}
-    <dl class="kv" style="margin-top:11px">
+    <dl class="kv fl-mt-3">
       <dt>Agreement</dt><dd>${agreePill}${agree.state === "divergent" ? ` <span class="mono">${agree.distinctAnswers} distinct answers</span>` : ""}</dd>
       <dt>AAAA</dt><dd>${dns.system.aaaa.ok ? escapeHtml(dns.system.aaaa.addresses.join(", ")) : `<em class="unset">${escapeHtml(dns.system.aaaa.error || "no AAAA")}</em>`}</dd>
       <dt>Authoritative NS</dt><dd>${dns.system.authoritativeNs.length ? escapeHtml(dns.system.authoritativeNs.join(", ")) : `<em class="unset">${escapeHtml(dns.system.nsError || "unknown")}</em>`}</dd>
@@ -264,18 +206,18 @@ function renderRouting(result) {
   const ctx = result.internetContext;
   if (!ctx || !ctx.enriched) {
     return `<article class="live-card">
-      <div class="live-card-head"><div><h4>Target network</h4></div>${badge("ripestat")}</div>
+      <div class="live-card-head"><div><h3>Target network</h3></div>${badge("ripestat")}</div>
       <p class="note">${escapeHtml(ctx?.reason || "No public routing context available.")}</p></article>`;
   }
   const r = ctx.routing;
   if (!r) {
     return `<article class="live-card">
-      <div class="live-card-head"><div><h4>Target network</h4></div>${badge("ripestat")}</div>
+      <div class="live-card-head"><div><h3>Target network</h3></div>${badge("ripestat")}</div>
       <p class="note">RIPEstat did not return routing information for this address.</p></article>`;
   }
   const rpkiPill = r.rpkiStatus === "valid" ? "pass" : r.rpkiStatus === "invalid" ? "fail" : "na";
   return `<article class="live-card">
-    <div class="live-card-head"><div><h4>Target network</h4><span class="mono">routing &amp; ownership context</span></div>${badge("ripestat")}</div>
+    <div class="live-card-head"><div><h3>Target network</h3><span class="mono">routing &amp; ownership context</span></div>${badge("ripestat")}</div>
     <dl class="kv">
       <dt>Resolved IP</dt><dd>${value(r.ip)}</dd>
       <dt>Prefix</dt><dd>${value(r.prefix)}</dd>
@@ -293,7 +235,7 @@ function renderRoutingActivity(result) {
   if (!activity) return "";
   const quiet = activity.announcements === 0 && activity.withdrawals === 0;
   return `<article class="live-card">
-    <div class="live-card-head"><div><h4>Routing activity</h4><span class="mono">last ${escapeHtml(activity.windowHours)}h · ${escapeHtml(activity.prefix)}</span></div>${badge("ripestat")}</div>
+    <div class="live-card-head"><div><h3>Routing activity</h3><span class="mono">last ${escapeHtml(activity.windowHours)}h · ${escapeHtml(activity.prefix)}</span></div>${badge("ripestat")}</div>
     <dl class="kv">
       <dt>Announcements</dt><dd>${escapeHtml(activity.announcements)}</dd>
       <dt>Withdrawals</dt><dd>${escapeHtml(activity.withdrawals)}</dd>
@@ -310,7 +252,7 @@ function renderVantages(result) {
   if (d.status !== "ok") {
     const reason = d.reason || d.error || "unavailable";
     return `<article class="live-card">
-      <div class="live-card-head"><div><h4>Public Internet vantages</h4></div>${badge("globalping")}</div>
+      <div class="live-card-head"><div><h3>Public Internet vantages</h3></div>${badge("globalping")}</div>
       <p class="note">${escapeHtml(reason)}</p></article>`;
   }
   const rows = d.data.vantages.map(v => {
@@ -323,7 +265,7 @@ function renderVantages(result) {
   }).join("");
   const s = d.data.summary;
   return `<article class="live-card">
-    <div class="live-card-head"><div><h4>Public Internet vantages</h4><span class="mono">${escapeHtml(s.reachable)}/${escapeHtml(s.total)} reachable${d.cached ? " · cached" : ""}</span></div>${badge("globalping")}</div>
+    <div class="live-card-head"><div><h3>Public Internet vantages</h3><span class="mono">${escapeHtml(s.reachable)}/${escapeHtml(s.total)} reachable${d.cached ? " · cached" : ""}</span></div>${badge("globalping")}</div>
     ${rows}
     <p class="note">Real ICMP measurements from independent public probes. These are OBSERVED remote evidence and do feed the deterministic second-vantage comparison.</p>
   </article>`;
@@ -338,9 +280,9 @@ function renderOutage(result) {
     : "Not configured";
   if (!outage) {
     return `<article class="live-card">
-      <div class="live-card-head"><div><h4>External outage context</h4></div>${badge("ioda")}</div>
+      <div class="live-card-head"><div><h3>External outage context</h3></div>${badge("ioda")}</div>
       <p class="note">No IODA context available for this target.</p>
-      <dl class="kv" style="margin-top:9px"><dt>Cloudflare Radar</dt><dd>${escapeHtml(radarLine)}</dd></dl></article>`;
+      <dl class="kv fl-mt-3"><dt>Cloudflare Radar</dt><dd>${escapeHtml(radarLine)}</dd></dl></article>`;
   }
   const anomalies = Object.entries(outage.scopes || {}).map(([scope, data]) => {
     if (!data.available) return `<div class="res-row"><div><strong>${escapeHtml(scope)}</strong></div><span class="pill na">unavailable</span><span></span></div>`;
@@ -350,9 +292,9 @@ function renderOutage(result) {
   }).join("");
 
   return `<article class="live-card">
-    <div class="live-card-head"><div><h4>External outage context</h4><span class="mono">last ${escapeHtml(outage.windowHours)}h</span></div>${badge("ioda")}</div>
+    <div class="live-card-head"><div><h3>External outage context</h3><span class="mono">last ${escapeHtml(outage.windowHours)}h</span></div>${badge("ioda")}</div>
     ${anomalies}
-    <dl class="kv" style="margin-top:11px"><dt>Cloudflare Radar</dt><dd>${escapeHtml(radarLine)}</dd></dl>
+    <dl class="kv fl-mt-3"><dt>Cloudflare Radar</dt><dd>${escapeHtml(radarLine)}</dd></dl>
     <p class="note">${escapeHtml(outage.summary)} Potentially relevant external signal only &mdash; Faultline never treats an outage feed as proof of the cause of this fault.</p>
   </article>`;
 }
@@ -361,11 +303,11 @@ function renderNetworkMetadata(result) {
   const meta = result.internetContext?.networkMetadata;
   if (!meta) {
     return `<article class="live-card">
-      <div class="live-card-head"><div><h4>Network metadata</h4></div>${badge("peeringdb")}</div>
+      <div class="live-card-head"><div><h3>Network metadata</h3></div>${badge("peeringdb")}</div>
       <p class="note">No PeeringDB record published for this network.</p></article>`;
   }
   return `<article class="live-card">
-    <div class="live-card-head"><div><h4>Network metadata</h4><span class="mono">self-published</span></div>${badge("peeringdb")}</div>
+    <div class="live-card-head"><div><h3>Network metadata</h3><span class="mono">self-published</span></div>${badge("peeringdb")}</div>
     <dl class="kv">
       <dt>Network</dt><dd>${value(meta.name)}</dd>
       <dt>ASN</dt><dd>${meta.asn != null ? `AS${escapeHtml(meta.asn)}` : `<em class="unset">unknown</em>`}</dd>
@@ -374,7 +316,7 @@ function renderNetworkMetadata(result) {
       <dt>Peering</dt><dd>${value(meta.peeringPolicy)}</dd>
       <dt>IX presence</dt><dd>${meta.exchangeCount != null ? `${escapeHtml(meta.exchangeCount)} exchanges` : `<em class="unset">unknown</em>`}</dd>
     </dl>
-    ${meta.exchanges?.length ? `<p class="mono" style="margin:9px 0 0">${escapeHtml(meta.exchanges.slice(0, 4).map(e => e.name).join(" · "))}</p>` : ""}
+    ${meta.exchanges?.length ? `<p class="mono fl-mt-3">${escapeHtml(meta.exchanges.slice(0, 4).map(e => e.name).join(" · "))}</p>` : ""}
     <p class="note">NETWORK METADATA, not OBSERVED PATH. Faultline has no evidence that this diagnostic traversed any listed exchange or facility.</p>
   </article>`;
 }
@@ -383,7 +325,7 @@ function renderAtlas(result) {
   const network = result.internetContext?.measurementNetwork;
   if (!network) {
     return `<article class="live-card">
-      <div class="live-card-head"><div><h4>RIPE Atlas context</h4></div>${badge("atlas")}</div>
+      <div class="live-card-head"><div><h3>RIPE Atlas context</h3></div>${badge("atlas")}</div>
       <p class="note">No RIPE Atlas context available.</p></article>`;
   }
   const scopes = Object.entries(network.scopes || {}).map(([scope, data]) => {
@@ -394,7 +336,7 @@ function renderAtlas(result) {
       <span class="pill ${data.total > 0 ? "pass" : "na"}">${escapeHtml(data.total)} connected</span><span></span></div>`;
   }).join("");
   return `<article class="live-card">
-    <div class="live-card-head"><div><h4>RIPE Atlas context</h4><span class="mono">measurement network</span></div>${badge("atlas")}</div>
+    <div class="live-card-head"><div><h3>RIPE Atlas context</h3><span class="mono">measurement network</span></div>${badge("atlas")}</div>
     ${scopes}
     <p class="note">${escapeHtml(network.note)}</p>
   </article>`;
@@ -404,7 +346,7 @@ function renderLocal(result) {
   const l = result.observed.local;
   if (!l.supported) {
     return `<article class="live-card">
-      <div class="live-card-head"><div><h4>This device</h4></div>${badge("local")}</div>
+      <div class="live-card-head"><div><h3>This device</h3></div>${badge("local")}</div>
       <dl class="kv"><dt>Host</dt><dd>${value(l.host)}</dd><dt>Platform</dt><dd>${value(l.platform)}</dd>
       <dt>Resolvers</dt><dd>${escapeHtml((l.resolvers || []).join(", ") || "unknown")}</dd></dl>
       <p class="note">${escapeHtml(l.reason || "")}</p></article>`;
@@ -412,7 +354,7 @@ function renderLocal(result) {
   const gw = result.observed.gatewayPing;
   const wifi = l.wifi || {};
   return `<article class="live-card">
-    <div class="live-card-head"><div><h4>This device</h4><span class="mono">${escapeHtml(l.host)}</span></div>${badge("local")}</div>
+    <div class="live-card-head"><div><h3>This device</h3><span class="mono">${escapeHtml(l.host)}</span></div>${badge("local")}</div>
     <dl class="kv">
       <dt>Interface</dt><dd>${value(l.interfaceAlias)}</dd>
       <dt>Local IPv4</dt><dd>${value(l.ipv4?.address)}${l.ipv4?.prefixLength ? `/${escapeHtml(l.ipv4.prefixLength)}` : ""}</dd>
@@ -432,7 +374,7 @@ function renderPath(result) {
   const path = result.observed.path || [];
   if (!path.length) {
     return `<article class="live-card">
-      <div class="live-card-head"><div><h4>Observed path</h4></div>${badge("local")}</div>
+      <div class="live-card-head"><div><h3>Observed path</h3></div>${badge("local")}</div>
       <p class="note">${escapeHtml(result.observed.traceroute.reason || "No traceroute hops were collected.")}</p></article>`;
   }
   const rows = path.map(hop => {
@@ -448,7 +390,7 @@ function renderPath(result) {
     </li>`;
   }).join("");
   return `<article class="live-card">
-    <div class="live-card-head"><div><h4>Observed path</h4><span class="mono">${escapeHtml(path.length)} hops · public hops enriched</span></div>${badge("local")} ${badge("ripestat")}</div>
+    <div class="live-card-head"><div><h3>Observed path</h3><span class="mono">${escapeHtml(path.length)} hops · public hops enriched</span></div>${badge("local")} ${badge("ripestat")}</div>
     <ul class="hop-list">${rows}</ul>
     <p class="note">Hop addresses are OBSERVED. Owner/ASN labels are PUBLIC ROUTING METADATA for the hop address, not proof of who operates the failing segment.</p>
   </article>`;
@@ -461,15 +403,15 @@ function renderVerdict(result) {
     return badge(s.name.replace("-activity", "").replace("ripe-atlas", "atlas").replace("cloudflare-radar", "radar"), state);
   });
   return `<div class="verdict">
-    <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start">
+    <div class="live-head">
       <div>
         <span class="section-label">DETERMINISTIC FAULT DOMAIN</span>
         <h3>${escapeHtml(d.faultDomainLabel)}</h3>
         <p>${escapeHtml(d.summary)}</p>
       </div>
-      <div style="text-align:right">
-        <div style="font-size:26px;font-weight:800;color:var(--accent)">${escapeHtml(d.confidence)}%</div>
-        <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.09em">confidence</div>
+      <div class="live-confidence">
+        <strong>${escapeHtml(d.confidence)}%</strong>
+        <span>confidence</span>
       </div>
     </div>
     <div class="src-list">${badge("deterministic")}${badge("local", "measured")}${sources.join("")}</div>
@@ -570,8 +512,8 @@ function renderManifest(data, activated) {
     <span class="pill ${t.scope === "private" ? "warn" : "pass"}">${escapeHtml(t.scope)}</span>
     <span class="pill ${t.runnable === false ? "fail" : "na"}">${escapeHtml(t.requiresPrivateProbe ? (t.runnable === false ? "needs private probe" : "private probe") : "control plane")}</span>
   </div>`).join("");
-  envResult.innerHTML = `<article class="live-card" style="margin-top:12px">
-    <div class="live-card-head"><div><h4>${escapeHtml(data.name)}</h4>
+  envResult.innerHTML = `<article class="live-card fl-mt-3">
+    <div class="live-card-head"><div><h3>${escapeHtml(data.name)}</h3>
       <span class="mono">${escapeHtml(data.summary.siteCount)} site(s) · ${escapeHtml(data.summary.targetCount)} target(s) · ${escapeHtml(data.summary.privateTargets)} private</span></div>
       ${badge("local", activated ? "activated" : "preview")}</div>
     ${rows}

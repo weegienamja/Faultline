@@ -1,0 +1,514 @@
+/* ==========================================================================
+   Layout
+   --------------------------------------------------------------------------
+   The application shell and the layout primitives. Nothing in this file makes
+   a colour decision; nothing in `components` makes a page-layout decision.
+
+   THE RESPONSIVE MODEL
+   --------------------------------------------------------------------------
+   Two mechanisms, used for two different jobs:
+
+     viewport media queries   the SHELL only — whether a navigation rail is
+                              labelled, iconised or laid out horizontally is a
+                              property of the window, not of any component.
+                              Three of them, down from nine.
+
+     container queries        EVERYTHING ELSE. A component adapts to the space
+                              it was actually given. This is what makes a
+                              600px-wide desktop window behave like a 600px
+                              region rather than like a phone, and what lets the
+                              same panel render correctly in a wide dashboard
+                              column and in the 400px Analyst drawer without a
+                              single page-specific rule.
+
+   The old sheet had `.fl-col-8` collapse to full width at 1200px of VIEWPORT.
+   With the Analyst drawer open, that same column was ~640px wide at a 1400px
+   viewport and stayed at `span 8` — two-column content in a 640px box — while
+   a 1180px viewport with no drawer got a full-width column it did not need.
+   Both cases are now decided by the container the content is in.
+   ========================================================================== */
+
+/* ==========================================================================
+   Containers
+   --------------------------------------------------------------------------
+   Named, because they nest. An unnamed `container-type: inline-size` on both a
+   region and a panel would make every `@container` query inside a panel
+   resolve against the panel, and a region-level layout rule would silently
+   stop working the moment someone wrapped it in a panel.
+   ========================================================================== */
+
+.fl-region {
+  container: fl-region / inline-size;
+}
+
+/* ==========================================================================
+   Application shell
+   ========================================================================== */
+
+.fl-app {
+  display: grid;
+  grid-template-columns: var(--fl-rail-w) minmax(0, 1fr);
+  min-block-size: 100dvh;
+}
+
+/* The Analyst is a third column rather than an overlay: it exists to be read
+   beside the evidence it describes, and a floating panel covers exactly the
+   panel being asked about. Below --fl-bp-split of viewport it floats instead,
+   because taking a column there would squeeze the evidence to nothing. */
+.fl-app[data-analyst="open"] {
+  grid-template-columns: var(--fl-rail-w) minmax(0, 1fr) var(--fl-drawer-w);
+}
+
+/* --- navigation rail ----------------------------------------------------- */
+
+.fl-rail {
+  position: sticky;
+  inset-block-start: 0;
+  block-size: 100dvh;
+  background: var(--fl-sunk);
+  border-inline-end: 1px solid var(--fl-line);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.fl-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--fl-s3);
+  block-size: var(--fl-topbar-h);
+  padding-inline: var(--fl-s4);
+  border-block-end: 1px solid var(--fl-line);
+  color: var(--fl-text);
+  font-weight: 650;
+  font-size: 0.9375rem;
+  letter-spacing: -0.01em;
+  flex: 0 0 auto;
+
+  &:hover {
+    text-decoration: none;
+  }
+}
+
+/* The mark: a square rotated 45 degrees, split by a horizontal bar. It reads as
+   a boundary with a displacement across it — the one place the product's name
+   is allowed to be literal. */
+.fl-brand-mark {
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  flex: 0 0 1.25rem;
+  border: 1.5px solid var(--fl-chrome);
+  border-radius: 3px;
+  rotate: 45deg;
+  display: grid;
+  place-items: center;
+
+  &::after {
+    content: "";
+    inline-size: 7px;
+    block-size: 1.5px;
+    background: var(--fl-chrome);
+  }
+}
+
+.fl-brand-env {
+  margin-inline-start: auto;
+  font-size: 0.625rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--fl-text-3);
+  border: 1px solid var(--fl-line);
+  border-radius: var(--fl-r-chip);
+  padding: 2px 5px;
+}
+
+/* Navigation groups are the product's four verbs. The grouping is the fastest
+   way to teach what Faultline is for, so it survives every rail width. */
+.fl-nav {
+  padding: var(--fl-s4) var(--fl-s3) var(--fl-s6);
+  flex: 1 1 auto;
+
+  & .fl-nav-group + .fl-nav-group {
+    margin-block-start: var(--fl-s5);
+  }
+}
+
+.fl-nav-group-label {
+  display: block;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--fl-text-3);
+  padding: 0 var(--fl-s3) var(--fl-s2);
+}
+
+/* Works for both an <a> destination and the one <button> that opens the
+   Analyst drawer, so the rail reads as a single list whatever each entry does. */
+.fl-nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--fl-s3);
+  inline-size: 100%;
+  padding: 7px var(--fl-s3);
+  border: 0;
+  border-inline-start: 2px solid transparent;
+  border-radius: var(--fl-r-control);
+  background: transparent;
+  color: var(--fl-text-2);
+  font: inherit;
+  font-size: var(--fl-fs-sm);
+  line-height: 1.3;
+  text-align: start;
+  transition: background var(--fl-dur-1) var(--fl-ease), color var(--fl-dur-1) var(--fl-ease);
+
+  &:hover {
+    background: var(--fl-surface-2);
+    color: var(--fl-text);
+    text-decoration: none;
+  }
+
+  &[aria-current="page"] {
+    background: var(--fl-chrome-soft);
+    color: var(--fl-text);
+    border-inline-start-color: var(--fl-chrome);
+    font-weight: 550;
+
+    & .fl-nav-icon {
+      color: var(--fl-chrome);
+    }
+  }
+}
+
+.fl-nav-icon {
+  inline-size: 1rem;
+  flex: 0 0 1rem;
+  text-align: center;
+  color: var(--fl-text-3);
+  font-size: 0.8125rem;
+}
+
+.fl-nav-count {
+  margin-inline-start: auto;
+  font-size: 0.625rem;
+  color: var(--fl-text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.fl-nav-item .fl-dot {
+  margin-inline-start: auto;
+}
+
+.fl-rail-foot {
+  flex: 0 0 auto;
+  border-block-start: 1px solid var(--fl-line);
+  padding: var(--fl-s3) var(--fl-s4);
+  display: flex;
+  align-items: center;
+  gap: var(--fl-s3);
+  font-size: var(--fl-fs-micro);
+  color: var(--fl-text-3);
+}
+
+/* --- main column --------------------------------------------------------- */
+
+.fl-main {
+  min-inline-size: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.fl-topbar {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 20;
+  block-size: var(--fl-topbar-h);
+  flex: 0 0 var(--fl-topbar-h);
+  display: flex;
+  align-items: center;
+  gap: var(--fl-s4);
+  padding-inline: var(--fl-gutter);
+  background: color-mix(in oklab, var(--fl-canvas) 92%, transparent);
+  border-block-end: 1px solid var(--fl-line);
+  /* A 3px backdrop blur on a bar that is always on screen is a permanent
+     compositor cost in a UI that sits beside a live measurement loop. A 92%
+     opaque ground reads the same and costs nothing. */
+  backdrop-filter: saturate(140%);
+}
+
+.fl-crumb {
+  display: flex;
+  align-items: baseline;
+  gap: var(--fl-s2);
+  min-inline-size: 0;
+  /* The breadcrumb is the element that yields. The topbar's actions are all
+     nowrap, so without a shrinkable crumb the bar pushed the whole document
+     3-5px wide at 320px — on every view, because the shell is shared. */
+  overflow: hidden;
+
+  & .fl-page-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.fl-crumb-sep {
+  color: var(--fl-text-3);
+  flex: 0 0 auto;
+}
+
+.fl-topbar-actions {
+  margin-inline-start: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--fl-s2);
+}
+
+.fl-content {
+  padding: var(--fl-s5) var(--fl-gutter) var(--fl-s8);
+  inline-size: 100%;
+  max-inline-size: var(--fl-content-max);
+  container: fl-region / inline-size;
+}
+
+.fl-foot {
+  padding-block-start: 0;
+  margin-block-start: auto;
+}
+
+/* --- view routing -------------------------------------------------------- */
+
+.fl-view {
+  display: none;
+
+  &.is-active {
+    display: block;
+  }
+}
+
+.fl-view-head {
+  margin-block-end: var(--fl-s5);
+  display: flex;
+  align-items: flex-start;
+  gap: var(--fl-s5);
+  flex-wrap: wrap;
+
+  & > div:first-child {
+    min-inline-size: 0;
+    flex: 1 1 26rem;
+  }
+
+  & .fl-body {
+    margin-block-start: var(--fl-s2);
+  }
+}
+
+.fl-view-head-actions {
+  display: flex;
+  gap: var(--fl-s2);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* ==========================================================================
+   Layout primitives
+   --------------------------------------------------------------------------
+   Three of them. They replace a 12-column grid whose only real users were a
+   5/7 and an 8/4 split, and whose two viewport breakpoints decided the answer
+   using the wrong measurement.
+   ========================================================================== */
+
+/* CARDS — a set of peers that should fill the space they are given.
+   Fully intrinsic: no query of any kind. `min(100%, …)` is what stops the
+   track from exceeding a narrow container and causing overflow, which the bare
+   `minmax(18rem, 1fr)` form does below 18rem. */
+.fl-cards {
+  display: grid;
+  gap: var(--fl-s3);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--fl-card-min, 18rem)), 1fr));
+}
+
+/* SPLIT — a primary region with a secondary one beside it. Stacks by default
+   and only goes side-by-side when its own container is genuinely wide enough.
+   `--fl-split` sets the ratio; the default is the 2:1 the dashboard uses. */
+.fl-split {
+  display: grid;
+  gap: var(--fl-s3);
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+
+  & > * {
+    min-inline-size: 0;
+  }
+}
+
+@container fl-region (inline-size > 60rem) {
+  .fl-split {
+    grid-template-columns: var(--fl-split, minmax(0, 2fr) minmax(0, 1fr));
+  }
+}
+
+/* STACK — vertical rhythm without every component owning a margin rule.
+   `margin-block-start` on the owl selector rather than `gap` so it composes
+   with elements that are conditionally rendered as empty strings, which is how
+   every panel module here builds its markup. */
+.fl-stack {
+  display: flex;
+  flex-direction: column;
+
+  & > * + * {
+    margin-block-start: var(--fl-stack, var(--fl-s3));
+  }
+}
+
+/* ROW — inline group that wraps rather than overflowing. */
+.fl-row {
+  display: flex;
+  align-items: center;
+  gap: var(--fl-s2);
+  flex-wrap: wrap;
+  min-inline-size: 0;
+}
+
+.fl-spacer {
+  margin-inline-start: auto;
+}
+
+/* ==========================================================================
+   Shell breakpoints
+   --------------------------------------------------------------------------
+   The only viewport queries in the product. Each one changes the shape of the
+   application frame, which is a window-level fact that no container knows.
+   ========================================================================== */
+
+/* Rail collapses to icons. The threshold is where a labelled rail starts
+   taking space the content needs, not a device class. */
+@media (width <= 64rem) {
+  :root {
+    --fl-rail-w: 3.75rem;
+  }
+
+  .fl-brand {
+    justify-content: center;
+    padding-inline: 0;
+
+    & > span:not(.fl-brand-mark) {
+      display: none;
+    }
+  }
+
+  .fl-brand-env {
+    display: none;
+  }
+
+  .fl-nav {
+    padding-inline: var(--fl-s2);
+  }
+
+  .fl-nav-group-label {
+    text-align: center;
+    padding-inline: 0;
+    font-size: 0.5625rem;
+    letter-spacing: 0.06em;
+  }
+
+  .fl-nav-item {
+    justify-content: center;
+    padding-inline: 0;
+
+    & span:not(.fl-nav-icon) {
+      display: none;
+    }
+  }
+
+  .fl-nav-count {
+    display: none;
+  }
+
+  .fl-rail-foot {
+    justify-content: center;
+    padding-inline: var(--fl-s2);
+
+    & span:not(.fl-dot) {
+      display: none;
+    }
+  }
+}
+
+/* Rail moves above the content. Below this the frame itself has to change
+   shape — a vertical rail and a usable content column do not both fit. */
+@media (width <= 52rem) {
+  .fl-app,
+  .fl-app[data-analyst="open"] {
+    grid-template-columns: minmax(0, 1fr);
+    /* Explicit rows. Without them the two children become auto-sized implicit
+       rows, and `min-block-size: 100dvh` on the grid stretches BOTH to share
+       the leftover height — which left the horizontal rail ~300px tall with a
+       band of empty space above and below the icons on every view. The rail
+       takes its content height; the content column takes the rest. */
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .fl-rail {
+    position: static;
+    block-size: auto;
+    flex-direction: row;
+    align-items: center;
+    overflow-x: auto;
+    border-inline-end: 0;
+    border-block-end: 1px solid var(--fl-line);
+  }
+
+  .fl-nav {
+    display: flex;
+    gap: var(--fl-s1);
+    padding: var(--fl-s2);
+  }
+
+  .fl-nav-group {
+    display: flex;
+    gap: var(--fl-s1);
+  }
+
+  .fl-nav-group + .fl-nav-group {
+    margin-block-start: 0;
+    /* The group boundary still has to read once the labels are gone, or the
+       four verbs collapse into one undifferentiated strip of icons. */
+    border-inline-start: 1px solid var(--fl-line);
+    padding-inline-start: var(--fl-s1);
+    margin-inline-start: var(--fl-s1);
+  }
+
+  .fl-nav-group-label,
+  .fl-rail-foot {
+    display: none;
+  }
+
+  /* The breadcrumb's group name duplicates what the rail already shows as the
+     active item, and at this width it is competing with the primary actions
+     for the same 300px. The page title stays. */
+  .fl-crumb .fl-label,
+  .fl-crumb-sep {
+    display: none;
+  }
+}
+
+/* The Analyst drawer stops being a column. Viewport-scoped because it is a
+   shell decision: the drawer is a sibling of the content column, so no
+   container inside the content can know about it. */
+@media (width <= 75rem) {
+  .fl-app[data-analyst="open"] {
+    grid-template-columns: var(--fl-rail-w) minmax(0, 1fr);
+  }
+
+  .fl-app[data-analyst="open"] .fl-analyst {
+    position: fixed;
+    inset-block-start: 0;
+    inset-inline-end: 0;
+    inline-size: min(25rem, 100vw);
+    z-index: 40;
+    box-shadow: var(--fl-shadow-float);
+  }
+}

@@ -1,0 +1,86 @@
+/* ==========================================================================
+   Utilities
+   --------------------------------------------------------------------------
+   Single-purpose classes, kept deliberately few. These exist to replace the
+   inline `style="margin-top:16px"` attributes the panel modules were writing
+   into their template strings — around forty of them, each one a spacing
+   decision made in JavaScript and therefore invisible to the design system.
+
+   A utility earns a place here only if it expresses a token. Anything that
+   needs a raw value belongs in a component.
+   ========================================================================== */
+
+/* Flow spacing — the only ones that were genuinely needed. */
+.fl-mt-1 { margin-block-start: var(--fl-s1); }
+.fl-mt-2 { margin-block-start: var(--fl-s2); }
+.fl-mt-3 { margin-block-start: var(--fl-s3); }
+.fl-mt-4 { margin-block-start: var(--fl-s4); }
+.fl-mt-5 { margin-block-start: var(--fl-s5); }
+.fl-mb-2 { margin-block-end: var(--fl-s2); }
+.fl-mb-3 { margin-block-end: var(--fl-s3); }
+.fl-m-0 { margin: 0; }
+
+.fl-grow { flex: 1 1 auto; min-inline-size: 0; }
+
+/* Inline group aligned to the end of its line — action clusters in a header. */
+.fl-row-end {
+  display: flex;
+  align-items: center;
+  gap: var(--fl-s2);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* A state block whose actions read as a continuation of the copy rather than a
+   centred call to action. */
+.fl-state-actions-start {
+  justify-content: flex-start;
+  margin-block-start: var(--fl-s4);
+}
+
+/* A cell that takes the whole width of the row it sits in. */
+.fl-span {
+  grid-column: 1 / -1;
+  color: var(--fl-text-2);
+}
+
+/* Tone. Only the four that carry meaning; there is no `.text-blue`. */
+.fl-tone-warn { color: var(--fl-warn); }
+.fl-tone-crit { color: var(--fl-crit); }
+.fl-tone-ok { color: var(--fl-ok); }
+.fl-tone-muted { color: var(--fl-text-3); }
+
+/* Available to assistive technology, not to the eye. Used for the state text
+   that accompanies every status colour, so a status is never conveyed by a
+   colour alone even where the visible label is a glyph. */
+.fl-sr-only {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* A numeric input sized to its content rather than to the browser default,
+   which is wide enough for a URL. */
+.fl-input-num {
+  inline-size: 4.5rem;
+  text-align: center;
+}
+
+.fl-input-num-sm {
+  inline-size: 3.75rem;
+  text-align: center;
+}
+
+/* Contain layout and paint for surfaces that update independently of the rest
+   of the page — the live sample table, the recorder timeline. Restricts the
+   area the browser has to re-lay-out when a new sample arrives, which matters
+   in a UI that is redrawing beside an active measurement loop. */
+.fl-contain {
+  contain: layout paint;
+}

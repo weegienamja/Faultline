@@ -32,19 +32,11 @@ async function request(path, options = {}) {
   return payload;
 }
 
-function installStyles() {
-  const style = document.createElement("style");
-  style.textContent = `
-  .cases-panel{margin-top:13px}.cases-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}.cases-actions{display:flex;gap:7px;flex-wrap:wrap}.case-layout{display:grid;grid-template-columns:minmax(250px,.8fr) minmax(0,1.2fr);gap:12px;margin-top:14px}.case-list{display:grid;gap:7px;max-height:340px;overflow:auto}.case-card{width:100%;text-align:left;border:1px solid var(--border-soft);border-radius:10px;background:rgba(255,255,255,.012);padding:11px;color:inherit;cursor:pointer}.case-card.active{border-color:var(--fl-ok-line);background:var(--fl-ok-soft)}.case-card strong{font-size:11px;display:block}.case-card small{display:block;color:var(--muted);font-size:9px;margin-top:4px}.case-detail{border:1px solid var(--border-soft);border-radius:10px;padding:14px;min-height:150px}.case-meta{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.case-pill{border:1px solid var(--border);border-radius:999px;padding:4px 7px;color:var(--muted);font-size:8px;text-transform:uppercase;letter-spacing:.08em}.case-timeline{margin:10px 0 0;padding-left:18px;color:var(--fl-text-2);font-size:9px;line-height:1.55;max-height:170px;overflow:auto}.case-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.case-form-grid .wide{grid-column:1/-1}.case-result{border:1px solid var(--fl-ok-line);border-radius:8px;padding:9px;margin-top:10px;font-size:9px;word-break:break-all}.cases-muted{color:var(--muted);font-size:10px;line-height:1.5}@media(max-width:760px){.case-layout,.case-form-grid{grid-template-columns:1fr}}
-  `;
-  document.head.appendChild(style);
-}
-
 function createDialog() {
   const dialog = document.createElement("dialog");
   dialog.className = "auth-dialog";
   dialog.id = "case-dialog";
-  dialog.innerHTML = `<form class="auth-form" id="case-form"><div><span class="section-label">CASE WORKSPACE</span><h3>Create support case</h3></div><div class="case-form-grid"><label class="wide">Title<input id="case-title" required placeholder="Intermittent voice degradation"></label><label>Customer<input id="case-customer" placeholder="Northstar Design"></label><label>Affected service<input id="case-service" placeholder="Voice platform"></label><label>Severity<select id="case-severity"><option>low</option><option selected>medium</option><option>high</option><option>critical</option></select></label></div><p class="auth-error" id="case-error"></p><div class="auth-actions"><button class="secondary-button" type="button" id="case-cancel">Cancel</button><button class="primary-button" type="submit">Create case</button></div></form>`;
+  dialog.innerHTML = `<form class="auth-form" id="case-form"><div><span class="section-label">CASE WORKSPACE</span><h2 class="fl-panel-title">Create support case</h2></div><div class="case-form-grid"><label class="wide">Title<input id="case-title" required placeholder="Intermittent voice degradation"></label><label>Customer<input id="case-customer" placeholder="Northstar Design"></label><label>Affected service<input id="case-service" placeholder="Voice platform"></label><label>Severity<select id="case-severity"><option>low</option><option selected>medium</option><option>high</option><option>critical</option></select></label></div><p class="auth-error" id="case-error"></p><div class="auth-actions"><button class="secondary-button" type="button" id="case-cancel">Cancel</button><button class="primary-button" type="submit">Create case</button></div></form>`;
   document.body.appendChild(dialog);
   dialog.querySelector("#case-cancel").addEventListener("click", () => dialog.close());
   dialog.querySelector("#case-form").addEventListener("submit", async event => {
@@ -70,7 +62,7 @@ function createDiagnosticDialog() {
   const dialog = document.createElement("dialog");
   dialog.className = "auth-dialog";
   dialog.id = "case-diagnostic-dialog";
-  dialog.innerHTML = `<form class="auth-form" id="case-diagnostic-form"><div><span class="section-label">CASE DIAGNOSTIC</span><h3>Add diagnostic run</h3></div><label>Target<input id="case-target" required placeholder="https://service.example/health"></label><label>Connectivity Contract<select id="case-contract"><option value="">Generic checks only</option></select></label><p class="auth-error" id="case-diagnostic-error"></p><div class="case-result" id="case-invitation-result" hidden></div><div class="auth-actions"><button class="secondary-button" type="button" id="case-diagnostic-cancel">Close</button><button class="primary-button" type="submit">Create diagnostic</button></div></form>`;
+  dialog.innerHTML = `<form class="auth-form" id="case-diagnostic-form"><div><span class="section-label">CASE DIAGNOSTIC</span><h2 class="fl-panel-title">Add diagnostic run</h2></div><label>Target<input id="case-target" required placeholder="https://service.example/health"></label><label>Connectivity Contract<select id="case-contract"><option value="">Generic checks only</option></select></label><p class="auth-error" id="case-diagnostic-error"></p><div class="case-result" id="case-invitation-result" hidden></div><div class="auth-actions"><button class="secondary-button" type="button" id="case-diagnostic-cancel">Close</button><button class="primary-button" type="submit">Create diagnostic</button></div></form>`;
   document.body.appendChild(dialog);
   dialog.querySelector("#case-diagnostic-cancel").addEventListener("click", () => dialog.close());
   dialog.querySelector("#case-diagnostic-form").addEventListener("submit", async event => {
@@ -98,14 +90,13 @@ function createDiagnosticDialog() {
   return dialog;
 }
 
-installStyles();
 const createCaseDialog = createDialog();
 const diagnosticDialog = createDiagnosticDialog();
 
 const panel = document.createElement("section");
 panel.className = "panel cases-panel";
 panel.id = "case-workspaces";
-panel.innerHTML = `<div class="cases-head"><div><span class="section-label">SUPPORT CASES</span><h3 style="margin:4px 0 0">Cases & evidence packages</h3></div><div class="cases-actions"><button class="secondary-button" id="case-refresh">Refresh</button><button class="primary-button" id="case-new">New case</button></div></div><p class="cases-muted" id="case-summary">Unlock live data to manage support cases.</p><div class="case-layout"><div class="case-list" id="case-list"></div><article class="case-detail" id="case-detail"><p class="cases-muted">Select a case to inspect its diagnostics and evidence timeline.</p></article></div>`;
+panel.innerHTML = `<div class="cases-head"><div><span class="section-label">SUPPORT CASES</span><h2 class="fl-panel-title fl-mt-1">Cases &amp; evidence packages</h2></div><div class="cases-actions"><button class="secondary-button" id="case-refresh">Refresh</button><button class="primary-button" id="case-new">New case</button></div></div><p class="cases-muted" id="case-summary">Unlock live data to manage support cases.</p><div class="case-layout"><div class="case-list" id="case-list"></div><article class="case-detail" id="case-detail"><p class="cases-muted">Select a case to inspect its diagnostics and evidence timeline.</p></article></div>`;
 if (lowerGrid?.dataset?.mount) lowerGrid.appendChild(panel);
 else lowerGrid?.parentNode?.insertBefore(panel, lowerGrid);
 
@@ -132,7 +123,7 @@ async function renderDetail() {
     detail.innerHTML = '<p class="cases-muted">Select a case to inspect its diagnostics and evidence timeline.</p>';
     return;
   }
-  detail.innerHTML = `<span class="section-label">${escapeHtml(current.id)}</span><h3 style="margin:4px 0">${escapeHtml(current.title)}</h3><p class="cases-muted">${escapeHtml(current.customer)} · ${escapeHtml(current.affectedService)}</p><div class="case-meta"><span class="case-pill">${escapeHtml(current.status)}</span><span class="case-pill">${escapeHtml(current.severity)}</span><span class="case-pill">${current.diagnosticCount} diagnostics</span><span class="case-pill">${current.completedDiagnosticCount} with evidence</span></div><div class="cases-actions"><button class="primary-button" id="case-add-diagnostic">Add diagnostic</button><button class="secondary-button" id="case-json">Evidence JSON</button><button class="secondary-button" id="case-report">Print report</button></div><ol class="case-timeline">${(current.timeline || []).slice(-12).reverse().map(event => `<li><strong>${escapeHtml(event.type)}</strong> · ${escapeHtml(event.summary)} <em>${escapeHtml(event.evidenceKind)}</em></li>`).join("") || "<li>No timeline events.</li>"}</ol>`;
+  detail.innerHTML = `<span class="section-label">${escapeHtml(current.id)}</span><h2 class="fl-panel-title fl-mt-1">${escapeHtml(current.title)}</h2><p class="cases-muted">${escapeHtml(current.customer)} · ${escapeHtml(current.affectedService)}</p><div class="case-meta"><span class="case-pill">${escapeHtml(current.status)}</span><span class="case-pill">${escapeHtml(current.severity)}</span><span class="case-pill">${current.diagnosticCount} diagnostics</span><span class="case-pill">${current.completedDiagnosticCount} with evidence</span></div><div class="cases-actions"><button class="primary-button" id="case-add-diagnostic">Add diagnostic</button><button class="secondary-button" id="case-json">Evidence JSON</button><button class="secondary-button" id="case-report">Print report</button></div><ol class="case-timeline">${(current.timeline || []).slice(-12).reverse().map(event => `<li><strong>${escapeHtml(event.type)}</strong> · ${escapeHtml(event.summary)} <em>${escapeHtml(event.evidenceKind)}</em></li>`).join("") || "<li>No timeline events.</li>"}</ol>`;
   detail.querySelector("#case-add-diagnostic").addEventListener("click", async () => {
     const select = diagnosticDialog.querySelector("#case-contract");
     const contracts = await fetch("/contracts.json", { cache: "no-store" }).then(r => r.json()).catch(() => []);
