@@ -1,8 +1,10 @@
-# Faultline
+# Faultline - Network Diagnostics & Troubleshooting
 
 **Find the network condition that breaks a connection, without reconfiguring anything.**
 
-Faultline is a local-first network diagnostics tool built around one question:
+Faultline is an open-source, local-first network troubleshooting and diagnostics tool for intermittent connectivity, DNS failures, IPv4/IPv6 differences, VPN routing problems, TLS issues and path-dependent network faults.
+
+It is built around one question:
 
 > What changed, which condition actually changes the outcome, and what evidence can I hand to the next person?
 
@@ -14,6 +16,23 @@ npm run bisect -- github.com
 ```
 
 No account. No cloud AI. No API key for the core workflow. No Docker required. Network Bisect makes real connections from your machine and varies conditions per connection rather than reconfiguring the host.
+
+## Problems Faultline is built to investigate
+
+Faultline is aimed at faults that are difficult to prove with a single ping or traceroute, especially when the outcome changes with network conditions.
+
+Typical examples include:
+
+- a website works on a mobile hotspot but fails on Wi-Fi
+- IPv4 works while IPv6 fails, or the reverse
+- changing DNS resolver changes whether a service resolves or connects
+- a VPN is connected but an internal service is still unreachable
+- one source interface works while another does not
+- TLS, SNI or ALPN differences change the connection outcome
+- an intermittent fault disappears before normal troubleshooting begins
+- a network change appears related to a regression but needs evidence rather than assumption
+
+See the [troubleshooting guides](docs/troubleshooting/README.md) for practical investigation paths.
 
 ## The product loop
 
@@ -249,6 +268,17 @@ npm run check
 npm test
 ```
 
+## Troubleshooting guides
+
+These guides describe common network failure patterns and show where Faultline can collect or isolate useful evidence:
+
+- [Website works on a hotspot but not Wi-Fi](docs/troubleshooting/website-works-on-hotspot-not-wifi.md)
+- [IPv4 works but IPv6 does not](docs/troubleshooting/ipv4-works-ipv6-does-not.md)
+- [VPN connected but an internal service is unreachable](docs/troubleshooting/vpn-connected-internal-service-unreachable.md)
+- [Diagnosing intermittent network failures](docs/troubleshooting/intermittent-network-failures.md)
+
+The guides deliberately avoid treating correlation as proof. If changing a condition appears to restore connectivity, Network Bisect can retest that condition under controlled alternation before Faultline reports a discriminator.
+
 ## Architecture
 
 ```text
@@ -285,7 +315,7 @@ SDK credentials belong in the support application's backend. The end-user widget
 
 ## Current limitations
 
-Faultline is still an open-source portfolio and research implementation rather than a production SaaS platform.
+Faultline is an early-stage open-source network diagnostics project rather than a production SaaS platform.
 
 Important limitations include:
 
@@ -332,6 +362,7 @@ See [ROADMAP.md](ROADMAP.md).
 - [Probe fleet](docs/PROBE_FLEET.md)
 - [Fleet safety](docs/FLEET_SAFETY.md)
 - [Topology](docs/TOPOLOGY.md)
+- [Troubleshooting guides](docs/troubleshooting/README.md)
 
 ## Tests
 
