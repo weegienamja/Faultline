@@ -162,7 +162,7 @@ function render() {
   `;
 
   method.textContent = data.length < MIN_POINTS
-    ? `Pairwise similarity over ${analysis.featureSpace.incidentCount} collected diagnostics, using standardised numerical telemetry, binary network states and one-hot Connectivity Contract outcomes. Fault domain is not used. ${analysis.method.name} clustering is not applied below minPts=${analysis.method.minPoints}.`
+    ? `Pairwise similarity over ${analysis.featureSpace.incidentCount} collected diagnostics, using standardised numerical telemetry, binary network states and one-hot Connectivity Contract outcomes. Fault domain is not used. No density-based cluster is reported below minPts=${analysis.method.minPoints}; only pairwise similarity is shown.`
     : `${analysis.method.name}: ε=${analysis.method.epsilon}, minPts=${analysis.method.minPoints}. ${analysis.featureSpace.incidentCount} visible incidents analysed using standardised numerical telemetry, binary network states and one-hot Connectivity Contract outcomes. Fault domain is not used to fit clusters.`;
 }
 
