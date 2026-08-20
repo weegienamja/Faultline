@@ -115,10 +115,10 @@ An earlier, unmerged implementation of this milestone (branch
 `agent/v12-embedded-api-sdk`, draft PR #14) prototyped a credential model that
 the merged implementation does not have:
 
-- **Project-scoped API keys** — `fl_api_...`, hashed, revocable, held on the
+- **Project-scoped API keys** - `fl_api_...`, hashed, revocable, held on the
   project record, with explicit scopes (`diagnostics:create`,
   `diagnostics:read`, `cases:read`, `evidence:read`) checked per request.
-- **One-use embed tokens** — `fl_embed_...`, 1-30 minute TTL, pinned to a single
+- **One-use embed tokens** - `fl_embed_...`, 1-30 minute TTL, pinned to a single
   target, consumed on first exchange, so a support portal can hand a browser a
   bounded credential instead of an API key.
 
