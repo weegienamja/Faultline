@@ -5,7 +5,7 @@ troubleshooting begins.**
 
 By the time someone opens a diagnostic tool, the thing that changed has usually
 changed back. The route flapped, the VPN reconnected, the Wi-Fi roamed to
-another AP — and all that remains is a user saying "it was broken a minute ago".
+another AP, and all that remains is a user saying "it was broken a minute ago".
 Flight Recorder keeps a short rolling window so that minute still exists.
 
 It is deliberately **not** continuous monitoring, an NMS, or a time-series
@@ -47,7 +47,7 @@ once, when something has already happened.
 
 Slow-tier values are carried forward between refreshes and keep their own
 `observedAt` with `carriedForward: true`. A carried value is **never**
-re-timestamped as though it had just been measured — doing so would manufacture
+re-timestamped as though it had just been measured. Doing so would manufacture
 precision the recorder does not have, and would report a route change seconds
 before it was actually seen.
 
@@ -91,8 +91,8 @@ So three outcomes are kept distinct:
 ### Contract sampling is asymmetric
 
 A lightweight sample can afford a contract's `dns` and `tcp` checks but not its
-`tls` and `http` checks. So a **FAIL is conclusive** — a failing required check
-fails the contract regardless of what was skipped — while a **PASS is reported
+`tls` and `http` checks. So a **FAIL is conclusive**: a failing required check
+fails the contract regardless of what was skipped, while a **PASS is reported
 as `PARTIAL`**, naming the checks that were not evaluated. The asymmetry is
 stated rather than smoothed into "passing".
 
@@ -176,7 +176,7 @@ troubleshooting, so the boundary is enforced in code, not just in wording:
 | ❌ Not produced | the route change caused the outage |
 
 `observedChange.statement` states what was observed and how two windows differ.
-It never states why, and it contains no causal vocabulary at all — the
+It never states why, and it contains no causal vocabulary at all. The
 qualification lives in `observedChange.note`, deliberately not repeated in the
 statement, because a sentence that must contain the word "caused" in order to
 deny causation is one careless edit away from asserting it. A test asserts the
@@ -184,7 +184,7 @@ statement is free of causal terms.
 
 The record is also careful about what did *not* happen. A manual capture taken
 while everything is working produces "the capture was requested while the target
-was still reachable" — not "the failing sample", and no recovery claim.
+was still reachable", not "the failing sample", and no recovery claim.
 
 ---
 
@@ -193,7 +193,7 @@ was still reachable" — not "the failing sample", and no recovery claim.
 This is where the feature becomes more than a log.
 
 The recorder can say *what differed*. It cannot say whether that difference
-matters, because it only watched — it never varied anything. Network Bisect can,
+matters, because it only watched; it never varied anything. Network Bisect can,
 because it runs controlled experiments with paired confirmation.
 
 ```
@@ -226,7 +226,7 @@ vary it, and saying so is more useful than implying it could be tested.
 
 `POST /api/recorder/incidents/{id}/bisect` runs Bisect restricted to exactly the
 axes the recorder observed changing, rather than re-deriving the whole matrix.
-Bisect then reaches its own verdict independently — and may well find that none
+Bisect then reaches its own verdict independently, and may well find that none
 of the candidates changes the outcome.
 
 ### Resolved addresses and CDNs
@@ -235,7 +235,7 @@ A CDN-hosted target returns a rotating subset of a stable address pool, so
 comparing the first address would report "the target moved" on almost every
 tick. Two answer sets that overlap are treated as the same pool; only fully
 disjoint sets count as a repoint. The path fingerprint deliberately excludes the
-resolved address — it describes how traffic *leaves* this machine, not where it
+resolved address. It describes how traffic *leaves* this machine, not where it
 lands.
 
 ---
@@ -255,7 +255,7 @@ Local recording needs no server, matching `npm run bisect`. Ctrl+C stops it and
 prints any incident still open rather than discarding it.
 
 `mark` talks to a running control plane (`FAULTLINE_URL`,
-`FAULTLINE_ADMIN_TOKEN`) — for when the engineer sees the problem before a
+`FAULTLINE_ADMIN_TOKEN`), for when the engineer sees the problem before a
 threshold does.
 
 Flags: `--interval` (seconds, 2–30), `--window` (seconds, 60–600), `--contract`,
@@ -320,7 +320,7 @@ simulation source ───┘
               Bisect handoff
 ```
 
-Everything downstream is production code — the ring buffer, threshold crossing,
+Everything downstream is production code: the ring buffer, threshold crossing,
 cooldown, trigger selection, freeze, BEFORE/DURING/AFTER assembly, the
 difference engine, axis mapping and the Bisect handoff. A demo that exercised a
 parallel implementation would prove nothing about the path that runs for real.
@@ -421,7 +421,7 @@ other.
 **A scenario must be internally consistent, and DNS is where that bites.**
 `targetDnsV4` / `targetDnsV6` state how many A and AAAA records the target
 publishes. The `ipv6-path-loss` demo keeps `targetDnsV6: 2` in *every* phase,
-including the failing one — that is the entire point: the target still publishes
+including the failing one. That is the entire point: the target still publishes
 AAAA while this machine loses the ability to use it. A sample claiming
 `ipv6: PASS` alongside zero AAAA records would contradict itself and destroy the
 distinction between a local capability deficiency and a target property.
@@ -433,7 +433,7 @@ result rather than assumed absent: only `INAPPLICABLE` yields zero, because
 A simulation is **bound to its scenario's target and port**. The CLI refuses a
 positional target alongside `--simulate` rather than silently ignoring it, so
 scripted samples for one host can never be recorded as an incident against
-another — which would also point a later Bisect handoff at a host the scenario
+another, which would also point a later Bisect handoff at a host the scenario
 never described.
 
 Every field is validated against an allow-list with bounded lengths and enum
@@ -441,7 +441,7 @@ checks; unknown fields are discarded rather than reaching a sample. Phase states
 are `PASS`, `FAIL`, `INAPPLICABLE`, `UNSTABLE`, `UNKNOWN` or `not-sampled`.
 
 The HTTP API (`POST /api/recorder/start` with `simulate`) accepts **built-in
-scenario names only** — never a filesystem path, so a request can never name a
+scenario names only**, never a filesystem path, so a request can never name a
 file on the server. The CLI accepts a path, because there the operator chose it.
 `GET /api/recorder/scenarios` lists what is available.
 
@@ -472,8 +472,8 @@ event becomes durable evidence.
 * **Persistence can be switched off.** `FAULTLINE_RECORDER_PERSIST=0` keeps
   incidents in memory only, restoring the fully ephemeral behaviour.
 
-A persisted incident contains local network identifiers — interface names,
-gateway and local addresses, DNS servers, Wi-Fi SSID/BSSID — because those are
+A persisted incident contains local network identifiers - interface names,
+gateway and local addresses, DNS servers, Wi-Fi SSID/BSSID - because those are
 the evidence. The store file is written `0600`. At most 20 incidents are kept on
 disk, oldest evicted first.
 
@@ -503,11 +503,11 @@ broke? · What stayed healthy? · Which differences can Network Bisect test?*
 | `intervalMs` | 3000 | 2000–30000 |
 | `windowMs` | 180000 | 60000–600000 |
 | `afterWindowMs` | 60000 | 10000–300000 |
-| `slowEveryTicks` | 5 | — |
-| `cooldownMs` | 60000 | — |
-| `maxIncidents` | 10 | — |
-| `captureOnStateChange` | false | — |
-| `samplePublicIp` | false | — |
+| `slowEveryTicks` | 5 | - |
+| `cooldownMs` | 60000 | - |
+| `maxIncidents` | 10 | - |
+| `captureOnStateChange` | false | - |
+| `samplePublicIp` | false | - |
 | `FAULTLINE_RECORDER_PERSIST` | `1` | `0` disables incident persistence |
 
 Gateway thresholds: 5% loss, 40 ms latency.
@@ -535,6 +535,6 @@ except one case that records against an unresolvable host.
   everywhere.
 * One recorder runs at a time. Closed incidents persist; the live buffer does not.
 * The recorder observes. It does not experiment, and therefore never establishes
-  cause — that is Network Bisect's job.
+  cause; that is Network Bisect's job.
 * A change that happens and reverts entirely between two ticks is not seen. A
   shorter interval narrows the gap at proportionate cost.
