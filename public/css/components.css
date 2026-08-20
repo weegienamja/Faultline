@@ -1,0 +1,1246 @@
+/* ==========================================================================
+   Components
+   --------------------------------------------------------------------------
+   The shared vocabulary. If a surface needs something that is not here, the
+   fix is to add it here, not to invent a local variant — that is how the
+   product ended up with three badge systems, four radii and six shades of
+   "muted text".
+   ========================================================================== */
+
+/* ==========================================================================
+   Status resolution
+   --------------------------------------------------------------------------
+   `data-status` sets three custom properties; components read those and never
+   name a status directly. Every status-bearing component used to carry four
+   near-identical rule blocks (one per status) — badge, dot, tile, panel, bar,
+   timeline node was 24 rules for one idea. It is now four, once.
+
+   Components read the slots only under their own `[data-status]`, so a status
+   panel does not tint every unrelated child through inheritance.
+   ========================================================================== */
+
+[data-status="ok"] {
+  --fl-status: var(--fl-ok);
+  --fl-status-soft: var(--fl-ok-soft);
+  --fl-status-line: var(--fl-ok-line);
+}
+
+[data-status="warn"] {
+  --fl-status: var(--fl-warn);
+  --fl-status-soft: var(--fl-warn-soft);
+  --fl-status-line: var(--fl-warn-line);
+}
+
+[data-status="crit"] {
+  --fl-status: var(--fl-crit);
+  --fl-status-soft: var(--fl-crit-soft);
+  --fl-status-line: var(--fl-crit-line);
+}
+
+[data-status="info"] {
+  --fl-status: var(--fl-chrome);
+  --fl-status-soft: var(--fl-chrome-soft);
+  --fl-status-line: var(--fl-chrome-line);
+}
+
+[data-status="idle"] {
+  --fl-status: var(--fl-idle);
+  --fl-status-soft: var(--fl-idle-soft);
+  --fl-status-line: var(--fl-idle-line);
+}
+
+/* ==========================================================================
+   Typography primitives
+   ========================================================================== */
+
+.fl-label {
+  font-size: var(--fl-fs-micro);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fl-text-3);
+  margin: 0;
+}
+
+.fl-page-title {
+  font-size: var(--fl-fs-lg);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: var(--fl-lh-tight);
+  margin: 0;
+}
+
+.fl-panel-title {
+  font-size: var(--fl-fs-md);
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  line-height: var(--fl-lh-tight);
+  margin: 0;
+}
+
+.fl-meta {
+  font-size: var(--fl-fs-micro);
+  color: var(--fl-text-3);
+  margin: 0;
+}
+
+.fl-body {
+  font-size: var(--fl-fs-sm);
+  color: var(--fl-text-2);
+  line-height: var(--fl-lh-body);
+  margin: 0;
+}
+
+/* Prose stops at a readable measure. Data does not — a table or a timeline is
+   allowed the full width, which is the distinction an "everything is centred
+   at 720px" layout gets wrong for an engineering tool. */
+.fl-prose {
+  max-inline-size: var(--fl-measure);
+}
+
+.fl-mono {
+  font-family: var(--fl-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.fl-num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Machine values — addresses, IDs, interface names. Long ones break anywhere
+   rather than pushing a column wide; that is the single most common cause of
+   horizontal overflow in this product. */
+.fl-value {
+  font-family: var(--fl-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.95em;
+  color: var(--fl-text);
+  overflow-wrap: anywhere;
+  line-break: anywhere;
+}
+
+/* ==========================================================================
+   Buttons
+   ========================================================================== */
+
+.fl-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--fl-s2);
+  block-size: var(--fl-control-h);
+  padding-inline: var(--fl-s3);
+  max-inline-size: 100%;
+  border: 1px solid var(--fl-line-strong);
+  border-radius: var(--fl-r-control);
+  background: var(--fl-surface-2);
+  color: var(--fl-text);
+  font-size: var(--fl-fs-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background var(--fl-dur-1) var(--fl-ease), border-color var(--fl-dur-1) var(--fl-ease);
+
+  &:hover:not(:disabled) {
+    background: var(--fl-surface-3);
+    text-decoration: none;
+  }
+
+  /* A press must be visible without moving the control, or a mis-hit in a
+     dense toolbar is indistinguishable from a hit. */
+  &:active:not(:disabled) {
+    background: var(--fl-surface-3);
+    border-color: var(--fl-chrome-line);
+  }
+
+  &:disabled,
+  &[aria-disabled="true"] {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}
+
+.fl-btn-primary {
+  background: var(--fl-chrome);
+  border-color: var(--fl-chrome);
+  color: var(--fl-text-ink);
+  font-weight: 650;
+
+  &:hover:not(:disabled) {
+    background: var(--fl-chrome-hi);
+    border-color: var(--fl-chrome-hi);
+  }
+}
+
+.fl-btn-quiet {
+  background: transparent;
+  border-color: transparent;
+  color: var(--fl-text-2);
+
+  &:hover:not(:disabled) {
+    background: var(--fl-surface-2);
+    color: var(--fl-text);
+  }
+}
+
+.fl-btn-sm {
+  block-size: var(--fl-control-h-sm);
+  padding-inline: var(--fl-s2);
+  font-size: var(--fl-fs-micro);
+}
+
+/* A control mid-request. `aria-busy` rather than a class, so the state is
+   announced as well as drawn. */
+.fl-btn[aria-busy="true"] {
+  color: transparent;
+  position: relative;
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-start: 50%;
+    inline-size: 0.75rem;
+    block-size: 0.75rem;
+    margin: -0.375rem 0 0 -0.375rem;
+    border: 1.5px solid currentcolor;
+    border-block-start-color: transparent;
+    border-radius: 50%;
+    color: var(--fl-text);
+    animation: fl-spin 640ms linear infinite;
+  }
+}
+
+@keyframes fl-spin {
+  to { rotate: 360deg; }
+}
+
+/* ==========================================================================
+   Form controls
+   ========================================================================== */
+
+.fl-input,
+.fl-select,
+.fl-textarea {
+  block-size: var(--fl-control-h);
+  padding-inline: var(--fl-s3);
+  border: 1px solid var(--fl-line-strong);
+  border-radius: var(--fl-r-control);
+  background: var(--fl-sunk);
+  color: var(--fl-text);
+  font-size: var(--fl-fs-sm);
+  outline: none;
+
+  &:focus {
+    border-color: var(--fl-chrome);
+    box-shadow: 0 0 0 3px var(--fl-chrome-soft);
+  }
+
+  &::placeholder {
+    color: var(--fl-text-3);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.fl-input-mono {
+  font-family: var(--fl-mono);
+}
+
+.fl-textarea {
+  block-size: auto;
+  padding: var(--fl-s3);
+  font-family: var(--fl-mono);
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.fl-field {
+  display: grid;
+  gap: var(--fl-s2);
+  min-inline-size: 0;
+
+  & > .fl-label {
+    color: var(--fl-text-2);
+  }
+}
+
+/* A field group that contains an invalid control announces it on the group,
+   so the label turns with the input instead of the panel module having to
+   propagate a class upward. */
+.fl-field:has(:user-invalid) {
+  & > .fl-label {
+    color: var(--fl-crit);
+  }
+
+  & .fl-input {
+    border-color: var(--fl-crit-line);
+  }
+}
+
+.fl-segmented {
+  display: inline-flex;
+  padding: 2px;
+  gap: 2px;
+  background: var(--fl-surface-2);
+  border: 1px solid var(--fl-line);
+  border-radius: var(--fl-r-control);
+
+  & button {
+    border: 0;
+    background: transparent;
+    color: var(--fl-text-2);
+    padding: 4px var(--fl-s3);
+    border-radius: var(--fl-r-chip);
+    font-size: var(--fl-fs-sm);
+    white-space: nowrap;
+
+    &:hover {
+      color: var(--fl-text);
+    }
+
+    &[aria-pressed="true"] {
+      background: var(--fl-surface-3);
+      color: var(--fl-text);
+      font-weight: 550;
+    }
+  }
+}
+
+/* ==========================================================================
+   Control bar
+   ========================================================================== */
+
+.fl-controlbar {
+  display: flex;
+  align-items: center;
+  gap: var(--fl-s2);
+  flex-wrap: wrap;
+  padding: var(--fl-s2) var(--fl-s3);
+  background: var(--fl-surface);
+  border: 1px solid var(--fl-line);
+  border-radius: var(--fl-r-card);
+  margin-block-end: var(--fl-s4);
+}
+
+.fl-control-group {
+  display: flex;
+  align-items: center;
+  gap: var(--fl-s2);
+  min-inline-size: 0;
+
+  & > .fl-label {
+    margin-inline-end: var(--fl-s1);
+    white-space: nowrap;
+  }
+}
+
+/* ==========================================================================
+   Panel — the single card primitive
+   --------------------------------------------------------------------------
+   Every panel is a container. That is what lets the components inside it
+   respond to the panel's width rather than the window's, and it is the reason
+   the same panel is legible in a dashboard column and in the Analyst drawer.
+   ========================================================================== */
+
+.fl-panel {
+  background: var(--fl-surface);
+  border: 1px solid var(--fl-line);
+  border-radius: var(--fl-r-card);
+  box-shadow: var(--fl-shadow-raised);
+  min-inline-size: 0;
+  container: fl-panel / inline-size;
+
+  & + .fl-panel {
+    margin-block-start: var(--fl-s3);
+  }
+
+  /* Status takes the inline-start edge — the only place a panel takes colour.
+     A tinted panel ground would put a colour behind data that has its own
+     status to report. */
+  &[data-status] {
+    border-inline-start: 2px solid var(--fl-status);
+  }
+}
+
+.fl-panel-head {
+  display: flex;
+  align-items: center;
+  gap: var(--fl-s3);
+  padding: var(--fl-s3) var(--fl-pad-panel);
+  border-block-end: 1px solid var(--fl-line-soft);
+  min-block-size: 2.75rem;
+  flex-wrap: wrap;
+
+  & > div:first-child {
+    min-inline-size: 0;
+    flex: 1 1 auto;
+  }
+}
+
+.fl-panel-head-actions {
+  margin-inline-start: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--fl-s2);
+  flex-wrap: wrap;
+}
+
+.fl-panel-body {
+  padding: var(--fl-pad-panel);
+}
+
+.fl-panel-body-flush {
+  padding: 0;
+}
+
+.fl-panel-foot {
+  padding: var(--fl-s2) var(--fl-pad-panel);
+  border-block-start: 1px solid var(--fl-line-soft);
+  font-size: var(--fl-fs-micro);
+  color: var(--fl-text-3);
+  display: flex;
+  align-items: center;
+  gap: var(--fl-s3);
+  flex-wrap: wrap;
+
+  /* A link here is a flex item, so it is blockified and loses the inline
+     exception to the 24px target-size minimum. It is a real control sitting on
+     its own, and it gets a real target. */
+  & a {
+    display: inline-flex;
+    align-items: center;
+    min-block-size: 1.5rem;
+  }
+}
+
+/* ==========================================================================
+   Stat tiles
+   ========================================================================== */
+
+.fl-tiles {
+  display: grid;
+  gap: var(--fl-s3);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+}
+
+.fl-tile {
+  background: var(--fl-surface);
+  border: 1px solid var(--fl-line);
+  border-radius: var(--fl-r-card);
+  padding: var(--fl-s3) var(--fl-s4);
+  display: grid;
+  gap: var(--fl-s1);
+  align-content: start;
+  min-inline-size: 0;
+
+  &[data-status] .fl-tile-value {
+    color: var(--fl-status);
+  }
+
+  &[data-status="idle"] .fl-tile-value {
+    color: var(--fl-text-3);
+  }
+}
+
+.fl-tile-label {
+  font-size: var(--fl-fs-micro);
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--fl-text-3);
+}
+
+.fl-tile-value {
+  font-size: var(--fl-fs-metric);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+
+  /* A tile whose value is a phrase, not a figure. At numeral size a label like
+     "ISP / upstream network" wraps to three lines and outweighs the
+     measurements beside it. */
+  &[data-kind="text"] {
+    font-size: var(--fl-fs-md);
+    line-height: var(--fl-lh-tight);
+    letter-spacing: -0.005em;
+  }
+
+  & small {
+    font-size: var(--fl-fs-sm);
+    font-weight: 500;
+    color: var(--fl-text-3);
+    margin-inline-start: 3px;
+    letter-spacing: 0;
+  }
+}
+
+.fl-tile-sub {
+  font-size: var(--fl-fs-micro);
+  color: var(--fl-text-3);
+  display: flex;
+  align-items: center;
+  gap: var(--fl-s1);
+  flex-wrap: wrap;
+}
+
+/* ==========================================================================
+   Badges, dots
+   ========================================================================== */
+
+.fl-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px;
+  border-radius: var(--fl-r-chip);
+  border: 1px solid var(--fl-idle-line);
+  background: var(--fl-idle-soft);
+  color: var(--fl-text-2);
+  font-size: var(--fl-fs-micro);
+  font-weight: 550;
+  letter-spacing: 0.02em;
+  line-height: 1.5;
+  /* Badges usually hold one short word, but some carry a value from the
+     backend — a Bisect axis name, an interface classification. Those can be
+     long, and a chip that cannot wrap pushes the page instead. Wrapping loses
+     nothing; overflowing loses the layout. */
+  max-inline-size: 100%;
+  overflow-wrap: anywhere;
+
+  &[data-status] {
+    border-color: var(--fl-status-line);
+    background: var(--fl-status-soft);
+    color: var(--fl-status);
+  }
+
+  /* Idle is the absence of a state, not a state. It gets no ground. */
+  &[data-status="idle"] {
+    background: transparent;
+    color: var(--fl-text-3);
+  }
+}
+
+/* Machine states — PASS / FAIL / INAPPLICABLE / UNSUPPORTED / UNSTABLE.
+   Monospace because they are literal protocol vocabulary, not prose. */
+.fl-badge-code {
+  font-family: var(--fl-mono);
+  font-size: var(--fl-fs-micro);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.fl-dot {
+  inline-size: 7px;
+  block-size: 7px;
+  flex: 0 0 7px;
+  border-radius: 50%;
+  background: var(--fl-idle);
+  display: inline-block;
+
+  &[data-status] {
+    background: var(--fl-status);
+  }
+}
+
+/* ==========================================================================
+   Tables
+   --------------------------------------------------------------------------
+   Density is the point. A table that drops columns to fit is a table that has
+   thrown away the comparison it exists to support, so the default behaviour is
+   to scroll, with the identifying column pinned so a row never loses its name.
+   ========================================================================== */
+
+.fl-table-wrap {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  /* Tells the user there is more to the right — without this an overflowing
+     table looks like a table that simply ends. */
+  background:
+    linear-gradient(to right, var(--fl-surface) 30%, transparent),
+    linear-gradient(to left, var(--fl-surface) 30%, transparent) 100% 0,
+    radial-gradient(farthest-side at 0 50%, oklch(0% 0 0 / .35), transparent),
+    radial-gradient(farthest-side at 100% 50%, oklch(0% 0 0 / .35), transparent) 100% 0;
+  background-repeat: no-repeat;
+  background-size: 3rem 100%, 3rem 100%, 1rem 100%, 1rem 100%;
+  background-attachment: local, local, scroll, scroll;
+}
+
+.fl-table {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-size: var(--fl-fs-sm);
+
+  & th {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 1;
+    text-align: start;
+    font-size: var(--fl-fs-micro);
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--fl-text-3);
+    background: var(--fl-surface-2);
+    padding: var(--fl-s2) var(--fl-pad-cell);
+    border-block-end: 1px solid var(--fl-line);
+    white-space: nowrap;
+  }
+
+  & td {
+    padding-inline: var(--fl-pad-cell);
+    block-size: var(--fl-row);
+    border-block-end: 1px solid var(--fl-line-soft);
+    color: var(--fl-text-2);
+    vertical-align: middle;
+  }
+
+  & tbody tr:hover td {
+    background: var(--fl-surface-2);
+  }
+
+  & td:first-child {
+    color: var(--fl-text);
+    font-weight: 500;
+  }
+
+  & tr[data-selectable] {
+    cursor: pointer;
+  }
+
+  & tr[aria-selected="true"] td {
+    background: var(--fl-chrome-soft);
+  }
+}
+
+.fl-table .fl-right,
+.fl-table .fl-num {
+  text-align: end;
+  font-family: var(--fl-mono);
+}
+
+.fl-table-compact td {
+  block-size: auto;
+  padding-block: 6px;
+}
+
+/* Stacked mode — opt-in, and only for tables whose cells carry `data-label`.
+   Below the width where columns stop being comparable, each row becomes a
+   key/value block. Nothing is hidden: the same cells are still present, just
+   labelled individually instead of by a column header that has scrolled away.
+   Driven by the panel's own width, so this fires in a narrow drawer at a wide
+   viewport too. */
+@container fl-panel (inline-size < 34rem) {
+  .fl-table[data-stack] {
+    & thead {
+      /* Visually hidden, not removed: the header row is still the accessible
+         name for each cell. */
+      position: absolute;
+      inline-size: 1px;
+      block-size: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+
+    & tr {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 2px var(--fl-s3);
+      padding: var(--fl-s2) var(--fl-pad-cell);
+      border-block-end: 1px solid var(--fl-line-soft);
+    }
+
+    & td {
+      display: grid;
+      grid-template-columns: subgrid;
+      grid-column: 1 / -1;
+      align-items: baseline;
+      block-size: auto;
+      padding: 1px 0;
+      border: 0;
+
+      &::before {
+        content: attr(data-label);
+        font-size: var(--fl-fs-micro);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--fl-text-3);
+      }
+    }
+
+    & td:first-child {
+      font-weight: 600;
+    }
+  }
+}
+
+/* Key/value list. */
+.fl-kv {
+  margin: 0;
+  display: grid;
+
+  & > div {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--fl-s4);
+    padding-block: 7px;
+    border-block-end: 1px solid var(--fl-line-soft);
+    font-size: var(--fl-fs-sm);
+    flex-wrap: wrap;
+
+    &:last-child {
+      border-block-end: 0;
+    }
+  }
+
+  & dt {
+    color: var(--fl-text-3);
+    white-space: nowrap;
+  }
+
+  & dd {
+    margin: 0;
+    text-align: end;
+    color: var(--fl-text);
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* ==========================================================================
+   Bars and charts
+   ========================================================================== */
+
+.fl-chart {
+  display: grid;
+  gap: var(--fl-s2);
+}
+
+.fl-chart-plot {
+  position: relative;
+  min-block-size: 7.5rem;
+}
+
+.fl-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fl-s3);
+  font-size: var(--fl-fs-micro);
+  color: var(--fl-text-3);
+
+  & span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+}
+
+.fl-bars {
+  display: grid;
+  gap: var(--fl-s2);
+}
+
+.fl-bar-row {
+  display: grid;
+  grid-template-columns: minmax(5.5rem, 26%) minmax(0, 1fr) auto;
+  gap: var(--fl-s3);
+  align-items: center;
+  font-size: var(--fl-fs-sm);
+}
+
+.fl-bar-track {
+  block-size: 6px;
+  border-radius: var(--fl-r-pill);
+  background: var(--fl-surface-3);
+  overflow: hidden;
+}
+
+.fl-bar-fill {
+  display: block;
+  block-size: 100%;
+  border-radius: var(--fl-r-pill);
+  background: var(--fl-chrome);
+
+  &[data-status] {
+    background: var(--fl-status);
+  }
+}
+
+.fl-bar-value {
+  font-family: var(--fl-mono);
+  font-size: var(--fl-fs-micro);
+  color: var(--fl-text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ==========================================================================
+   Timeline — the generic event list
+   --------------------------------------------------------------------------
+   The Flight Recorder chronology is a separate, purpose-built component
+   (chronology.css). This one is for ordinary event lists: hypothesis moves,
+   case history, experiment transcripts.
+   ========================================================================== */
+
+.fl-timeline {
+  display: grid;
+  position: relative;
+}
+
+.fl-tl-item {
+  display: grid;
+  grid-template-columns: 6.75rem 1rem minmax(0, 1fr);
+  gap: var(--fl-s3);
+  padding-block: var(--fl-s3);
+  border-block-start: 1px solid var(--fl-line-soft);
+  align-items: start;
+
+  &:first-child {
+    border-block-start: 0;
+  }
+
+  &:last-child .fl-tl-rail::before {
+    display: none;
+  }
+}
+
+/* In a narrow panel the fixed timestamp column costs more than it returns:
+   the time moves above the entry and the rail keeps the sequence readable. */
+@container fl-panel (inline-size < 30rem) {
+  .fl-tl-item {
+    grid-template-columns: 1rem minmax(0, 1fr);
+    gap: var(--fl-s2);
+  }
+
+  .fl-tl-when {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .fl-tl-rail {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+  }
+
+  .fl-tl-body {
+    grid-column: 2;
+  }
+}
+
+.fl-tl-when {
+  font-family: var(--fl-mono);
+  font-size: var(--fl-fs-micro);
+  color: var(--fl-text-3);
+  letter-spacing: 0.02em;
+  padding-block-start: 2px;
+}
+
+.fl-tl-rail {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  padding-block-start: 4px;
+  block-size: 100%;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset-block: 12px -20px;
+    inline-size: 1px;
+    background: var(--fl-line);
+  }
+}
+
+.fl-tl-node {
+  inline-size: 9px;
+  block-size: 9px;
+  border-radius: 50%;
+  background: var(--fl-surface);
+  border: 2px solid var(--fl-idle);
+  position: relative;
+  z-index: 1;
+
+  &[data-status] {
+    border-color: var(--fl-status);
+  }
+
+  &[data-terminal] {
+    background: var(--fl-chrome);
+    border-color: var(--fl-chrome);
+  }
+}
+
+.fl-tl-body {
+  min-inline-size: 0;
+}
+
+.fl-tl-title {
+  font-size: var(--fl-fs-sm);
+  font-weight: 550;
+  color: var(--fl-text);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.fl-tl-why {
+  font-size: var(--fl-fs-micro);
+  color: var(--fl-text-3);
+  line-height: var(--fl-lh-body);
+  margin: 3px 0 0;
+}
+
+.fl-tl-out {
+  display: flex;
+  gap: var(--fl-s2);
+  align-items: center;
+  flex-wrap: wrap;
+  margin-block-start: var(--fl-s2);
+}
+
+/* ==========================================================================
+   Progressive disclosure
+   ========================================================================== */
+
+.fl-disclose {
+  border-block-start: 1px solid var(--fl-line-soft);
+
+  & > summary {
+    cursor: pointer;
+    list-style: none;
+    padding-block: var(--fl-s2);
+    font-size: var(--fl-fs-sm);
+    color: var(--fl-text-2);
+    display: flex;
+    align-items: center;
+    gap: var(--fl-s2);
+    min-block-size: var(--fl-control-h-sm);
+
+    &::-webkit-details-marker {
+      display: none;
+    }
+
+    &::before {
+      content: "\25B8";
+      color: var(--fl-text-3);
+      font-size: var(--fl-fs-micro);
+      transition: rotate var(--fl-dur-2) var(--fl-ease);
+    }
+
+    &:hover {
+      color: var(--fl-text);
+    }
+  }
+
+  &[open] > summary::before {
+    rotate: 90deg;
+  }
+}
+
+.fl-disclose-body {
+  padding-block-end: var(--fl-s3);
+}
+
+/* ==========================================================================
+   State surfaces — empty, loading, error, locked
+   ========================================================================== */
+
+.fl-state {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: var(--fl-s2);
+  padding: var(--fl-s8) var(--fl-s5);
+  text-align: center;
+  min-block-size: 10rem;
+
+  &[data-tone="error"] .fl-state-icon {
+    border-color: var(--fl-crit-line);
+    background: var(--fl-crit-soft);
+    color: var(--fl-crit);
+  }
+
+  &[data-tone="locked"] .fl-state-icon {
+    border-color: var(--fl-warn-line);
+    background: var(--fl-warn-soft);
+    color: var(--fl-warn);
+  }
+}
+
+.fl-state-icon {
+  inline-size: 2rem;
+  block-size: 2rem;
+  border-radius: var(--fl-r-control);
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--fl-line-strong);
+  background: var(--fl-surface-2);
+  color: var(--fl-text-3);
+  font-size: 0.9375rem;
+  margin-block-end: var(--fl-s1);
+}
+
+.fl-state-title {
+  font-size: var(--fl-fs-base);
+  font-weight: 600;
+  color: var(--fl-text);
+  margin: 0;
+}
+
+.fl-state-body {
+  font-size: var(--fl-fs-sm);
+  color: var(--fl-text-3);
+  margin: 0;
+  max-inline-size: var(--fl-measure-tight);
+  line-height: var(--fl-lh-body);
+  /* An empty-state body often quotes the value that produced it — a hostname,
+     an adapter name. A ch-based measure does not constrain one long token. */
+  overflow-wrap: anywhere;
+}
+
+.fl-state-actions {
+  display: flex;
+  gap: var(--fl-s2);
+  margin-block-start: var(--fl-s2);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.fl-status-line {
+  font-size: var(--fl-fs-sm);
+  color: var(--fl-text-3);
+  line-height: var(--fl-lh-body);
+  margin: var(--fl-s3) 0 0;
+  min-block-size: 1.125rem;
+
+  &[data-tone="error"] {
+    color: var(--fl-crit);
+  }
+
+  &[data-tone="ok"] {
+    color: var(--fl-ok);
+  }
+}
+
+/* Skeletons preserve layout where a spinner collapses it. */
+.fl-skeleton {
+  background: linear-gradient(90deg, var(--fl-surface-2) 25%, var(--fl-surface-3) 37%, var(--fl-surface-2) 63%);
+  background-size: 400% 100%;
+  animation: fl-shimmer 1.4s ease infinite;
+  border-radius: var(--fl-r-chip);
+  block-size: 0.75rem;
+}
+
+.fl-skeleton-rows {
+  display: grid;
+  gap: var(--fl-s3);
+  padding: var(--fl-pad-panel);
+
+  & .fl-skeleton:nth-child(2n) {
+    inline-size: 72%;
+  }
+
+  & .fl-skeleton:nth-child(3n) {
+    inline-size: 54%;
+  }
+}
+
+@keyframes fl-shimmer {
+  to { background-position: 0 50%; }
+}
+
+/* A measurement genuinely in flight. The only looping animation in the
+   product, and it stops when the measurement does. */
+.fl-running {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fl-fs-micro);
+  color: var(--fl-text-2);
+
+  &::before {
+    content: "";
+    inline-size: 7px;
+    block-size: 7px;
+    border-radius: 50%;
+    background: var(--fl-chrome);
+    animation: fl-pulse 1.1s ease-in-out infinite;
+  }
+}
+
+@keyframes fl-pulse {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fl-running::before {
+    opacity: 1;
+  }
+}
+
+/* ==========================================================================
+   Dialog
+   ========================================================================== */
+
+.fl-dialog {
+  inline-size: min(30rem, calc(100vw - 2rem));
+  border: 1px solid var(--fl-line-strong);
+  border-radius: var(--fl-r-card);
+  background: var(--fl-surface);
+  color: var(--fl-text);
+  padding: 0;
+  box-shadow: var(--fl-shadow-float);
+
+  &::backdrop {
+    background: oklch(8% 0.01 259 / 0.72);
+  }
+}
+
+.fl-dialog-wide {
+  inline-size: min(42.5rem, calc(100vw - 2rem));
+}
+
+.fl-dialog-head {
+  padding: var(--fl-s4) var(--fl-s5) 0;
+}
+
+.fl-dialog-body {
+  padding: var(--fl-s4) var(--fl-s5);
+  display: grid;
+  gap: var(--fl-s4);
+  max-block-size: min(70dvh, 40rem);
+  overflow-y: auto;
+}
+
+.fl-dialog-foot {
+  padding: var(--fl-s3) var(--fl-s5) var(--fl-s5);
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--fl-s2);
+  flex-wrap: wrap;
+}
+
+/* ==========================================================================
+   Steps and code
+   ========================================================================== */
+
+.fl-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+
+  & li {
+    display: grid;
+    grid-template-columns: 1.375rem minmax(0, 1fr);
+    gap: var(--fl-s3);
+    padding-block: var(--fl-s3);
+    border-block-start: 1px solid var(--fl-line-soft);
+    align-items: start;
+
+    &:first-child {
+      border-block-start: 0;
+    }
+  }
+
+  & strong {
+    display: block;
+    font-size: var(--fl-fs-sm);
+    font-weight: 550;
+    color: var(--fl-text);
+  }
+
+  & > li > span {
+    display: block;
+    font-size: var(--fl-fs-micro);
+    color: var(--fl-text-3);
+    margin-block-start: 2px;
+    line-height: 1.5;
+  }
+}
+
+.fl-step-n {
+  inline-size: 1.375rem;
+  block-size: 1.375rem;
+  border-radius: var(--fl-r-chip);
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--fl-line-strong);
+  color: var(--fl-text-3);
+  font-family: var(--fl-mono);
+  font-size: var(--fl-fs-micro);
+}
+
+.fl-code {
+  margin: 0;
+  padding: var(--fl-s3);
+  background: var(--fl-sunk);
+  border: 1px solid var(--fl-line);
+  border-radius: var(--fl-r-control);
+  font-family: var(--fl-mono);
+  font-size: var(--fl-fs-micro);
+  line-height: 1.7;
+  color: var(--fl-text-2);
+  overflow-x: auto;
+}
+
+/* ==========================================================================
+   Freshness — how old is this reading
+   --------------------------------------------------------------------------
+   Faultline shows values that were true at some point. Which point matters,
+   and a number with no age on it silently claims to be current.
+   ========================================================================== */
+
+.fl-age {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--fl-mono);
+  font-size: var(--fl-fs-micro);
+  color: var(--fl-text-3);
+  white-space: nowrap;
+
+  &::before {
+    content: "";
+    inline-size: 5px;
+    block-size: 5px;
+    border-radius: 50%;
+    background: var(--fl-idle);
+  }
+
+  &[data-fresh="live"] {
+    color: var(--fl-text-2);
+
+    &::before {
+      background: var(--fl-ok);
+    }
+  }
+
+  &[data-fresh="stale"] {
+    color: var(--fl-warn);
+
+    &::before {
+      background: var(--fl-warn);
+    }
+  }
+
+  /* A value kept on screen from an earlier reading because a newer one did not
+     arrive. Hollow marker: there is nothing behind it right now. */
+  &[data-fresh="carried"]::before {
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--fl-warn);
+  }
+
+  &[data-fresh="disconnected"] {
+    color: var(--fl-crit);
+
+    &::before {
+      background: var(--fl-crit);
+    }
+  }
+}

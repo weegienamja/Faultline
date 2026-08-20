@@ -70,15 +70,15 @@ if (host) host.innerHTML = `
   </div>
 
   <form class="fl-controlbar" id="bisect-form">
-    <div class="fl-control-group" style="flex:0 1 460px;min-width:260px">
+    <div class="fl-control-group fl-grow">
       <span class="fl-label">Target</span>
-      <input class="fl-input fl-input-mono" type="text" id="bisect-target" style="flex:1"
+      <input class="fl-input fl-input-mono fl-grow" type="text" id="bisect-target"
              placeholder="example.com · 1.1.1.1 · https://example.com/health"
              autocomplete="off" spellcheck="false" value="example.com" />
     </div>
     <div class="fl-control-group">
       <span class="fl-label">Repeat</span>
-      <input class="fl-input fl-input-mono" type="number" id="bisect-repeat" min="1" max="10" value="3" style="width:56px;text-align:center" />
+      <input class="fl-input fl-input-mono fl-input-num-sm" type="number" id="bisect-repeat" min="1" max="10" value="3" aria-label="Confirmations per experiment" />
     </div>
     <div class="fl-control-group">
       <span class="fl-label">Strategy</span>
@@ -156,15 +156,23 @@ function renderVerdict(report) {
       <header class="fl-panel-head">
         <div>
           <span class="fl-label">${escapeHtml(VERDICT_LABEL[kind] || "Result")}</span>
-          <h3 class="fl-panel-title">${escapeHtml(v.headline || "")}</h3>
+          <h2 class="fl-panel-title">${escapeHtml(v.headline || "")}</h2>
+        </div>
+        <div class="fl-panel-head-actions">
+          <!-- The one evidence class that carries real authority: Faultline
+               deliberately varied a condition and measured the outcome. Stating
+               it here is what separates this conclusion from the recorder's
+               temporal comparison, which looks superficially similar and means
+               considerably less. -->
+          <span class="fl-provenance" data-evidence="experiment">Deterministic experiment</span>
         </div>
       </header>
       <div class="fl-panel-body">
-        ${v.claim ? `<p class="bisect-claim">${escapeHtml(v.claim)}</p>` : ""}
+        ${v.claim ? `<p class="fl-claim bisect-claim" data-evidence="experiment">${escapeHtml(v.claim)}</p>` : ""}
         ${v.detail ? `<p class="fl-body fl-prose">${escapeHtml(v.detail)}</p>` : ""}
-        ${v.workaround ? `<p class="fl-body fl-prose" style="margin-top:8px">${escapeHtml(v.workaround)}</p>` : ""}
-        ${v.recommendation ? `<p class="fl-body fl-prose" style="margin-top:8px">${escapeHtml(v.recommendation)}</p>` : ""}
-        <div class="fl-tiles" style="margin-top:16px">${tiles.map(tile).join("")}</div>
+        ${v.workaround ? `<p class="fl-body fl-prose fl-mt-2">${escapeHtml(v.workaround)}</p>` : ""}
+        ${v.recommendation ? `<p class="fl-body fl-prose fl-mt-2">${escapeHtml(v.recommendation)}</p>` : ""}
+        <div class="fl-tiles fl-mt-4">${tiles.map(tile).join("")}</div>
       </div>
       ${report.evidence?.note ? `<footer class="fl-panel-foot"><span>${escapeHtml(report.evidence.note)}</span></footer>` : ""}
     </section>`;
@@ -230,7 +238,7 @@ function renderPath(report) {
               : item.count != null ? badge(`${item.count} in play`, "info")
               : ""}
             ${item.sequence ? `<span class="bisect-seq">${escapeHtml(item.sequence)}</span>` : ""}
-            ${item.detail && !item.sequence ? `<span class="fl-tl-why" style="margin:0">${escapeHtml(item.detail)}</span>` : ""}
+            ${item.detail && !item.sequence ? `<span class="fl-tl-why fl-m-0">${escapeHtml(item.detail)}</span>` : ""}
           </div>
         </div>
       </div>`).join("")}</div>`,
@@ -246,7 +254,7 @@ const HYPOTHESIS_ORDER = { SUPPORTED: 0, STILL_POSSIBLE: 1, WEAKENED: 2, NOT_TES
 
 function hypothesisRows(list) {
   return `<div class="fl-table-wrap"><table class="fl-table fl-table-compact">
-    <thead><tr><th style="width:140px">State</th><th>Explanation</th></tr></thead>
+    <thead><tr><th class="fl-col-state">State</th><th>Explanation</th></tr></thead>
     <tbody>${list.map(h => `<tr>
       <td>${stateBadge(h.state)}</td>
       <td>
@@ -275,7 +283,7 @@ function renderHypotheses(report) {
     meta: `<span class="fl-meta">${live.length} of ${list.length} still live</span>`,
     flush: true,
     body: `${live.length ? hypothesisRows(live) : ""}
-      ${eliminated.length ? `<div style="padding:0 16px">${disclose(
+      ${eliminated.length ? `<div class="fl-panel-body">${disclose(
         `Eliminated explanations (${eliminated.length})`,
         hypothesisRows(eliminated)
       )}</div>` : ""}`,
@@ -292,36 +300,36 @@ function renderDetail(report) {
 
   const interfaces = report.interfaces || [];
   if (interfaces.length >= 2) {
-    blocks.push(disclose(`Local interfaces (${interfaces.length})`, `<div class="fl-table-wrap"><table class="fl-table fl-table-compact">
+    blocks.push(disclose(`Local interfaces (${interfaces.length})`, `<div class="fl-table-wrap"><table class="fl-table fl-table-compact" data-stack>
       <thead><tr><th>Interface</th><th>Address</th><th>Classification</th><th>Route to target</th></tr></thead>
       <tbody>${interfaces.map(i => `<tr>
-        <td>${escapeHtml(i.name)}</td>
-        <td class="fl-mono">${escapeHtml(i.address)}</td>
-        <td>${badge(i.classification, "idle")}</td>
-        <td>${i.routeSupport === "NO_ROUTE" ? badge("No route", "idle") : badge("Route ok", "ok")}</td>
+        <td data-label="Interface">${escapeHtml(i.name)}</td>
+        <td data-label="Address"><span class="fl-value">${escapeHtml(i.address)}</span></td>
+        <td data-label="Classification">${badge(i.classification, "idle")}</td>
+        <td data-label="Route to target">${i.routeSupport === "NO_ROUTE" ? badge("No route", "idle") : badge("Route ok", "ok")}</td>
       </tr>`).join("")}</tbody></table></div>`));
   }
 
   const skipped = report.skipped || [];
   if (skipped.length) {
-    blocks.push(disclose(`Experiments not run (${skipped.length})`, `<div class="fl-table-wrap"><table class="fl-table fl-table-compact">
+    blocks.push(disclose(`Experiments not run (${skipped.length})`, `<div class="fl-table-wrap"><table class="fl-table fl-table-compact" data-stack>
       <thead><tr><th>Condition</th><th>Variant</th><th>Why it was skipped</th></tr></thead>
       <tbody>${skipped.map(s => `<tr>
-        <td>${escapeHtml(s.axisLabel)}</td><td>${escapeHtml(s.label)}</td><td>${escapeHtml(s.reason)}</td>
+        <td data-label="Condition">${escapeHtml(s.axisLabel)}</td><td data-label="Variant">${escapeHtml(s.label)}</td><td data-label="Why it was skipped">${escapeHtml(s.reason)}</td>
       </tr>`).join("")}</tbody></table></div>`));
   }
 
   const executed = report.executed || [];
   if (executed.length) {
-    blocks.push(disclose(`All executed experiments (${executed.length})`, `<div class="fl-table-wrap"><table class="fl-table fl-table-compact">
+    blocks.push(disclose(`All executed experiments (${executed.length})`, `<div class="fl-table-wrap"><table class="fl-table fl-table-compact" data-stack>
       <thead><tr><th>Condition</th><th>Variant</th><th>Result</th><th class="fl-right">n</th><th class="fl-right">Score</th><th>Detail</th></tr></thead>
       <tbody>${executed.map(r => `<tr>
-        <td>${escapeHtml(r.axisLabel)}</td>
-        <td>${escapeHtml(r.label)}</td>
-        <td>${stateBadge(r.result)}</td>
-        <td class="fl-right">${escapeHtml(r.passes)}/${escapeHtml(r.total)}</td>
-        <td class="fl-right">${escapeHtml(r.selectionScore ?? "—")}</td>
-        <td>${escapeHtml(r.stage ? `${r.stage}: ` : "")}${escapeHtml(r.reason || "")}</td>
+        <td data-label="Condition">${escapeHtml(r.axisLabel)}</td>
+        <td data-label="Variant">${escapeHtml(r.label)}</td>
+        <td data-label="Result">${stateBadge(r.result)}</td>
+        <td class="fl-right" data-label="Confirmations">${escapeHtml(r.passes)}/${escapeHtml(r.total)}</td>
+        <td class="fl-right" data-label="Score">${escapeHtml(r.selectionScore ?? "—")}</td>
+        <td data-label="Detail">${escapeHtml(r.stage ? `${r.stage}: ` : "")}${escapeHtml(r.reason || "")}</td>
       </tr>`).join("")}</tbody></table></div>`));
   }
 
@@ -340,14 +348,14 @@ function renderExhaustive(report) {
     title: "Full condition matrix",
     meta: `<span class="fl-meta">${rows.length} conditions</span>`,
     flush: true,
-    body: `<div class="fl-table-wrap"><table class="fl-table">
+    body: `<div class="fl-table-wrap"><table class="fl-table" data-stack>
       <thead><tr><th>Condition</th><th>Variant</th><th>Result</th><th class="fl-right">n</th><th>Detail</th></tr></thead>
       <tbody>${rows.map(r => `<tr>
-        <td>${escapeHtml(r.axisId === "__baseline__" ? "baseline" : r.axisLabel)}</td>
-        <td>${escapeHtml(r.label)}</td>
-        <td>${stateBadge(r.outcome)}</td>
-        <td class="fl-right">${escapeHtml(r.passes)}/${escapeHtml(r.total)}</td>
-        <td>${escapeHtml(r.stage ? `${r.stage}: ` : "")}${escapeHtml(r.reason || "")}</td>
+        <td data-label="Condition">${escapeHtml(r.axisId === "__baseline__" ? "baseline" : r.axisLabel)}</td>
+        <td data-label="Variant">${escapeHtml(r.label)}</td>
+        <td data-label="Result">${stateBadge(r.outcome)}</td>
+        <td class="fl-right" data-label="Confirmations">${escapeHtml(r.passes)}/${escapeHtml(r.total)}</td>
+        <td data-label="Detail">${escapeHtml(r.stage ? `${r.stage}: ` : "")}${escapeHtml(r.reason || "")}</td>
       </tr>`).join("")}</tbody>
     </table></div>`
   });
@@ -397,7 +405,7 @@ form?.addEventListener("submit", async event => {
     if (!response.ok) throw new Error(report.error || `Faultline returned HTTP ${response.status}.`);
 
     results.innerHTML = report.mode === "adaptive"
-      ? renderVerdict(report) + `<div class="fl-grid"><div class="fl-col-7">${renderPath(report)}</div><div class="fl-col-5">${renderHypotheses(report)}</div></div>` + renderDetail(report)
+      ? renderVerdict(report) + `<div class="fl-split"><div>${renderPath(report)}</div><div>${renderHypotheses(report)}</div></div>` + renderDetail(report)
       : renderExhaustive(report);
 
     const k = report.counters;
@@ -419,14 +427,3 @@ form?.addEventListener("submit", async event => {
 });
 
 // Two rules that are genuinely local to this screen.
-const style = document.createElement("style");
-style.textContent = `
-  .bisect-claim { margin: 0 0 8px; font-size: var(--fl-fs-base); font-weight: 550; color: var(--fl-text); line-height: 1.5; }
-  .bisect-seq { font-family: var(--fl-mono); font-size: var(--fl-fs-micro); color: var(--fl-text-2); letter-spacing: .14em; }
-  .bisect-hyp-label { display: block; color: var(--fl-text); }
-  /* The engine's note explains why a hypothesis moved. It is a second line, not
-     a continuation of the label, or the two run together into one sentence. */
-  .bisect-note { display: block; margin-top: 2px; font-size: var(--fl-fs-micro); color: var(--fl-text-3); line-height: 1.5; }
-  .fl-table-compact td { padding-top: 6px; padding-bottom: 6px; height: auto; }
-`;
-document.head.appendChild(style);

@@ -16,34 +16,6 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-function installStyles() {
-  const style = document.createElement("style");
-  style.textContent = `
-    .intelligence-panel { margin-top: 13px; }
-    .intelligence-head { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; flex-wrap:wrap; }
-    .intelligence-badges { display:flex; gap:6px; flex-wrap:wrap; }
-    .intelligence-badge { border:1px solid var(--fl-ok-line); color:var(--accent); background:var(--accent-soft); border-radius:999px; padding:5px 8px; font-size:8px; letter-spacing:.09em; text-transform:uppercase; }
-    .intelligence-badge.neutral { border-color:var(--border); color:var(--muted); background:rgba(255,255,255,.015); }
-    .intelligence-summary { margin:10px 0 0; color:#b8c8c3; line-height:1.55; font-size:12px; max-width:850px; }
-    .intelligence-layout { display:grid; grid-template-columns:minmax(0,1.1fr) minmax(260px,.9fr); gap:12px; margin-top:16px; }
-    .pattern-card, .similar-card { border:1px solid var(--border-soft); border-radius:11px; background:rgba(255,255,255,.012); padding:14px; }
-    .pattern-card h4, .similar-card h4 { margin:0 0 8px; font-size:12px; }
-    .pattern-meta { color:var(--muted); font-size:10px; margin-bottom:10px; }
-    .pattern-features { display:flex; flex-wrap:wrap; gap:6px; }
-    .pattern-feature { border:1px solid var(--fl-ok-line); border-radius:999px; padding:5px 8px; color:#bcd0ca; font-size:9px; background:var(--fl-ok-soft); }
-    .similar-list { display:grid; gap:7px; }
-    .similar-row { border-top:1px solid var(--border-soft); padding-top:8px; display:grid; grid-template-columns:1fr auto; gap:8px; }
-    .similar-row:first-child { border-top:0; padding-top:0; }
-    .similar-row strong { font-size:10px; display:block; }
-    .similar-row small { color:var(--muted); font-size:9px; line-height:1.4; display:block; margin-top:3px; }
-    .similar-score { color:var(--accent); font-size:13px; font-weight:780; white-space:nowrap; }
-    .intelligence-method { margin-top:10px; color:var(--fl-text-3); font-size:9px; line-height:1.5; }
-    .intelligence-empty { color:var(--muted); font-size:11px; line-height:1.5; }
-    @media(max-width:760px) { .intelligence-layout { grid-template-columns:1fr; } }
-  `;
-  document.head.appendChild(style);
-}
-
 function createPanel() {
   const panel = document.createElement("section");
   panel.className = "panel intelligence-panel";
@@ -52,7 +24,7 @@ function createPanel() {
     <div class="intelligence-head">
       <div>
         <span class="section-label">DATA SCIENCE · INCIDENT INTELLIGENCE</span>
-        <h3 style="margin:4px 0 0">Related evidence patterns</h3>
+        <h2 class="fl-panel-title fl-mt-1">Related evidence patterns</h2>
       </div>
       <div class="intelligence-badges">
         <span class="intelligence-badge">DBSCAN</span>
@@ -71,7 +43,6 @@ function createPanel() {
   return panel;
 }
 
-installStyles();
 const panel = createPanel();
 const summary = panel.querySelector("#intelligence-summary");
 const patternCard = panel.querySelector("#pattern-card");
@@ -113,7 +84,7 @@ function render() {
   if (cluster) {
     summary.textContent = `${cluster.size} diagnostics form ${cluster.id}, a dense group with a similar measured evidence signature. This does not change the deterministic fault-domain result.`;
     patternCard.innerHTML = `
-      <h4>${escapeHtml(cluster.id)} · ${cluster.size} related diagnostics</h4>
+      <h3>${escapeHtml(cluster.id)} · ${cluster.size} related diagnostics</h3>
       <div class="pattern-meta">Current case: ${escapeHtml(incident.id)} · cluster discovered without labelled training data</div>
       <div class="pattern-features">
         ${cluster.commonCharacteristics.map(item => `<span class="pattern-feature">${escapeHtml(item.label)}</span>`).join("") || '<span class="intelligence-empty">No single human-readable characteristic is shared across every member.</span>'}
@@ -122,14 +93,14 @@ function render() {
   } else {
     summary.textContent = `${incident.id} is currently treated as an outlier rather than part of a dense incident pattern. Similarity scores are still available for comparison.`;
     patternCard.innerHTML = `
-      <h4>No dense cluster for this incident</h4>
+      <h3>No dense cluster for this incident</h3>
       <p class="intelligence-empty">DBSCAN marked this evidence pattern as noise at the current density threshold. That is a valid analytical result rather than forcing every case into a group.</p>
     `;
   }
 
   const neighbours = insight?.neighbours || [];
   similarCard.innerHTML = `
-    <h4>Most similar diagnostics</h4>
+    <h3>Most similar diagnostics</h3>
     <div class="similar-list">
       ${neighbours.length ? neighbours.map(item => `
         <div class="similar-row">

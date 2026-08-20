@@ -1,0 +1,91 @@
+/* ==========================================================================
+   Base
+   --------------------------------------------------------------------------
+   Element defaults built from tokens. No class selectors in this file.
+   ========================================================================== */
+
+body {
+  background: var(--fl-canvas);
+  color: var(--fl-text);
+  font-family: var(--fl-font);
+  font-size: var(--fl-fs-base);
+  line-height: var(--fl-lh-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  min-block-size: 100dvh;
+}
+
+a {
+  color: var(--fl-chrome);
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+code,
+kbd,
+samp,
+pre {
+  font-family: var(--fl-mono);
+  font-size: 0.95em;
+}
+
+/* Focus
+   --------------------------------------------------------------------------
+   :focus-visible only, so a pointer user never sees a ring on click but a
+   keyboard user always does. The double outline (ring + offset in the canvas
+   colour) keeps the indicator visible against both a panel and a status-tinted
+   ground, which a single ring does not. */
+:focus-visible {
+  outline: 2px solid var(--fl-chrome);
+  outline-offset: 2px;
+  border-radius: var(--fl-r-chip);
+}
+
+/* A tinted selection reads as "selected" rather than "highlighted in a word
+   processor", and keeps monospace values legible while dragging across them. */
+::selection {
+  background: var(--fl-chrome-soft);
+  color: var(--fl-text);
+}
+
+/* Scrollbars inside dense panels. Thin, neutral, and only visible against the
+   surface they scroll. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--fl-line-strong) transparent;
+}
+
+/* View transitions
+   --------------------------------------------------------------------------
+   Opacity only, and brief. A cross-fade says "this screen replaced that one";
+   anything longer, or anything that slides, puts an animation between an
+   engineer and the measurement they navigated to look at.
+
+   The router already declines to start a transition under
+   prefers-reduced-motion, so this is belt-and-braces for a transition started
+   any other way. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--fl-dur-3);
+  animation-timing-function: var(--fl-ease);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+  }
+}
+
+/* Anything the user may need to compare down a column is tabular. Faultline is
+   full of latency figures stacked vertically; proportional digits make a 1 and
+   a 7 sit in different places and defeat the comparison the column exists for. */
+table,
+output,
+time,
+[data-num] {
+  font-variant-numeric: tabular-nums;
+}

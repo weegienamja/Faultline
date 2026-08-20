@@ -4,6 +4,7 @@ import { spawn } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { fetchStylesheet } from "./stylesheet-helper.mjs";
 
 // Flight Recorder HTTP surface, through a real server process.
 //
@@ -478,7 +479,7 @@ test("the recorder panel never pairs SIMULATED with a measured-locally claim", a
     assert.ok(branch.indexOf("Scenario source") < branch.indexOf("Measured locally"),
       "the simulated branch must come first, with measured as the else");
 
-    const css = await (await fetch(`${base}/design-system.css`)).text();
+    const css = await fetchStylesheet(base);
     assert.match(css, /\.fl-source\[data-kind="simulated"\]/, "the simulated source chip needs its own styling");
   });
 });

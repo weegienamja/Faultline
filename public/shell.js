@@ -80,7 +80,7 @@ export function panel({ label, title, meta = "", body, foot = "", status, flush 
     <header class="fl-panel-head">
       <div>
         ${label ? `<span class="fl-label">${escapeHtml(label)}</span>` : ""}
-        <h3 class="fl-panel-title">${escapeHtml(title)}</h3>
+        <h2 class="fl-panel-title">${escapeHtml(title)}</h2>
       </div>
       ${meta ? `<div class="fl-panel-head-actions">${meta}</div>` : ""}
     </header>
@@ -160,9 +160,34 @@ function routeFromHash() {
   return views.has(raw) ? raw : "overview";
 }
 
+/**
+ * Switch views, with a cross-fade where the browser can do one cheaply.
+ *
+ * Views are `display: none` siblings, so a switch is instantaneous and the
+ * whole screen changes at once — which reads as a flicker rather than as
+ * navigation. A short cross-fade says "this replaced that" without costing
+ * troubleshooting time.
+ *
+ * Three conditions, all of which must hold, or it falls straight through to
+ * the plain swap:
+ *   - the browser has the API at all;
+ *   - the user has not asked for reduced motion;
+ *   - this is not the first render (there is nothing to transition FROM, and
+ *     animating the initial paint would delay first contentful paint).
+ */
 function apply(name) {
   const view = views.get(name);
   if (!view || activeView === name) return;
+
+  const animate = activeView !== null
+    && typeof document.startViewTransition === "function"
+    && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  if (animate) document.startViewTransition(() => swap(name, view));
+  else swap(name, view);
+}
+
+function swap(name, view) {
   activeView = name;
 
   for (const [key, entry] of views) entry.node.classList.toggle("is-active", key === name);
@@ -238,4 +263,7 @@ export const auth = {
 
 document.addEventListener("click", event => {
   if (event.target.closest("[data-action='unlock']")) document.getElementById("auth-open")?.click();
+  // The rail's Explain entry drives the one Analyst toggle rather than owning a
+  // second copy of the drawer's open/close state.
+  if (event.target.closest("[data-opens='analyst']")) document.getElementById("analyst-toggle")?.click();
 });

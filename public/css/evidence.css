@@ -1,0 +1,543 @@
+/* ==========================================================================
+   Evidence visual language
+   --------------------------------------------------------------------------
+   The most important file in the stylesheet, and the reason it is the last
+   layer before utilities: nothing in `features` can weaken these rules by
+   accident, whatever selector it uses.
+
+   Faultline's backend maintains strict epistemic boundaries. A difference
+   between two windows is an association in time; a Bisect run is an
+   experiment; a scenario is a script; the Analyst is a guess. The interface
+   has to carry those distinctions as plainly as the data model does, because a
+   user who cannot tell them apart on screen has lost the property the whole
+   product is built to provide.
+
+   FIVE CLASSES, FOUR SIGNALS
+   --------------------------------------------------------------------------
+   Each class is separated by four independent signals, so no single failure —
+   colour blindness, a monochrome display, a screenshot, a printed capsule —
+   collapses two classes into one:
+
+     FRAME     border style and the inline-start rule
+     GROUND    surface, or a texture no other class has
+     GLYPH     a distinct mark
+     LABEL     a word, always present, never abbreviated to a colour
+
+                    frame             ground       glyph  weight
+     observed       solid, solid rule surface       ◉     normal
+     comparison     solid, dotted rule surface      ≠     normal
+     deterministic  solid, CHROME rule surface      ⊢     strong
+     experiment     solid, DOUBLE rule raised       ⑂     strongest
+     simulated      DASHED all round  HATCHED       ⟲     normal
+     interpret.     dashed, no rule   transparent   ~     quietest
+
+   `deterministic` and `experiment` are the two that are easiest to conflate,
+   and the two it matters most to keep apart. Both are Faultline's own
+   conclusions and both are reproducible, but only one of them established that
+   CHANGING a condition changes the outcome:
+
+     deterministic  observed measurements -> fixed rules -> fault domain
+     experiment     condition varied -> outcome measured -> discriminator
+
+   A rule engine reading a set of measurements has not run an experiment, and
+   must not borrow the visual language of one. The double rule is reserved.
+
+   The two that must never be mistaken for a measurement — simulated and
+   interpretation — are the two that are dashed. The hatch on simulated is a
+   texture, not a tint: it survives greyscale, it survives a screenshot, and
+   there is no measured surface anywhere in the product that carries it.
+
+   Authority runs in one direction only:
+     experiment  >  deterministic  >  observed  >  comparison  >  interpretation
+   and simulated sits outside that ordering entirely, because it is not
+   evidence about the user's network at all.
+   ========================================================================== */
+
+/* ==========================================================================
+   The provenance chip
+   --------------------------------------------------------------------------
+   Says where a value came from. Monospace and uppercase because it is a
+   classification, not prose. Present on every surface that displays a value
+   whose origin is not self-evident.
+   ========================================================================== */
+
+.fl-source,
+.fl-provenance {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border-radius: var(--fl-r-chip);
+  border: 1px solid var(--fl-line-strong);
+  background: var(--fl-surface-2);
+  color: var(--fl-text-3);
+  font-family: var(--fl-mono);
+  font-size: var(--fl-fs-micro);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  line-height: 1.6;
+
+  &::before {
+    content: var(--fl-ev-glyph, "");
+    font-size: 0.75em;
+    opacity: 0.9;
+  }
+}
+
+/* MEASURED / OBSERVED — a real reading from a real endpoint.
+   The plainest treatment in the product. Measurement is the default state of
+   the world here; it does not need decoration, and giving it any would leave
+   nothing quieter for the classes that must read as weaker. */
+.fl-source[data-kind="measured"],
+.fl-source[data-kind="observed"],
+.fl-provenance[data-evidence="observed"] {
+  --fl-ev-glyph: "\25C9";
+  color: var(--fl-text-2);
+  border-color: var(--fl-line-strong);
+}
+
+/* DETERMINISTIC COMPARISON — a fixed-rule difference between two observed
+   states. Association in time. Dotted edge: the two ends are real, the link
+   between them is not something Faultline claims. */
+.fl-source[data-kind="comparison"],
+.fl-provenance[data-evidence="comparison"] {
+  --fl-ev-glyph: "\2260";
+  color: var(--fl-text-2);
+  border-style: dotted;
+  border-color: var(--fl-line-strong);
+}
+
+/* DETERMINISTIC RULE FINDING — fixed rules over observed measurements. A real
+   Faultline conclusion, reproducible and explainable, but not an experiment.
+   The turnstile is the logic symbol for "derives", which is exactly what the
+   engine did. */
+.fl-source[data-kind="deterministic"],
+.fl-provenance[data-evidence="deterministic"] {
+  --fl-ev-glyph: "\22A2";
+  color: var(--fl-chrome);
+  border-color: var(--fl-chrome-line);
+  background: transparent;
+}
+
+/* DETERMINISTIC EXPERIMENT — Faultline varied a condition and measured the
+   outcome. The filled chrome ground and the heavier weight are reserved for
+   this, the strongest claim the product makes. */
+.fl-source[data-kind="experiment"],
+.fl-provenance[data-evidence="experiment"] {
+  --fl-ev-glyph: "\2442";
+  color: var(--fl-chrome);
+  border-color: var(--fl-chrome-line);
+  background: var(--fl-chrome-soft);
+  font-weight: 600;
+}
+
+/* SIMULATED — scripted from a scenario. Never a measurement of any network.
+   Dashed and amber, and the block it labels carries a hatch. */
+.fl-source[data-kind="simulated"],
+.fl-provenance[data-evidence="simulated"] {
+  --fl-ev-glyph: "\27F2";
+  color: var(--fl-warn);
+  border-color: var(--fl-warn-line);
+  background: var(--fl-warn-soft);
+  border-style: dashed;
+  font-weight: 600;
+}
+
+/* INTERPRETATION — Analyst. Deliberately the quietest chip in the product. */
+.fl-source[data-kind="interpretation"],
+.fl-provenance[data-evidence="interpretation"] {
+  --fl-ev-glyph: "~";
+  color: var(--fl-text-3);
+  border-color: var(--fl-idle-line);
+  background: transparent;
+  border-style: dashed;
+}
+
+/* INFERRED — derived from local adapter/neighbour state rather than measured
+   end to end. Real input, derived conclusion. */
+.fl-source[data-kind="inferred"] {
+  --fl-ev-glyph: "\25CC";
+  color: var(--fl-warn);
+  border-color: var(--fl-warn-line);
+  background: var(--fl-warn-soft);
+}
+
+/* EXTERNAL — a third-party vantage point. Measured, but not by this endpoint,
+   so it answers a different question from a local reading. */
+.fl-source[data-kind="external"] {
+  --fl-ev-glyph: "\29BF";
+  color: var(--fl-chrome);
+  border-color: var(--fl-chrome-line);
+  background: var(--fl-chrome-soft);
+}
+
+.fl-source[data-kind="demo"] {
+  --fl-ev-glyph: "\25CB";
+  border-style: dashed;
+  color: var(--fl-text-3);
+  background: transparent;
+}
+
+/* --------------------------------------------------------------------------
+   Live Diagnostics source badges
+   --------------------------------------------------------------------------
+   The live panel names its source with `src-badge src-<kind>` rather than the
+   `fl-source` chip, because it predates it. Rather than keep a parallel set of
+   colours for the same idea — which is what it had, including its own amber and
+   its own periwinkle — each kind is mapped onto the evidence class it actually
+   belongs to. One vocabulary, expressed twice in markup.
+   -------------------------------------------------------------------------- */
+
+.src-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border-radius: var(--fl-r-chip);
+  border: 1px solid var(--fl-line-strong);
+  background: var(--fl-surface-2);
+  color: var(--fl-text-3);
+  font-family: var(--fl-mono);
+  font-size: var(--fl-fs-micro);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  line-height: 1.6;
+  max-inline-size: 100%;
+  overflow-wrap: anywhere;
+
+  &::before {
+    content: var(--fl-ev-glyph, "");
+    font-size: 0.75em;
+    opacity: 0.9;
+  }
+}
+
+/* Measured here, on this machine. */
+.src-live,
+.src-local {
+  --fl-ev-glyph: "\25C9";
+  color: var(--fl-text-2);
+}
+
+/* Faultline's own rule engine. A derivation, not an experiment — Live
+   Diagnostics does not vary conditions, so it does not get the experiment
+   chip's filled ground. */
+.src-deterministic {
+  --fl-ev-glyph: "\22A2";
+  color: var(--fl-chrome);
+  border-color: var(--fl-chrome-line);
+  background: transparent;
+}
+
+/* Measured, but from somebody else's vantage point — a different question from
+   a local reading, so it never shares the local treatment. */
+.src-ripestat,
+.src-globalping,
+.src-atlas,
+.src-ioda,
+.src-peeringdb,
+.src-radar {
+  --fl-ev-glyph: "\29BF";
+  color: var(--fl-chrome);
+  border-color: var(--fl-chrome-line);
+  background: var(--fl-chrome-soft);
+}
+
+.src-inferred {
+  --fl-ev-glyph: "\25CC";
+  color: var(--fl-warn);
+  border-color: var(--fl-warn-line);
+  background: var(--fl-warn-soft);
+}
+
+.src-demo {
+  --fl-ev-glyph: "\25CB";
+  border-style: dashed;
+  color: var(--fl-text-3);
+  background: transparent;
+}
+
+/* ==========================================================================
+   Evidence blocks
+   --------------------------------------------------------------------------
+   A region of the interface whose whole contents belong to one evidence class.
+   `data-evidence` on the container is the single switch.
+   ========================================================================== */
+
+.fl-evidence {
+  --fl-ev-tone: var(--fl-text-2);
+  --fl-ev-rule: var(--fl-line-strong);
+
+  border: 1px solid var(--fl-line);
+  border-inline-start: 2px solid var(--fl-ev-rule);
+  border-radius: var(--fl-r-control);
+  padding: var(--fl-s3);
+  background: var(--fl-surface);
+  min-inline-size: 0;
+}
+
+.fl-evidence-head {
+  display: flex;
+  align-items: center;
+  gap: var(--fl-s2);
+  flex-wrap: wrap;
+  margin-block-end: var(--fl-s2);
+}
+
+.fl-evidence-title {
+  font-size: var(--fl-fs-sm);
+  font-weight: 600;
+  color: var(--fl-text);
+  margin: 0;
+}
+
+/* The caveat line. Every class that is not a plain measurement states its own
+   limit in words, in the block, every time — not in a legend elsewhere on the
+   page that the user has to go and find. */
+.fl-evidence-caveat {
+  font-size: var(--fl-fs-micro);
+  color: var(--fl-text-3);
+  line-height: var(--fl-lh-body);
+  margin-block-start: var(--fl-s2);
+}
+
+/* --- observed ------------------------------------------------------------ */
+.fl-evidence[data-evidence="observed"] {
+  --fl-ev-rule: var(--fl-text-3);
+}
+
+/* --- deterministic comparison -------------------------------------------- */
+/* The dotted rule is the visual statement that this is an association. */
+.fl-evidence[data-evidence="comparison"] {
+  --fl-ev-rule: var(--fl-text-3);
+
+  border-inline-start-style: dotted;
+  border-inline-start-width: 3px;
+}
+
+/* --- deterministic rule finding ------------------------------------------- */
+/* Authoritative: a solid rule in the product's own colour. Distinct from
+   interpretation (which has no rule at all) and from an experiment (which
+   doubles the rule and lifts the ground). Faultline stands behind this; it just
+   did not vary anything to get it. */
+.fl-evidence[data-evidence="deterministic"] {
+  --fl-ev-tone: var(--fl-chrome);
+  --fl-ev-rule: var(--fl-chrome);
+
+  border-inline-start-width: 3px;
+
+  & .fl-evidence-title {
+    color: var(--fl-text);
+  }
+}
+
+/* --- deterministic experiment -------------------------------------------- */
+/* The one block in the product that is allowed to look authoritative: raised
+   ground, the product's colour, and a doubled inline-start rule that nothing
+   else uses. */
+.fl-evidence[data-evidence="experiment"] {
+  --fl-ev-tone: var(--fl-chrome);
+  --fl-ev-rule: var(--fl-chrome);
+
+  background: var(--fl-surface-2);
+  border-color: var(--fl-chrome-line);
+  border-inline-start-style: double;
+  border-inline-start-width: 4px;
+
+  & .fl-evidence-title {
+    color: var(--fl-text);
+  }
+}
+
+/* --- simulated ----------------------------------------------------------- */
+/* Dashed on every edge, and a diagonal hatch no measured surface has. The
+   hatch is the signal that survives greyscale, a screenshot and a printout,
+   which is exactly the set of places where a scenario could otherwise be
+   mistaken for a capture of someone's real network. */
+.fl-evidence[data-evidence="simulated"] {
+  --fl-ev-tone: var(--fl-warn);
+  --fl-ev-rule: var(--fl-warn);
+
+  border: 1px dashed var(--fl-warn-line);
+  border-inline-start: 3px dashed var(--fl-warn);
+  background:
+    repeating-linear-gradient(
+      135deg,
+      transparent 0 6px,
+      color-mix(in oklab, var(--fl-warn) 7%, transparent) 6px 7px
+    ),
+    var(--fl-surface);
+
+  & .fl-evidence-title {
+    color: var(--fl-warn);
+  }
+}
+
+/* --- interpretation ------------------------------------------------------ */
+/* No inline-start rule at all — the rule is what says "Faultline asserts
+   this", and the Analyst does not. Transparent ground so it reads as a note
+   written on the page rather than a panel the product is standing behind. */
+.fl-evidence[data-evidence="interpretation"] {
+  --fl-ev-tone: var(--fl-text-3);
+
+  border: 1px dashed var(--fl-idle-line);
+  border-inline-start: 1px dashed var(--fl-idle-line);
+  background: transparent;
+
+  & .fl-evidence-title {
+    color: var(--fl-text-2);
+    font-weight: 550;
+  }
+
+  /* Body text one step quieter than a finding's. Interpretation should be
+     readable and useful; it should never be the loudest thing on screen. */
+  & p {
+    color: var(--fl-text-3);
+  }
+}
+
+/* ==========================================================================
+   Group-level contamination marking
+   --------------------------------------------------------------------------
+   `:has()` earns its place here. A panel that contains any simulated evidence
+   must say so at its own header, or a user who scrolled past the banner reads
+   scripted numbers as measurements. Previously this required each panel module
+   to walk its own contents and set a class on the way up; now the relationship
+   is declared once, where it is true.
+   ========================================================================== */
+
+.fl-panel:has([data-evidence="simulated"]) > .fl-panel-head::after,
+.fl-panel:has(.fl-source[data-kind="simulated"]) > .fl-panel-head::after {
+  content: "SIMULATED";
+  margin-inline-start: auto;
+  font-family: var(--fl-mono);
+  font-size: var(--fl-fs-micro);
+  letter-spacing: 0.08em;
+  color: var(--fl-warn);
+  border: 1px dashed var(--fl-warn-line);
+  border-radius: var(--fl-r-chip);
+  padding: 1px 6px;
+  flex: 0 0 auto;
+}
+
+/* A panel whose header already carries its own actions must not have the
+   marker shove them around; it goes after them instead. */
+.fl-panel:has([data-evidence="simulated"]) > .fl-panel-head:has(.fl-panel-head-actions)::after {
+  margin-inline-start: 0;
+}
+
+/* An evidence set that mixes a scripted item into otherwise measured ones is
+   the single most dangerous state this interface can be in. The whole group
+   takes the dashed warn edge so the mixture is visible before any individual
+   row is read. */
+.fl-evidence-set:has([data-evidence="simulated"]) {
+  border-inline-start: 3px dashed var(--fl-warn);
+  padding-inline-start: var(--fl-s3);
+}
+
+.fl-evidence-set {
+  display: grid;
+  gap: var(--fl-s2);
+  min-inline-size: 0;
+}
+
+/* ==========================================================================
+   Authority ordering in prose
+   --------------------------------------------------------------------------
+   Where a conclusion is stated as a sentence rather than a block.
+   ========================================================================== */
+
+.fl-claim {
+  font-size: var(--fl-fs-base);
+  line-height: var(--fl-lh-body);
+  color: var(--fl-text);
+  margin: 0;
+
+  /* A deterministic conclusion is stated flatly and carries weight. */
+  &[data-evidence="experiment"],
+  &[data-evidence="deterministic"] {
+    font-weight: 600;
+  }
+
+  /* An interpretation is a sentence someone offered, and reads like one. */
+  &[data-evidence="interpretation"] {
+    font-weight: 400;
+    color: var(--fl-text-2);
+  }
+}
+
+/* ==========================================================================
+   Analyst surfaces
+   --------------------------------------------------------------------------
+   The Analyst drawer's blocks are evidence-classed like everything else, so
+   the boundary between a Faultline finding it is quoting and its own reading
+   of that finding is drawn by the same system that draws it everywhere else.
+   ========================================================================== */
+
+.fl-analyst-block {
+  border: 1px solid var(--fl-line);
+  border-radius: var(--fl-r-control);
+  padding: var(--fl-s2) var(--fl-s3);
+  min-inline-size: 0;
+
+  & > .fl-label {
+    display: block;
+    margin-block-end: var(--fl-s2);
+  }
+}
+
+/* A finding the Analyst is quoting is Faultline's, and looks like Faultline's. */
+.fl-analyst-block[data-kind="finding"] {
+  border-color: var(--fl-line-strong);
+  border-inline-start: 2px solid var(--fl-text-3);
+  background: var(--fl-surface);
+
+  & > .fl-label {
+    color: var(--fl-text-2);
+  }
+}
+
+/* The Analyst's own reading. Dashed, unsaturated, no rule. */
+.fl-analyst-block[data-kind="interpretation"] {
+  border-style: dashed;
+  border-color: var(--fl-idle-line);
+  background: transparent;
+
+  & > .fl-label {
+    color: var(--fl-text-3);
+  }
+}
+
+/* Evidence citations. Interactive, so they take the chrome colour — but they
+   are references TO evidence, not evidence, and stay chip-sized. */
+.fl-ref {
+  font-family: var(--fl-mono);
+  font-size: var(--fl-fs-micro);
+  letter-spacing: 0.04em;
+  padding: 1px 5px;
+  border-radius: var(--fl-r-chip);
+  border: 1px solid var(--fl-chrome-line);
+  background: var(--fl-chrome-soft);
+  color: var(--fl-chrome);
+  cursor: pointer;
+  line-height: 1.6;
+
+  &:hover:not(:disabled) {
+    background: color-mix(in oklab, var(--fl-chrome) 20%, transparent);
+  }
+
+  &:disabled {
+    cursor: default;
+    border-color: var(--fl-idle-line);
+    background: transparent;
+    color: var(--fl-text-3);
+  }
+}
+
+.fl-refs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fl-s1);
+  margin-block-start: var(--fl-s1);
+}

@@ -4,6 +4,7 @@ import { spawn } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { fetchStylesheet } from "./stylesheet-helper.mjs";
 
 // Analyst HTTP surface, exercised through a real server process.
 //
@@ -276,7 +277,7 @@ test("the routed dashboard loads the Analyst drawer assets", async () => {
     assert.equal(module.status, 200);
     assert.match(module.headers.get("content-type") || "", /javascript/);
 
-    const css = await (await fetch(`${base}/design-system.css`)).text();
+    const css = await fetchStylesheet(base);
     assert.ok(css.includes(".fl-analyst"), "drawer styles should ship in the design system");
   });
 });

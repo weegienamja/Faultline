@@ -5,8 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="Faultline captures evidence for transient network faults, isolates the condition responsible, and preserves the result as a portable evidence package." />
   <title>Overview · Faultline</title>
-  <link rel="stylesheet" href="/design-system.css" />
-  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/css/faultline.css" />
 </head>
 <body>
   <div class="fl-app">
@@ -39,6 +38,21 @@
           <span class="fl-nav-group-label">Isolate</span>
           <a class="fl-nav-item" href="#/bisect"><span class="fl-nav-icon" aria-hidden="true">⑂</span><span>Network Bisect</span></a>
           <a class="fl-nav-item" href="#/topology"><span class="fl-nav-icon" aria-hidden="true">◇</span><span>Topology &amp; Paths</span></a>
+        </div>
+
+        <!-- EXPLAIN is a capability of the product and belongs in the model the
+             rail teaches, so all four verbs read without opening the README.
+             It is the one entry that opens a drawer rather than a destination,
+             because the Analyst is meant to be read ALONGSIDE evidence rather
+             than instead of it. Being findable is not the same as being
+             authoritative: its epistemic rank is carried by the evidence-class
+             styling of what it produces, not by hiding it from navigation. -->
+        <div class="fl-nav-group">
+          <span class="fl-nav-group-label">Explain</span>
+          <button class="fl-nav-item" type="button" data-opens="analyst"
+                  aria-controls="analyst-drawer" aria-expanded="false">
+            <span class="fl-nav-icon" aria-hidden="true">◈</span><span>Faultline Analyst</span>
+          </button>
         </div>
 
         <div class="fl-nav-group">
@@ -86,13 +100,13 @@
 
           <div class="fl-tiles" id="overview-tiles"></div>
 
-          <div class="fl-grid" style="margin-top:12px">
-            <div class="fl-col-8">
+          <div class="fl-split fl-mt-3">
+            <div>
               <section class="fl-panel" data-status="idle" id="diagnosis-panel">
                 <header class="fl-panel-head">
                   <div>
                     <span class="fl-label">Likely fault domain</span>
-                    <h3 class="fl-panel-title" id="fault-domain">Loading…</h3>
+                    <h2 class="fl-panel-title" id="fault-domain">Loading…</h2>
                   </div>
                   <div class="fl-panel-head-actions">
                     <span class="fl-meta">Confidence</span>
@@ -112,7 +126,7 @@
                 <header class="fl-panel-head">
                   <div>
                     <span class="fl-label">Fault isolation</span>
-                    <h3 class="fl-panel-title">Path health</h3>
+                    <h2 class="fl-panel-title">Path health</h2>
                   </div>
                   <div class="fl-panel-head-actions">
                     <span class="fl-source" data-kind="measured">Measured</span>
@@ -124,12 +138,12 @@
               </section>
             </div>
 
-            <div class="fl-col-4">
+            <div>
               <section class="fl-panel">
                 <header class="fl-panel-head">
                   <div>
                     <span class="fl-label">Incident context</span>
-                    <h3 class="fl-panel-title" id="incident-title">Loading…</h3>
+                    <h2 class="fl-panel-title" id="incident-title">Loading…</h2>
                   </div>
                   <div class="fl-panel-head-actions">
                     <span class="fl-badge" id="incident-status" data-status="idle">Loading</span>
@@ -153,7 +167,7 @@
                 <header class="fl-panel-head">
                   <div>
                     <span class="fl-label">Next best action</span>
-                    <h3 class="fl-panel-title">Recommended actions</h3>
+                    <h2 class="fl-panel-title">Recommended actions</h2>
                   </div>
                 </header>
                 <div class="fl-panel-body">
@@ -167,7 +181,7 @@
             <header class="fl-panel-head">
               <div>
                 <span class="fl-label">Why Faultline reached this conclusion</span>
-                <h3 class="fl-panel-title">Supporting evidence</h3>
+                <h2 class="fl-panel-title">Supporting evidence</h2>
               </div>
               <div class="fl-panel-head-actions">
                 <a class="fl-btn fl-btn-sm" href="#/evidence">Open evidence</a>
@@ -182,14 +196,14 @@
             <header class="fl-panel-head">
               <div>
                 <span class="fl-label">Reference incidents</span>
-                <h3 class="fl-panel-title">Worked examples</h3>
+                <h2 class="fl-panel-title">Worked examples</h2>
               </div>
               <div class="fl-panel-head-actions">
                 <span class="fl-source" data-kind="demo">Sample data</span>
               </div>
             </header>
             <div class="fl-panel-body">
-              <p class="fl-body fl-prose" style="margin-bottom:12px">
+              <p class="fl-body fl-prose fl-mb-3">
                 Fixed reference incidents covering known failure classes. Selecting one loads it into
                 the analysis above so the reasoning can be inspected without an active fault.
                 Real measurements come from Live Diagnostics.
@@ -236,7 +250,7 @@
             <header class="fl-panel-head">
               <div>
                 <span class="fl-label">Inferred local topology</span>
-                <h3 class="fl-panel-title">Network map</h3>
+                <h2 class="fl-panel-title">Network map</h2>
               </div>
               <div class="fl-panel-head-actions">
                 <span class="fl-badge" id="topology-kind" data-status="idle">unknown</span>
@@ -244,7 +258,7 @@
               </div>
             </header>
             <div class="fl-panel-body">
-              <p class="fl-body fl-prose" id="topology-summary" style="margin-bottom:12px"></p>
+              <p class="fl-body fl-prose fl-mb-3" id="topology-summary"></p>
               <div class="topology-canvas" id="topology-canvas" aria-label="Interactive inferred network topology"></div>
               <div class="topology-legend">
                 <span><i class="legend-line"></i> observed relationship</span>
@@ -260,7 +274,7 @@
             <header class="fl-panel-head">
               <div>
                 <span class="fl-label">Endpoint observation</span>
-                <h3 class="fl-panel-title">Observed route</h3>
+                <h2 class="fl-panel-title">Observed route</h2>
               </div>
               <div class="fl-panel-head-actions">
                 <span class="fl-source" data-kind="measured">ICMP</span>
@@ -345,7 +359,7 @@
             <header class="fl-panel-head">
               <div>
                 <span class="fl-label">Registered vantage points</span>
-                <h3 class="fl-panel-title">Fleet health</h3>
+                <h2 class="fl-panel-title">Fleet health</h2>
               </div>
               <div class="fl-panel-head-actions">
                 <span class="fl-source" data-kind="measured">Heartbeat</span>
@@ -363,7 +377,7 @@
 
       </div>
 
-      <footer class="fl-content" style="padding-top:0">
+      <footer class="fl-content fl-foot">
         <p class="fl-meta">Faultline v1.5 preview · Capture, isolate and preserve network fault evidence · Evidence before escalation.</p>
       </footer>
     </main>
@@ -387,7 +401,7 @@
     <form id="auth-form">
       <div class="fl-dialog-head">
         <span class="fl-label">Control plane</span>
-        <h2 class="fl-panel-title" style="margin-top:4px">Unlock live data</h2>
+        <h2 class="fl-panel-title fl-mt-1">Unlock live data</h2>
       </div>
       <div class="fl-dialog-body">
         <p class="fl-body">
@@ -412,7 +426,7 @@
     <form id="invite-form">
       <div class="fl-dialog-head">
         <span class="fl-label">One-time endpoint diagnostic</span>
-        <h2 class="fl-panel-title" style="margin-top:4px">Create diagnostic invitation</h2>
+        <h2 class="fl-panel-title fl-mt-1">Create diagnostic invitation</h2>
       </div>
       <div class="fl-dialog-body">
         <p class="fl-body">

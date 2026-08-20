@@ -1,0 +1,73 @@
+/* ==========================================================================
+   Reset
+   --------------------------------------------------------------------------
+   Deliberately small. This is an application, not a document site, so the
+   only UA defaults worth normalising are the ones that cause layout surprises.
+   ========================================================================== */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Flex and grid children default to min-content width, which is what makes a
+   long IPv6 address or a 63-character hostname push a whole dashboard column
+   wider than its track. Faultline displays both routinely. */
+* {
+  min-width: 0;
+}
+
+body,
+h1, h2, h3, h4, h5, h6,
+p, figure, blockquote, dl, dd {
+  margin: 0;
+}
+
+ul[class],
+ol[class] {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+img,
+svg {
+  display: block;
+  max-inline-size: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+/* `[hidden]` is applied by the panel modules to toggle whole surfaces. It has
+   to beat the display value of whatever primitive it lands on, and there is no
+   selector-based way to do that generically. */
+[hidden] {
+  display: none !important;
+}
+
+/* Motion is opt-in. Everything animated in this product is either a state echo
+   or a continuity cue; none of it carries information, so all of it can go.
+   Together with the rule above these are the only !important declarations in
+   the stylesheet, and both are here in the lowest layer — the two that existed
+   purely to win a specificity fight (in diagnose.html) are gone. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -119,8 +119,8 @@ function renderChange() {
   ];
 
   host.innerHTML = `
-    <div class="fl-grid">
-      <div class="fl-col-7">
+    <div class="fl-split">
+      <div>
         ${panel({
           label: "Workflow",
           title: "Pre-change / post-change comparison",
@@ -130,7 +130,7 @@ function renderChange() {
           foot: `<span>A worsening measurement is reported as a regression <em>candidate</em>, never as proof of causation.</span>`
         })}
       </div>
-      <div class="fl-col-5">
+      <div>
         ${panel({
           label: "Interface",
           title: "Driving the workflow",
@@ -157,8 +157,8 @@ function renderEnvironment() {
   host.dataset.rendered = "1";
 
   host.innerHTML = `
-    <div class="fl-grid">
-      <div class="fl-col-7">
+    <div class="fl-split">
+      <div>
         ${panel({
           label: "Scope",
           title: "Environment manifest",
@@ -168,13 +168,13 @@ function renderEnvironment() {
               With one loaded, results are reported against your environment rather than a single
               hostname typed into a box.
             </p>
-            <div class="fl-state-actions" style="justify-content:flex-start;margin-top:16px">
+            <div class="fl-state-actions fl-state-actions-start">
               <button class="fl-btn fl-btn-primary" data-goto="live" data-live-mode="environment">Open manifest editor</button>
             </div>`,
           foot: `<span>Private addresses, local hostnames, MACs, SSIDs and VPN routes are never transmitted off this machine.</span>`
         })}
       </div>
-      <div class="fl-col-5">
+      <div>
         ${panel({
           label: "Targets",
           title: "What belongs in a manifest",
@@ -209,25 +209,25 @@ function renderSettings() {
   host.dataset.rendered = "1";
 
   host.innerHTML = `
-    <div class="fl-grid">
-      <div class="fl-col-7">
+    <div class="fl-split">
+      <div>
         ${panel({
           label: "Data sources",
           title: "Where evidence comes from",
           flush: true,
-          body: `<div class="fl-table-wrap"><table class="fl-table">
+          body: `<div class="fl-table-wrap"><table class="fl-table" data-stack>
             <thead><tr><th>Source</th><th>Provides</th><th>Credential</th><th>Class</th></tr></thead>
             <tbody>${SOURCES.map(([name, provides, cred, kind]) => `<tr>
-              <td>${name}</td>
-              <td>${provides}</td>
-              <td>${cred === "none" ? badge("None", "ok") : badge("Token", "warn")}</td>
-              <td>${source(kind, kind === "measured" ? "Measured" : "External")}</td>
+              <td data-label="Source">${name}</td>
+              <td data-label="Provides">${provides}</td>
+              <td data-label="Credential">${cred === "none" ? badge("None", "ok") : badge("Token", "warn")}</td>
+              <td data-label="Class">${source(kind, kind === "measured" ? "Measured" : "External")}</td>
             </tr>`).join("")}</tbody>
           </table></div>`,
           foot: `<span>External context is supporting evidence. The deterministic engine is the only thing that decides a fault domain.</span>`
         })}
       </div>
-      <div class="fl-col-5">
+      <div>
         ${panel({
           label: "Access",
           title: "Credentials in this session",
@@ -237,7 +237,7 @@ function renderSettings() {
               <div><dt>Storage</dt><dd>this browser tab only</dd></div>
               <div><dt>Persisted</dt><dd>never</dd></div>
             </dl>
-            <p class="fl-body" style="margin-top:12px">
+            <p class="fl-body fl-mt-3">
               SDK credentials belong in the support application's backend. The end-user widget only ever
               receives a one-time invitation URL.
             </p>`
@@ -246,7 +246,7 @@ function renderSettings() {
           label: "Reasoning",
           title: "Diagnosis policy",
           body: `<p class="fl-body">Faultline does not use an AI or LLM API anywhere in diagnosis. Every conclusion comes from deterministic rules over observed measurements and is traceable to the evidence that produced it.</p>
-            <p class="fl-body" style="margin-top:10px">The optional Faultline Analyst explains that evidence in natural language. It runs locally, reads through read-only tools, and produces no findings of its own.</p>`
+            <p class="fl-body fl-mt-3">The optional Faultline Analyst explains that evidence in natural language. It runs locally, reads through read-only tools, and produces no findings of its own.</p>`
         })}
         ${panel({
           label: "Inference",
@@ -260,7 +260,7 @@ function renderSettings() {
               <div><dt>Cloud inference</dt><dd>${badge("Never", "ok")}</dd></div>
               <div><dt>Conversations</dt><dd>not persisted</dd></div>
             </dl>
-            <p class="fl-body" style="margin-top:12px">
+            <p class="fl-body fl-mt-3">
               Optional. Faultline's measurement and diagnosis work identically without it.
             </p>`
         })}

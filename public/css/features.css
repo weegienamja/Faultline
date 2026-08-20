@@ -1,0 +1,2249 @@
+/* ==========================================================================
+   Feature surfaces
+   --------------------------------------------------------------------------
+   Styling specific to one product surface. Everything here used to live in one
+   of five places: styles.css, a `<style>` element injected into <head> by
+   live-panel.js, another by cases-panel.js, another by intelligence-panel.js,
+   and another by bisect-panel.js.
+
+   Those injected sheets landed in the document AFTER the linked stylesheet, so
+   they won on source order, and the fix at the time was a block of
+   `body .thing` selectors in styles.css to take the specificity back. Moving
+   them into a cascade layer removes both the injection and the counter-attack:
+   an unlayered injected rule beats every layer, a layered one obeys the order
+   declared in faultline.css.
+
+   Class names are unchanged. The panel modules render these names and none of
+   them had to be touched to re-home their styles.
+   ========================================================================== */
+
+/* ==========================================================================
+   Legacy compatibility aliases
+   --------------------------------------------------------------------------
+   Kept only for the surfaces that still render these names. Each maps onto a
+   primitive rather than reimplementing one.
+   ========================================================================== */
+
+.panel {
+  background: var(--fl-surface);
+  border: 1px solid var(--fl-line);
+  border-radius: var(--fl-r-card);
+  box-shadow: var(--fl-shadow-raised);
+  padding: var(--fl-pad-panel);
+  min-inline-size: 0;
+  container: fl-panel / inline-size;
+
+  & + .panel {
+    margin-block-start: var(--fl-s3);
+  }
+}
+
+.section-label,
+.eyebrow {
+  display: block;
+  font-size: var(--fl-fs-micro);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fl-text-3);
+}
+
+.primary-button,
+.secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--fl-s2);
+  block-size: var(--fl-control-h);
+  padding-inline: var(--fl-s3);
+  border: 1px solid var(--fl-line-strong);
+  border-radius: var(--fl-r-control);
+  background: var(--fl-surface-2);
+  color: var(--fl-text);
+  font-size: var(--fl-fs-sm);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}
+
+.primary-button {
+  background: var(--fl-chrome);
+  border-color: var(--fl-chrome);
+  color: var(--fl-text-ink);
+  font-weight: 650;
+
+  &:hover:not(:disabled) {
+    background: var(--fl-chrome-hi);
+    text-decoration: none;
+  }
+}
+
+.secondary-button:hover:not(:disabled) {
+  background: var(--fl-surface-3);
+  text-decoration: none;
+}
+
+.fatal {
+  padding: var(--fl-s8);
+  color: var(--fl-text);
+}
+
+/* ==========================================================================
+   Overview
+   ========================================================================== */
+
+/* Confidence: sized as a control, not a hero graphic. It reports one number
+   that is not the headline. */
+.confidence-ring {
+  inline-size: 2.5rem;
+  block-size: 2.5rem;
+  flex: 0 0 2.5rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle, var(--fl-surface) 62%, transparent 63%),
+    conic-gradient(var(--fl-chrome) var(--confidence, 0%), var(--fl-line) 0);
+
+  & strong {
+    font-size: var(--fl-fs-micro);
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* The endpoint-to-target walk. Five stages when there is room; wraps to a grid
+   of whatever fits when there is not, which keeps every stage visible instead
+   of dropping the last two. */
+.path {
+  display: grid;
+  gap: var(--fl-s2);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 7.5rem), 1fr));
+}
+
+.path-node {
+  min-inline-size: 0;
+  border: 1px solid var(--fl-line);
+  border-block-start: 2px solid var(--fl-idle);
+  border-radius: var(--fl-r-control);
+  padding: var(--fl-s2) var(--fl-s3);
+  background: var(--fl-surface-2);
+
+  & small {
+    display: block;
+    font-size: var(--fl-fs-micro);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--fl-text-3);
+    margin-block-end: 3px;
+  }
+
+  & strong {
+    display: block;
+    font-size: var(--fl-fs-sm);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &.pass { border-block-start-color: var(--fl-ok); }
+  &.warn { border-block-start-color: var(--fl-warn); }
+
+  &.fail {
+    border-block-start-color: var(--fl-crit);
+
+    & strong {
+      color: var(--fl-crit);
+    }
+  }
+}
+
+.metric-grid {
+  display: grid;
+  gap: var(--fl-s2);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr));
+}
+
+.metric {
+  border: 1px solid var(--fl-line);
+  border-radius: var(--fl-r-control);
+  padding: var(--fl-s3);
+  background: var(--fl-surface-2);
+  min-inline-size: 0;
+
+  & > span {
+    display: block;
+    font-size: var(--fl-fs-micro);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--fl-text-3);
+    margin-block-end: 5px;
+  }
+
+  & strong {
+    font-size: 1.25rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  /* The state word sits on its own line under the value. Inline, it ran
+     straight on after the number for short values and wrapped for long ones,
+     so the row read differently depending on the measurement. */
+  & em {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-style: normal;
+    margin-block-start: 6px;
+    font-size: var(--fl-fs-micro);
+    color: var(--fl-text-3);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+
+    &::before {
+      content: "";
+      inline-size: 6px;
+      block-size: 6px;
+      border-radius: 50%;
+      background: var(--fl-ok);
+    }
+  }
+
+  &.warn {
+    & em { color: var(--fl-warn); }
+    & em::before { background: var(--fl-warn); }
+  }
+
+  &.fail {
+    & strong { color: var(--fl-crit); }
+    & em { color: var(--fl-crit); }
+    & em::before { background: var(--fl-crit); }
+  }
+
+  &.neutral {
+    & strong { color: var(--fl-text-3); }
+    & em { color: var(--fl-text-3); }
+    & em::before { background: var(--fl-idle); }
+  }
+}
+
+.evidence-list {
+  display: grid;
+}
+
+.evidence-row {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr);
+  gap: var(--fl-s1) var(--fl-s3);
+  align-items: baseline;
+  padding-block: var(--fl-s3);
+  border-block-start: 1px solid var(--fl-line-soft);
+  font-size: var(--fl-fs-sm);
+
+  &:first-child {
+    border-block-start: 0;
+  }
+
+  & strong {
+    font-size: var(--fl-fs-sm);
+    font-weight: 550;
+  }
+
+  & p {
+    margin: 0;
+    grid-column: 2;
+    color: var(--fl-text-3);
+    line-height: 1.5;
+    font-size: var(--fl-fs-micro);
+  }
+
+  &.warn .evidence-dot { background: var(--fl-warn); }
+  &.fail .evidence-dot { background: var(--fl-crit); }
+}
+
+/* Wide enough for the four-track layout the row was designed for. Narrow, it
+   is the same four values stacked — nothing is dropped. */
+@container fl-panel (inline-size > 34rem) {
+  .evidence-row {
+    grid-template-columns: 8px 10rem minmax(0, 1fr) auto;
+    align-items: center;
+
+    & p {
+      grid-column: 3;
+    }
+  }
+}
+
+.evidence-dot {
+  inline-size: 7px;
+  block-size: 7px;
+  border-radius: 50%;
+  background: var(--fl-ok);
+  align-self: center;
+}
+
+.evidence-value {
+  color: var(--fl-text);
+  font-family: var(--fl-mono);
+  font-size: var(--fl-fs-micro);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.action-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  counter-reset: actions;
+
+  & li {
+    counter-increment: actions;
+    display: grid;
+    grid-template-columns: 1.375rem minmax(0, 1fr);
+    gap: var(--fl-s3);
+    align-items: start;
+    padding-block: var(--fl-s3);
+    border-block-start: 1px solid var(--fl-line-soft);
+    color: var(--fl-text-2);
+    font-size: var(--fl-fs-sm);
+    line-height: 1.5;
+
+    &:first-child {
+      border-block-start: 0;
+    }
+
+    &::before {
+      content: counter(actions);
+      inline-size: 1.375rem;
+      block-size: 1.375rem;
+      border: 1px solid var(--fl-line-strong);
+      color: var(--fl-text-3);
+      border-radius: var(--fl-r-chip);
+      display: grid;
+      place-items: center;
+      font-family: var(--fl-mono);
+      font-size: var(--fl-fs-micro);
+    }
+  }
+}
+
+.incident-strip {
+  display: grid;
+  gap: var(--fl-s2);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+}
+
+.incident-chip {
+  text-align: start;
+  border: 1px solid var(--fl-line);
+  border-inline-start: 2px solid var(--fl-line-strong);
+  background: var(--fl-surface-2);
+  border-radius: var(--fl-r-control);
+  padding: var(--fl-s2) var(--fl-s3);
+  color: var(--fl-text-2);
+  min-inline-size: 0;
+
+  &:hover {
+    background: var(--fl-surface-3);
+    color: var(--fl-text);
+  }
+
+  &.active {
+    border-inline-start-color: var(--fl-chrome);
+    background: var(--fl-chrome-soft);
+    color: var(--fl-text);
+  }
+
+  & span {
+    display: block;
+    font-size: var(--fl-fs-micro);
+    color: var(--fl-text-3);
+    margin-block-end: 3px;
+    letter-spacing: 0.04em;
+  }
+
+  & strong {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--fl-fs-sm);
+    font-weight: 550;
+  }
+}
+
+.source-live {
+  font-size: var(--fl-fs-micro);
+  letter-spacing: 0.06em;
+  color: var(--fl-text-2);
+  background: var(--fl-surface-3);
+  border-radius: 3px;
+  padding: 1px 4px;
+  margin-inline-end: 3px;
+}
+
+/* ==========================================================================
+   Route trace
+   ========================================================================== */
+
+.route-trace {
+  display: flex;
+  gap: var(--fl-s2);
+  overflow-x: auto;
+  padding-block-end: var(--fl-s1);
+  overscroll-behavior-x: contain;
+}
+
+.route-hop {
+  min-inline-size: 8.75rem;
+  flex: 0 0 auto;
+  border: 1px solid var(--fl-line);
+  border-radius: var(--fl-r-control);
+  padding: var(--fl-s2) var(--fl-s3);
+  background: var(--fl-surface-2);
+  display: grid;
+  gap: 3px;
+  position: relative;
+
+  &::after {
+    content: "";
+    position: absolute;
+    inset-inline-end: -7px;
+    inset-block-start: 50%;
+    inline-size: 6px;
+    block-size: 1px;
+    background: var(--fl-line-strong);
+  }
+
+  &:last-child::after {
+    display: none;
+  }
+
+  & small {
+    color: var(--fl-text-3);
+    font-size: var(--fl-fs-micro);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  & strong {
+    font-family: var(--fl-mono);
+    font-size: var(--fl-fs-sm);
+    font-variant-numeric: tabular-nums;
+    overflow-wrap: anywhere;
+  }
+
+  & span {
+    color: var(--fl-text-3);
+    font-size: var(--fl-fs-micro);
+  }
+
+  &.timeout {
+    border-color: var(--fl-warn-line);
+    background: var(--fl-warn-soft);
+
+    & small,
+    & span {
+      color: var(--fl-warn);
+    }
+  }
+}
+
+.route-note {
+  color: var(--fl-text-3);
+  font-size: var(--fl-fs-micro);
+}
+
+/* ==========================================================================
+   Probe fleet
+   ========================================================================== */
+
+.probe-fleet {
+  display: grid;
+  gap: var(--fl-s3);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+}
+
+.probe-tile {
+  border: 1px solid var(--fl-line);
+  border-radius: var(--fl-r-card);
+  padding: var(--fl-s3) var(--fl-s4);
+  background: var(--fl-surface-2);
+  display: grid;
+  gap: var(--fl-s3);
+  min-inline-size: 0;
+
+  & h3 {
+    margin: 0;
+    font-size: var(--fl-fs-base);
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+
+  & p {
+    margin: 2px 0 0;
+    color: var(--fl-text-3);
+    font-size: var(--fl-fs-micro);
+    overflow-wrap: anywhere;
+  }
+}
+
+.probe-tile-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--fl-s3);
+  align-items: flex-start;
+}
+
+.probe-health {
+  border-radius: var(--fl-r-chip);
+  padding: 2px 6px;
+  font-size: var(--fl-fs-micro);
+  letter-spacing: 0.05em;
+  font-weight: 550;
+  border: 1px solid var(--fl-idle-line);
+  color: var(--fl-text-3);
+  white-space: nowrap;
+
+  &.online {
+    color: var(--fl-ok);
+    border-color: var(--fl-ok-line);
+    background: var(--fl-ok-soft);
+  }
+
+  &.stale {
+    color: var(--fl-warn);
+    border-color: var(--fl-warn-line);
+    background: var(--fl-warn-soft);
+  }
+
+  &.offline,
+  &.disabled {
+    color: var(--fl-crit);
+    border-color: var(--fl-crit-line);
+    background: var(--fl-crit-soft);
+  }
+}
+
+.probe-meta {
+  display: grid;
+  gap: var(--fl-s2);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 7rem), 1fr));
+
+  & div {
+    border-block-start: 1px solid var(--fl-line-soft);
+    padding-block-start: var(--fl-s2);
+    min-inline-size: 0;
+  }
+
+  & small {
+    display: block;
+    color: var(--fl-text-3);
+    font-size: var(--fl-fs-micro);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-block-end: 3px;
+  }
+
+  & strong {
+    display: block;
+    font-size: var(--fl-fs-micro);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.fleet-empty {
+  color: var(--fl-text-3);
+  font-size: var(--fl-fs-sm);
+  margin: 0;
+}
+
+/* ==========================================================================
+   Topology map
+   --------------------------------------------------------------------------
+   The canvas is a normalised coordinate space: node positions are percentages
+   and the SVG viewBox is 0 0 100 100 with a non-uniform aspect ratio, so links
+   and nodes are laid out by the same arithmetic at every width.
+
+   Previously the renderer measured `canvas.clientWidth`, clamped it to a
+   720px minimum and positioned nodes at absolute pixels inside a viewBox that
+   scaled — so under 720px the SVG shrank while the nodes did not, and the
+   links visibly detached from the boxes they connected.
+   ========================================================================== */
+
+.topology-canvas {
+  position: relative;
+  /* Scales with available width instead of a flat 400px that was too short on
+     a wide display and too tall in a narrow column. */
+  block-size: clamp(20rem, 42cqi, 34rem);
+  border: 1px solid var(--fl-line);
+  border-radius: var(--fl-r-control);
+  overflow: hidden;
+  background:
+    linear-gradient(var(--fl-line-soft) 1px, transparent 1px) 0 0 / 2rem 2rem,
+    linear-gradient(90deg, var(--fl-line-soft) 1px, transparent 1px) 0 0 / 2rem 2rem,
+    var(--fl-sunk);
+  /* Vertical page scrolling still works over the canvas. `touch-action: none`
+     on the whole surface suppressed the browser's own scroll gesture across a
+     large mostly-empty area, on a page that scrolls — but only the NODES are
+     draggable, so only the nodes need to claim the gesture. */
+  touch-action: pan-y;
+  container: fl-topology / inline-size;
+}
+
+.topology-grid {
+  display: none;
+}
+
+.topology-links {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.topology-link {
+  stroke: var(--fl-line-strong);
+  stroke-width: 1.5;
+  /* Non-scaling stroke keeps a 1.5px line 1.5px at every canvas size — without
+     it, the non-uniform viewBox stretches the stroke horizontally and links
+     read as different weights depending on the window. */
+  vector-effect: non-scaling-stroke;
+
+  &.inferred {
+    stroke-dasharray: 5 5;
+    opacity: 0.7;
+  }
+
+  &.affected {
+    stroke: var(--fl-warn);
+    stroke-width: 2;
+  }
+
+  &.fault {
+    stroke: var(--fl-crit);
+    stroke-width: 2;
+  }
+
+  &.observed-path {
+    stroke: var(--fl-chrome);
+    stroke-width: 2;
+  }
+}
+
+.topology-node {
+  position: absolute;
+  /* Sized against the canvas, not the root. The renderer clamps node centres
+     to 12%-88% of the canvas, so a node stays fully inside only while its
+     half-width is under 12% of the canvas — i.e. while its width is under
+     24cqi. Tying the two numbers together is what stops boxes hanging over the
+     edge in a narrow column, without giving up the readable 140px it gets on a
+     wide one. */
+  /* Three limits, whichever bites first:
+       8.75rem  the readable width on a wide canvas;
+       24cqi    the width above which the renderer's 12% edge clamp can no
+                longer keep a box inside the canvas;
+       the lane share, so a seven-hop path does not overlap itself. The
+       renderer publishes the chain length as --fl-topo-chain; that is
+       application data, not a DOM measurement.
+     The 4.5rem floor stops a very long path collapsing to unreadable slivers;
+     past that point the boxes touch, which is the honest signal that the path
+     is longer than the canvas can lay out flat. */
+  inline-size: clamp(
+    4.5rem,
+    min(24cqi, calc(76cqi / var(--fl-topo-chain, 5) - 0.5rem)),
+    8.75rem
+  );
+  min-block-size: 3.5rem;
+  translate: -50% -50%;
+  border: 1px solid var(--fl-line-strong);
+  border-radius: var(--fl-r-control);
+  background: var(--fl-surface);
+  color: var(--fl-text);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--fl-s2);
+  align-items: center;
+  padding: var(--fl-s2);
+  text-align: start;
+  box-shadow: var(--fl-shadow-raised);
+  user-select: none;
+  cursor: grab;
+  /* The node, and only the node, takes the gesture — dragging it must not
+     scroll the page underneath. */
+  touch-action: none;
+  z-index: 2;
+  /* The node adapts to its OWN width, which is the only thing that knows how
+     much room this particular box ended up with — it depends on the canvas
+     width and on how many hops the path has, and no viewport query can see
+     either. */
+  container: fl-node / inline-size;
+
+  &:active {
+    cursor: grabbing;
+  }
+
+  &.endpoint,
+  &.target {
+    border-color: var(--fl-chrome-line);
+  }
+
+  /* Status is not carried by colour alone: a faulted node also gains a solid
+     2px edge and a marker its peers do not have. */
+  &.local-fault {
+    border-color: var(--fl-crit);
+    border-inline-start-width: 3px;
+    background: var(--fl-crit-soft);
+  }
+
+  & strong {
+    display: block;
+    font-size: var(--fl-fs-micro);
+    font-weight: 600;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  & small {
+    display: block;
+    margin-block-start: 2px;
+    color: var(--fl-text-3);
+    font-size: var(--fl-fs-micro);
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* In a narrow canvas the labelled boxes collide before the layout does. They
+   shrink to the icon plus a truncated label rather than overlapping. */
+@container fl-topology (inline-size < 30rem) {
+  .topology-node {
+    padding: var(--fl-s1) var(--fl-s2);
+    min-block-size: 2.75rem;
+  }
+}
+
+.topology-icon {
+  inline-size: 1.625rem;
+  block-size: 1.625rem;
+  border-radius: var(--fl-r-chip);
+  display: grid;
+  place-items: center;
+  background: var(--fl-surface-3);
+  color: var(--fl-text-2);
+  font-size: 0.8125rem;
+}
+
+.topology-confidence {
+  position: absolute;
+  inset-inline-end: 5px;
+  inset-block-start: 5px;
+  inline-size: 5px;
+  block-size: 5px;
+  border-radius: 50%;
+  background: var(--fl-ok);
+
+  &.medium { background: var(--fl-warn); }
+  &.low { background: var(--fl-idle); }
+}
+
+.topology-legend {
+  display: flex;
+  gap: var(--fl-s4);
+  flex-wrap: wrap;
+  margin-block-start: var(--fl-s3);
+  color: var(--fl-text-3);
+  font-size: var(--fl-fs-micro);
+
+  & span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+}
+
+.legend-line {
+  inline-size: 1.25rem;
+  block-size: 0;
+  border-block-start: 2px solid var(--fl-line-strong);
+
+  &.inferred { border-block-start-style: dashed; }
+  &.fault { border-color: var(--fl-crit); }
+  &.observed { border-color: var(--fl-chrome); }
+}
+
+.topology-empty {
+  min-block-size: 11rem;
+  display: grid;
+  place-items: center;
+  color: var(--fl-text-3);
+  font-size: var(--fl-fs-sm);
+}
+
+/* What a squeezed node gives up, in order. The label and the status marker are
+   what identify a node, so they are the last things standing: the glyph goes
+   first, then the address line. `grid-template-columns: auto` means the hidden
+   icon's track collapses to nothing and the label gets the whole box rather
+   than the 40px it was left with. */
+@container fl-node (inline-size < 7rem) {
+  .topology-icon {
+    display: none;
+  }
+}
+
+@container fl-node (inline-size < 5.5rem) {
+  .topology-node small {
+    display: none;
+  }
+}
+
+/* ==========================================================================
+   Live diagnostics
+   --------------------------------------------------------------------------
+   Was an injected stylesheet with 8px uppercase labels, five radii, four
+   hardcoded rgba() colours and its own 760px media query.
+   ========================================================================== */
+
+.live-panel {
+  margin-block-end: var(--fl-s3);
+  border-color: var(--fl-line);
+}
+
+.live-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--fl-s4);
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.live-form {
+  display: flex;
+  gap: var(--fl-s2);
+  flex-wrap: wrap;
+  margin-block-start: var(--fl-s4);
+  align-items: stretch;
+
+  & input[type="text"] {
+    flex: 1 1 18rem;
+    min-inline-size: 0;
+    /* The primary control on this screen. Without an explicit height it sized
+       itself from the monospace font at 23px, against 30px for every other
+       control in the product and 44px on a coarse pointer. */
+    block-size: var(--fl-control-h);
+    border: 1px solid var(--fl-line-strong);
+    border-radius: var(--fl-r-control);
+    background: var(--fl-sunk);
+    color: var(--fl-text);
+    padding-inline: var(--fl-s3);
+    font-family: var(--fl-mono);
+    font-size: var(--fl-fs-sm);
+    outline: none;
+
+    &:focus {
+      border-color: var(--fl-chrome);
+      box-shadow: 0 0 0 3px var(--fl-chrome-soft);
+    }
+  }
+
+  & button {
+    white-space: nowrap;
+  }
+}
+
+.live-modes {
+  display: flex;
+  gap: var(--fl-s1);
+  flex-wrap: wrap;
+  margin-block-start: var(--fl-s3);
+}
+
+.live-mode {
+  border: 1px solid var(--fl-line-strong);
+  border-radius: var(--fl-r-control);
+  background: transparent;
+  color: var(--fl-text-2);
+  padding: 5px var(--fl-s3);
+  font-size: var(--fl-fs-sm);
+  min-block-size: var(--fl-control-h-sm);
+
+  &:hover {
+    color: var(--fl-text);
+    background: var(--fl-surface-2);
+  }
+
+  &.active {
+    border-color: var(--fl-chrome-line);
+    color: var(--fl-chrome);
+    background: var(--fl-chrome-soft);
+    font-weight: 550;
+  }
+}
+
+.live-status {
+  margin: var(--fl-s3) 0 0;
+  color: var(--fl-text-2);
+  font-size: var(--fl-fs-micro);
+  line-height: var(--fl-lh-body);
+  min-block-size: 1rem;
+
+  &.error {
+    color: var(--fl-crit);
+  }
+}
+
+.live-grid {
+  display: grid;
+  gap: var(--fl-s3);
+  margin-block-start: var(--fl-s4);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+}
+
+.live-card {
+  border: 1px solid var(--fl-line-soft);
+  border-radius: var(--fl-r-card);
+  padding: var(--fl-s4);
+  background: var(--fl-surface-2);
+  min-inline-size: 0;
+  container: fl-panel / inline-size;
+
+  & h3 {
+    margin: 0 0 3px;
+    font-size: var(--fl-fs-sm);
+    font-weight: 600;
+  }
+
+  & .note {
+    color: var(--fl-text-3);
+    font-size: var(--fl-fs-micro);
+    line-height: 1.5;
+    margin: var(--fl-s2) 0 0;
+  }
+}
+
+.live-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--fl-s2);
+  align-items: flex-start;
+  margin-block-end: var(--fl-s3);
+  flex-wrap: wrap;
+}
+
+/* --------------------------------------------------------------------------
+   Live Diagnostics internals
+   --------------------------------------------------------------------------
+   These were generic global names (.kv, .pill, .mono, .hop, .verdict)
+   inherited from the panel's original injected stylesheet, and they were held
+   apart from the rest of the product by an @scope block.
+
+   That worked, but it made a large part of Live Diagnostics depend on @scope
+   being supported: where it is not, the whole block is discarded and the panel
+   loses its inner styling. Prefixing the names achieves the same containment
+   with ordinary selectors, so nothing here rests on a feature Faultline does
+   not otherwise need.
+   -------------------------------------------------------------------------- */
+
+/* Key/value pairs inside a live card. Stacks below the width where the value
+   column stops being usable, rather than at a viewport size. */
+.live-kv {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px var(--fl-s3);
+  font-size: var(--fl-fs-micro);
+
+  & dt {
+    color: var(--fl-text-3);
+    font-size: var(--fl-fs-micro);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+  }
+
+  & dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+    font-family: var(--fl-mono);
+    font-size: var(--fl-fs-micro);
+    font-variant-numeric: tabular-nums;
+    color: var(--fl-text);
+    margin-block-end: var(--fl-s1);
+  }
+}
+
+@container fl-panel (inline-size > 18rem) {
+  .live-kv {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: baseline;
+
+    & dt {
+      align-self: baseline;
+    }
+
+    & dd {
+      margin-block-end: 0;
+    }
+  }
+}
+
+.live-unset {
+  color: var(--fl-text-3);
+}
+
+.live-stage-row,
+.live-res-row,
+.live-van-row {
+  display: grid;
+  gap: var(--fl-s2);
+  align-items: center;
+  padding-block: 7px;
+  border-block-start: 1px solid var(--fl-line-soft);
+  font-size: var(--fl-fs-micro);
+
+  &:first-of-type,
+  &[data-continues] {
+    border-block-start: 0;
+    padding-block-start: 0;
+  }
+}
+
+/* The resolved-addresses line under a resolver row. It belongs to the row
+   above it, so it carries no rule of its own. */
+.live-res-row[data-continues] .live-mono {
+  grid-column: 1 / -1;
+  color: var(--fl-text-2);
+}
+
+/* Confidence figure on the deterministic verdict. */
+.live-confidence {
+  text-align: end;
+
+  & strong {
+    display: block;
+    font-size: var(--fl-fs-metric);
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--fl-text);
+    font-variant-numeric: tabular-nums;
+  }
+
+  & span {
+    display: block;
+    font-size: var(--fl-fs-micro);
+    color: var(--fl-text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+}
+
+/* The DNS / TCP / TLS / HTTP ladder. A fixed leading column keeps the stage
+   names aligned so the sequence reads as a sequence. */
+.live-stage-row {
+  grid-template-columns: 3.25rem minmax(0, 1fr) auto;
+}
+
+.live-res-row,
+.live-van-row {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.live-pill {
+  border-radius: var(--fl-r-chip);
+  padding: 2px 6px;
+  font-size: var(--fl-fs-micro);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid var(--fl-idle-line);
+  color: var(--fl-text-3);
+  white-space: nowrap;
+
+  &.pass {
+    color: var(--fl-ok);
+    border-color: var(--fl-ok-line);
+    background: var(--fl-ok-soft);
+  }
+
+  &.fail {
+    color: var(--fl-crit);
+    border-color: var(--fl-crit-line);
+    background: var(--fl-crit-soft);
+  }
+
+  &.warn {
+    color: var(--fl-warn);
+    border-color: var(--fl-warn-line);
+    background: var(--fl-warn-soft);
+  }
+
+  &.na {
+    color: var(--fl-text-3);
+  }
+}
+
+.live-mono {
+  font-family: var(--fl-mono);
+  font-size: var(--fl-fs-micro);
+  color: var(--fl-text-2);
+  overflow-wrap: anywhere;
+}
+
+.live-hop-list {
+  max-block-size: 14.5rem;
+  overflow: auto;
+  overscroll-behavior: contain;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.live-hop {
+  display: grid;
+  grid-template-columns: 1.625rem minmax(0, 1fr) auto;
+  gap: var(--fl-s2);
+  padding-block: 6px;
+  border-block-start: 1px solid var(--fl-line-soft);
+  font-size: var(--fl-fs-micro);
+  align-items: center;
+
+  &:first-child {
+    border-block-start: 0;
+  }
+
+  & small {
+    color: var(--fl-text-3);
+    display: block;
+    font-size: var(--fl-fs-micro);
+    overflow-wrap: anywhere;
+  }
+}
+
+/* The deterministic verdict.
+   --------------------------------------------------------------------------
+   A conclusion Faultline stands behind, so it gets a solid rule in the
+   product's colour — the DETERMINISTIC RULE FINDING treatment.
+
+   It previously used the double rule and raised ground, which are reserved for
+   a deterministic EXPERIMENT. Live Diagnostics runs fixed rules over observed
+   measurements; it does not vary a condition and re-measure. Borrowing Network
+   Bisect's visual language would have claimed a controlled experiment that
+   never happened, in the one product that exists to keep those apart. */
+.live-verdict {
+  border: 1px solid var(--fl-line);
+  border-inline-start: 3px solid var(--fl-chrome);
+  border-radius: var(--fl-r-control);
+  padding: var(--fl-s4);
+  background: var(--fl-surface);
+  margin-block-start: var(--fl-s4);
+
+  & h3 {
+    margin: 4px 0 6px;
+    font-size: var(--fl-fs-md);
+  }
+
+  & p {
+    margin: 0;
+    color: var(--fl-text-2);
+    font-size: var(--fl-fs-micro);
+    line-height: var(--fl-lh-body);
+  }
+}
+
+.live-src-list {
+  display: flex;
+  gap: var(--fl-s1);
+  flex-wrap: wrap;
+  margin-block-start: var(--fl-s3);
+}
+
+.live-disclaimer {
+  color: var(--fl-text-3);
+  font-size: var(--fl-fs-micro);
+  line-height: var(--fl-lh-body);
+  margin: var(--fl-s3) 0 0;
+  border-block-start: 1px solid var(--fl-line-soft);
+  padding-block-start: var(--fl-s3);
+}
+
+.live-env-actions {
+  display: flex;
+  gap: var(--fl-s2);
+  flex-wrap: wrap;
+  margin-block-start: var(--fl-s3);
+}
+
+.live-manifest-box {
+  margin-block-start: var(--fl-s3);
+
+  & textarea {
+    inline-size: 100%;
+    border: 1px solid var(--fl-line-strong);
+    border-radius: var(--fl-r-control);
+    background: var(--fl-sunk);
+    color: var(--fl-text);
+    padding: var(--fl-s3);
+    font-family: var(--fl-mono);
+    font-size: var(--fl-fs-micro);
+    min-block-size: 8rem;
+    outline: none;
+
+    &:focus {
+      border-color: var(--fl-chrome);
+      box-shadow: 0 0 0 3px var(--fl-chrome-soft);
+    }
+  }
+}
+
+/* ==========================================================================
+   Cases
+   ========================================================================== */
+
+.cases-panel {
+  margin-block-start: var(--fl-s3);
+}
+
+.cases-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--fl-s3);
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.cases-actions {
+  display: flex;
+  gap: var(--fl-s2);
+  flex-wrap: wrap;
+}
+
+/* Was a hard 250px/1.2fr two-column grid that collapsed only under a 760px
+   viewport query — so the case list was 250px wide inside a narrow panel on a
+   wide screen. Now it is the panel's own width that decides. */
+.case-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--fl-s3);
+  margin-block-start: var(--fl-s4);
+}
+
+/* 40rem is the two-pane threshold: a ~15rem list beside a usable detail pane.
+   `.intelligence-layout` makes the same decision and uses the same number. The
+   chronology stays at 42rem because its transition is a different shape — five
+   phase columns side by side, not two panes. */
+@container fl-panel (inline-size > 40rem) {
+  .case-layout {
+    grid-template-columns: minmax(14rem, 0.8fr) minmax(0, 1.2fr);
+  }
+}
+
+.case-list {
+  display: grid;
+  gap: var(--fl-s2);
+  max-block-size: 21rem;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.case-card {
+  inline-size: 100%;
+  text-align: start;
+  border: 1px solid var(--fl-line-soft);
+  border-inline-start: 2px solid transparent;
+  border-radius: var(--fl-r-control);
+  background: var(--fl-surface-2);
+  padding: var(--fl-s3);
+  color: inherit;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--fl-surface-3);
+  }
+
+  &.active {
+    border-inline-start-color: var(--fl-chrome);
+    background: var(--fl-chrome-soft);
+  }
+
+  & strong {
+    font-size: var(--fl-fs-sm);
+    display: block;
+    overflow-wrap: anywhere;
+  }
+
+  & small {
+    display: block;
+    color: var(--fl-text-3);
+    font-size: var(--fl-fs-micro);
+    margin-block-start: 4px;
+  }
+}
+
+.case-detail {
+  border: 1px solid var(--fl-line-soft);
+  border-radius: var(--fl-r-control);
+  padding: var(--fl-s4);
+  min-block-size: 9.5rem;
+  min-inline-size: 0;
+  container: fl-panel / inline-size;
+}
+
+.case-meta {
+  display: flex;
+  gap: var(--fl-s1);
+  flex-wrap: wrap;
+  margin-block: var(--fl-s2);
+}
+
+.case-pill {
+  border: 1px solid var(--fl-idle-line);
+  border-radius: var(--fl-r-chip);
+  padding: 2px 6px;
+  color: var(--fl-text-3);
+  font-size: var(--fl-fs-micro);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.case-timeline {
+  margin: var(--fl-s3) 0 0;
+  padding-inline-start: var(--fl-s5);
+  color: var(--fl-text-2);
+  font-size: var(--fl-fs-micro);
+  line-height: var(--fl-lh-body);
+  max-block-size: 11rem;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.case-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: var(--fl-s2);
+
+  & .wide {
+    grid-column: 1 / -1;
+  }
+}
+
+.case-result {
+  border: 1px solid var(--fl-ok-line);
+  background: var(--fl-ok-soft);
+  border-radius: var(--fl-r-control);
+  padding: var(--fl-s3);
+  margin-block-start: var(--fl-s3);
+  font-size: var(--fl-fs-micro);
+  font-family: var(--fl-mono);
+  overflow-wrap: anywhere;
+}
+
+.cases-muted {
+  color: var(--fl-text-2);
+  font-size: var(--fl-fs-sm);
+  line-height: var(--fl-lh-body);
+}
+
+/* ==========================================================================
+   Incident intelligence
+   --------------------------------------------------------------------------
+   Similarity and clustering are a separate evidence class from deterministic
+   diagnosis, and the panel says so; the styling keeps it quieter than a
+   finding rather than dressing it up as one.
+   ========================================================================== */
+
+.intelligence-panel {
+  margin-block-start: var(--fl-s3);
+}
+
+.intelligence-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--fl-s3);
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.intelligence-badges {
+  display: flex;
+  gap: var(--fl-s1);
+  flex-wrap: wrap;
+}
+
+.intelligence-badge {
+  border: 1px solid var(--fl-line-strong);
+  color: var(--fl-text-2);
+  background: var(--fl-surface-2);
+  border-radius: var(--fl-r-chip);
+  padding: 2px 6px;
+  font-size: var(--fl-fs-micro);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+
+  &.neutral {
+    border-color: var(--fl-line);
+    color: var(--fl-text-3);
+    background: transparent;
+  }
+}
+
+.intelligence-summary {
+  margin: var(--fl-s3) 0 0;
+  color: var(--fl-text-2);
+  line-height: var(--fl-lh-body);
+  font-size: var(--fl-fs-sm);
+  max-inline-size: var(--fl-measure);
+}
+
+.intelligence-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--fl-s3);
+  margin-block-start: var(--fl-s4);
+}
+
+/* Same two-pane decision as .case-layout, so the same 40rem. It was 44rem,
+   which is the drift the deleted breakpoint tokens claimed to prevent. */
+@container fl-panel (inline-size > 40rem) {
+  .intelligence-layout {
+    grid-template-columns: minmax(0, 1.1fr) minmax(15rem, 0.9fr);
+  }
+}
+
+.pattern-card,
+.similar-card {
+  border: 1px solid var(--fl-line-soft);
+  border-radius: var(--fl-r-card);
+  background: var(--fl-surface-2);
+  padding: var(--fl-s4);
+  min-inline-size: 0;
+
+  & h3 {
+    margin: 0 0 var(--fl-s2);
+    font-size: var(--fl-fs-sm);
+    font-weight: 600;
+  }
+}
+
+.pattern-meta {
+  color: var(--fl-text-3);
+  font-size: var(--fl-fs-micro);
+  margin-block-end: var(--fl-s3);
+}
+
+.pattern-features {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fl-s1);
+}
+
+.pattern-feature {
+  border: 1px solid var(--fl-line-strong);
+  border-radius: var(--fl-r-chip);
+  padding: 2px 6px;
+  color: var(--fl-text-2);
+  font-size: var(--fl-fs-micro);
+  background: var(--fl-surface-3);
+}
+
+.similar-list {
+  display: grid;
+  gap: var(--fl-s2);
+}
+
+.similar-row {
+  border-block-start: 1px solid var(--fl-line-soft);
+  padding-block-start: var(--fl-s2);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--fl-s2);
+
+  &:first-child {
+    border-block-start: 0;
+    padding-block-start: 0;
+  }
+
+  & strong {
+    font-size: var(--fl-fs-micro);
+    display: block;
+    overflow-wrap: anywhere;
+  }
+
+  & small {
+    color: var(--fl-text-3);
+    font-size: var(--fl-fs-micro);
+    line-height: 1.4;
+    display: block;
+    margin-block-start: 3px;
+  }
+}
+
+.similar-score {
+  color: var(--fl-text-2);
+  font-family: var(--fl-mono);
+  font-size: var(--fl-fs-base);
+  font-weight: 600;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.intelligence-method {
+  margin-block-start: var(--fl-s3);
+  color: var(--fl-text-3);
+  font-size: var(--fl-fs-micro);
+  line-height: var(--fl-lh-body);
+}
+
+.intelligence-empty {
+  color: var(--fl-text-2);
+  font-size: var(--fl-fs-sm);
+  line-height: var(--fl-lh-body);
+}
+
+/* ==========================================================================
+   Network Bisect
+   ========================================================================== */
+
+/* The hypothesis table's state column. Was an inline `style="width:140px"` in
+   the panel module, which put a layout decision somewhere the design system
+   could not see it. */
+.fl-col-state {
+  inline-size: 8.75rem;
+}
+
+.bisect-claim {
+  margin: 0 0 var(--fl-s2);
+  font-size: var(--fl-fs-base);
+  font-weight: 550;
+  color: var(--fl-text);
+  line-height: var(--fl-lh-body);
+}
+
+.bisect-seq {
+  font-family: var(--fl-mono);
+  font-size: var(--fl-fs-micro);
+  color: var(--fl-text-2);
+  letter-spacing: 0.14em;
+}
+
+.bisect-hyp-label {
+  display: block;
+  color: var(--fl-text);
+}
+
+/* The engine's note explains why a hypothesis moved. A second line, not a
+   continuation — inline, the two ran together into one sentence. */
+.bisect-note {
+  display: block;
+  margin-block-start: 2px;
+  font-size: var(--fl-fs-micro);
+  color: var(--fl-text-3);
+  line-height: 1.5;
+}
+
+/* ==========================================================================
+   Analyst drawer — internals
+   --------------------------------------------------------------------------
+   The drawer's BOX is a shell fact and lives in layout.css with the rest of
+   the frame. Only what is inside it is here.
+
+   Design intent, stated because it is easy to erode: this is an operations
+   surface, not a chat product. No avatars, no bubbles, no gradients, no
+   typing animation, no AI iconography.
+   ========================================================================== */
+
+.fl-analyst-head {
+  display: flex;
+  align-items: center;
+  gap: var(--fl-s2);
+  block-size: var(--fl-topbar-h);
+  padding-inline: var(--fl-s3);
+  border-block-end: 1px solid var(--fl-line);
+  flex: 0 0 auto;
+
+  & h2 {
+    font-size: var(--fl-fs-base);
+    font-weight: 620;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+
+  & .fl-spacer {
+    flex: 1;
+  }
+}
+
+.fl-analyst-state {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--fl-s1) var(--fl-s2);
+  align-items: center;
+  padding: var(--fl-s2) var(--fl-s3);
+  border-block-end: 1px solid var(--fl-line-soft);
+  font-size: var(--fl-fs-micro);
+  color: var(--fl-text-3);
+  flex: 0 0 auto;
+
+  & dt {
+    color: var(--fl-text-3);
+  }
+
+  & dd {
+    margin: 0;
+    color: var(--fl-text-2);
+    font-family: var(--fl-mono);
+    overflow-wrap: anywhere;
+  }
+}
+
+.fl-analyst-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--fl-s3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--fl-s3);
+}
+
+.fl-analyst-foot {
+  flex: 0 0 auto;
+  border-block-start: 1px solid var(--fl-line);
+  padding: var(--fl-s2) var(--fl-s3) var(--fl-s3);
+  background: var(--fl-sunk);
+}
+
+.fl-analyst-ask {
+  display: flex;
+  gap: var(--fl-s2);
+  align-items: flex-end;
+
+  & textarea {
+    flex: 1;
+    min-block-size: 2.125rem;
+    max-block-size: 8.25rem;
+    resize: none;
+    padding: var(--fl-s2);
+    line-height: 1.45;
+  }
+}
+
+.fl-turn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fl-s2);
+
+  & + .fl-turn {
+    border-block-start: 1px solid var(--fl-line-soft);
+    padding-block-start: var(--fl-s3);
+  }
+}
+
+.fl-turn-q {
+  font-size: var(--fl-fs-sm);
+  color: var(--fl-text);
+  font-weight: 600;
+  margin: 0;
+  display: flex;
+  gap: var(--fl-s2);
+
+  &::before {
+    content: "\203A";
+    color: var(--fl-text-3);
+    font-family: var(--fl-mono);
+  }
+}
+
+.fl-turn-a {
+  font-size: var(--fl-fs-sm);
+  color: var(--fl-text-2);
+  line-height: var(--fl-lh-body);
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+
+  &:empty::after {
+    content: "\2026";
+    color: var(--fl-text-3);
+  }
+}
+
+.fl-analyst-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--fl-s2);
+
+  & li {
+    font-size: var(--fl-fs-sm);
+    color: var(--fl-text-2);
+    line-height: var(--fl-lh-body);
+  }
+
+  &[data-numbered] {
+    counter-reset: fl-a;
+
+    & li {
+      display: grid;
+      grid-template-columns: 0.875rem minmax(0, 1fr);
+      gap: var(--fl-s2);
+
+      &::before {
+        counter-increment: fl-a;
+        content: counter(fl-a);
+        font-family: var(--fl-mono);
+        font-size: var(--fl-fs-micro);
+        color: var(--fl-text-3);
+        padding-block-start: 2px;
+      }
+    }
+  }
+}
+
+.fl-analyst-tools {
+  font-size: var(--fl-fs-micro);
+  color: var(--fl-text-3);
+
+  & code {
+    font-family: var(--fl-mono);
+    font-size: var(--fl-fs-micro);
+    color: var(--fl-text-2);
+  }
+
+  & li {
+    display: flex;
+    align-items: center;
+    gap: var(--fl-s2);
+    padding-block: 1px;
+  }
+}
+
+.fl-progress {
+  block-size: 4px;
+  border-radius: var(--fl-r-pill);
+  background: var(--fl-surface-3);
+  overflow: hidden;
+  margin-block: var(--fl-s2);
+
+  & > span {
+    display: block;
+    block-size: 100%;
+    background: var(--fl-chrome);
+    transition: inline-size var(--fl-dur-3) var(--fl-ease);
+  }
+}
+
+.fl-starters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fl-s1);
+}
+
+.fl-starter {
+  text-align: start;
+  background: transparent;
+  border: 1px solid var(--fl-line);
+  border-radius: var(--fl-r-control);
+  color: var(--fl-text-2);
+  font: inherit;
+  font-size: var(--fl-fs-sm);
+  padding: var(--fl-s2);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--fl-surface-2);
+    color: var(--fl-text);
+    border-color: var(--fl-line-strong);
+  }
+}
+
+/* ==========================================================================
+   Invitation dialog and the standalone consent page
+   ========================================================================== */
+
+.invite-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+  gap: var(--fl-s3);
+
+  & .wide {
+    grid-column: 1 / -1;
+  }
+}
+
+.invite-result {
+  border: 1px solid var(--fl-ok-line);
+  background: var(--fl-ok-soft);
+  border-radius: var(--fl-r-control);
+  padding: var(--fl-s3);
+  display: grid;
+  gap: var(--fl-s2);
+
+  & code {
+    display: block;
+    overflow-wrap: anywhere;
+    color: var(--fl-ok);
+    font-family: var(--fl-mono);
+    font-size: var(--fl-fs-micro);
+    line-height: 1.6;
+  }
+}
+
+.invite-result-actions {
+  display: flex;
+  gap: var(--fl-s2);
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+/* The case and diagnostic dialogs are built in JavaScript and were never given
+   a class the stylesheet knew about, so they rendered with the UA default —
+   a white box in the middle of a dark application. */
+.auth-dialog {
+  inline-size: min(34rem, calc(100vw - 2rem));
+  border: 1px solid var(--fl-line-strong);
+  border-radius: var(--fl-r-card);
+  background: var(--fl-surface);
+  color: var(--fl-text);
+  padding: var(--fl-s5);
+  box-shadow: var(--fl-shadow-float);
+
+  &::backdrop {
+    background: oklch(8% 0.01 259 / 0.72);
+  }
+
+  & h3 {
+    margin: var(--fl-s1) 0 0;
+    font-size: var(--fl-fs-md);
+    font-weight: 600;
+  }
+
+  & label {
+    display: grid;
+    gap: var(--fl-s1);
+    font-size: var(--fl-fs-micro);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--fl-text-3);
+    min-inline-size: 0;
+  }
+
+  & input,
+  & select,
+  & textarea {
+    block-size: var(--fl-control-h);
+    padding-inline: var(--fl-s3);
+    border: 1px solid var(--fl-line-strong);
+    border-radius: var(--fl-r-control);
+    background: var(--fl-sunk);
+    color: var(--fl-text);
+    font-size: var(--fl-fs-sm);
+    text-transform: none;
+    letter-spacing: normal;
+    outline: none;
+
+    &:focus {
+      border-color: var(--fl-chrome);
+      box-shadow: 0 0 0 3px var(--fl-chrome-soft);
+    }
+  }
+
+  & textarea {
+    block-size: auto;
+    padding: var(--fl-s3);
+    font-family: var(--fl-mono);
+    resize: vertical;
+  }
+}
+
+/* ==========================================================================
+   One-time consent page (/diagnose)
+   --------------------------------------------------------------------------
+   Was a 50-line <style> block inside diagnose.html — a third design system,
+   with its own radii (8, 10, 11px), its own `rgba(255,255,255,.012)` surface,
+   two `!important` colour overrides and a 680px media query. It is the page a
+   customer sees before agreeing to run a diagnostic on their machine, so it is
+   the last page in the product that should look like it came from somewhere
+   else.
+
+   It is a whole document rather than a view, so it owns its page frame; every
+   value below now comes from the same tokens as the application.
+   ========================================================================== */
+
+.invite-shell {
+  inline-size: min(48rem, 100%);
+  margin-inline: auto;
+  padding: var(--fl-s8) var(--fl-gutter);
+  display: grid;
+  gap: var(--fl-s4);
+  align-content: start;
+  min-block-size: 100dvh;
+  container: fl-region / inline-size;
+}
+
+.invite-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--fl-s3);
+  color: var(--fl-text);
+  font-weight: 650;
+  font-size: 1.0625rem;
+  letter-spacing: -0.01em;
+}
+
+.brand-mark {
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  flex: 0 0 1.25rem;
+  border: 1.5px solid var(--fl-chrome);
+  border-radius: 3px;
+  rotate: 45deg;
+  display: grid;
+  place-items: center;
+
+  & > span {
+    inline-size: 7px;
+    block-size: 1.5px;
+    background: var(--fl-chrome);
+  }
+}
+
+.invite-card {
+  border: 1px solid var(--fl-line);
+  border-radius: var(--fl-r-card);
+  background: var(--fl-surface);
+  box-shadow: var(--fl-shadow-raised);
+  padding: clamp(var(--fl-s5), 3cqi, var(--fl-s8));
+  container: fl-panel / inline-size;
+
+  & h1 {
+    margin: var(--fl-s2) 0 var(--fl-s3);
+    font-size: clamp(1.375rem, 1.1rem + 1.2cqi, 1.75rem);
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    line-height: var(--fl-lh-tight);
+  }
+
+  & > p {
+    color: var(--fl-text-2);
+    line-height: 1.65;
+    margin: 0;
+    max-inline-size: var(--fl-measure);
+  }
+}
+
+.invite-context {
+  margin-block: var(--fl-s6);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+  gap: var(--fl-s2);
+
+  & div {
+    border: 1px solid var(--fl-line-soft);
+    background: var(--fl-surface-2);
+    border-radius: var(--fl-r-control);
+    padding: var(--fl-s3);
+    min-inline-size: 0;
+  }
+
+  & small {
+    display: block;
+    color: var(--fl-text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: var(--fl-fs-micro);
+    margin-block-end: 5px;
+  }
+
+  & strong {
+    display: block;
+    overflow-wrap: anywhere;
+    font-size: var(--fl-fs-sm);
+    font-family: var(--fl-mono);
+  }
+}
+
+.contract-disclosure {
+  margin: calc(-1 * var(--fl-s2)) 0 var(--fl-s5);
+  border: 1px solid var(--fl-ok-line);
+  background: var(--fl-ok-soft);
+  border-radius: var(--fl-r-control);
+  padding: var(--fl-s4);
+
+  & h3 {
+    margin: 0 0 5px;
+    font-size: var(--fl-fs-base);
+  }
+
+  & p {
+    margin: 0 0 var(--fl-s3);
+    color: var(--fl-text-2);
+    font-size: var(--fl-fs-micro);
+    line-height: var(--fl-lh-body);
+  }
+}
+
+.contract-checks {
+  display: flex;
+  gap: var(--fl-s2);
+  flex-wrap: wrap;
+}
+
+.contract-check {
+  border: 1px solid var(--fl-line-soft);
+  border-radius: var(--fl-r-chip);
+  padding: 3px 7px;
+  color: var(--fl-text-2);
+  font-size: var(--fl-fs-micro);
+
+  &.required {
+    border-color: var(--fl-ok-line);
+    color: var(--fl-ok);
+  }
+}
+
+/* What is and is not collected. The two boxes are deliberately the same
+   weight: the "will not collect" side is the half a customer is reading for,
+   and making it quieter than the other would be a dark pattern. */
+.collection-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: var(--fl-s3);
+  margin-block: var(--fl-s5);
+}
+
+.collection-box {
+  border: 1px solid var(--fl-line-soft);
+  border-radius: var(--fl-r-card);
+  padding: var(--fl-s4);
+
+  & h3 {
+    font-size: var(--fl-fs-base);
+    margin: 0 0 var(--fl-s3);
+  }
+
+  & ul {
+    margin: 0;
+    padding-inline-start: var(--fl-s5);
+    color: var(--fl-text-2);
+    font-size: var(--fl-fs-sm);
+    line-height: 1.7;
+  }
+
+  &.no {
+    border-color: var(--fl-ok-line);
+
+    & h3 {
+      color: var(--fl-ok);
+    }
+  }
+}
+
+.consent-box {
+  margin-block-start: var(--fl-s5);
+  border-block-start: 1px solid var(--fl-line-soft);
+  padding-block-start: var(--fl-s5);
+  display: grid;
+  gap: var(--fl-s3);
+}
+
+.check-row {
+  display: flex;
+  gap: var(--fl-s3);
+  align-items: flex-start;
+  color: var(--fl-text-2);
+  font-size: var(--fl-fs-sm);
+  line-height: 1.5;
+
+  & input {
+    margin-block-start: 3px;
+    inline-size: 1rem;
+    block-size: 1rem;
+    flex: 0 0 1rem;
+    accent-color: var(--fl-chrome);
+  }
+}
+
+.topology-option {
+  padding: var(--fl-s3);
+  border: 1px solid var(--fl-line-soft);
+  border-radius: var(--fl-r-control);
+  background: var(--fl-surface-2);
+}
+
+/* The consent action. Full width and a real touch target: this is the single
+   decision the page exists to collect. */
+.invite-action {
+  inline-size: 100%;
+  justify-content: center;
+  border: 0;
+  min-block-size: var(--fl-touch);
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+}
+
+.invite-error {
+  color: var(--fl-crit);
+  font-size: var(--fl-fs-sm);
+  line-height: 1.5;
+  min-block-size: 1.125rem;
+}
+
+.loading-state {
+  color: var(--fl-text-2);
+}
+
+.client-panel {
+  display: grid;
+  gap: var(--fl-s4);
+
+  & h2 {
+    margin: 0;
+    font-size: 1.3125rem;
+  }
+
+  & p {
+    color: var(--fl-text-2);
+    line-height: var(--fl-lh-body);
+    font-size: var(--fl-fs-sm);
+    margin: 0;
+  }
+}
+
+/* Was `color: var(--accent) !important`. The !important existed only to beat
+   `.client-panel p`; a more specific selector does the same job without
+   creating a value nothing downstream can override. */
+.client-panel p.success-note {
+  color: var(--fl-ok);
+}
+
+.client-steps {
+  display: grid;
+  gap: var(--fl-s2);
+  counter-reset: step;
+}
+
+.client-step {
+  display: grid;
+  grid-template-columns: 1.75rem minmax(0, 1fr);
+  gap: var(--fl-s3);
+  align-items: start;
+  border: 1px solid var(--fl-line-soft);
+  border-radius: var(--fl-r-control);
+  padding: var(--fl-s3);
+  background: var(--fl-surface-2);
+
+  &::before {
+    counter-increment: step;
+    content: counter(step);
+    inline-size: 1.625rem;
+    block-size: 1.625rem;
+    border-radius: var(--fl-r-chip);
+    display: grid;
+    place-items: center;
+    background: var(--fl-chrome-soft);
+    color: var(--fl-chrome);
+    font-family: var(--fl-mono);
+    font-size: var(--fl-fs-micro);
+    font-weight: 700;
+    border: 1px solid var(--fl-chrome-line);
+  }
+
+  & strong {
+    display: block;
+    font-size: var(--fl-fs-sm);
+    margin-block-end: 4px;
+  }
+
+  & span {
+    color: var(--fl-text-2);
+    font-size: var(--fl-fs-micro);
+    line-height: 1.45;
+  }
+}
+
+.client-actions {
+  display: flex;
+  gap: var(--fl-s2);
+  flex-wrap: wrap;
+
+  & a,
+  & button {
+    min-block-size: var(--fl-touch);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+  }
+
+  & .secondary-button[disabled] {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+.client-warning {
+  border: 1px solid var(--fl-warn-line);
+  background: var(--fl-warn-soft);
+  border-radius: var(--fl-r-control);
+  padding: var(--fl-s3);
+}
+
+.client-panel p.client-warning {
+  color: var(--fl-warn);
+}
+
+.security-note {
+  text-align: center;
+  color: var(--fl-text-3);
+  font-size: var(--fl-fs-micro);
+  line-height: 1.5;
+}
+
+/* The cross-party incident room replaces the whole document, so it carries its
+   own page frame rather than living inside the application shell. */
+.fl-room {
+  inline-size: min(66rem, 100%);
+  margin-inline: auto;
+  padding: var(--fl-s8) var(--fl-gutter);
+  display: flex;
+  flex-direction: column;
+  gap: var(--fl-s3);
+  container: fl-region / inline-size;
+}
+
+.auth-form {
+  display: grid;
+  gap: var(--fl-s3);
+}
+
+.auth-actions {
+  display: flex;
+  gap: var(--fl-s2);
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.auth-error {
+  color: var(--fl-crit);
+  font-size: var(--fl-fs-sm);
+  min-block-size: 1.125rem;
+}

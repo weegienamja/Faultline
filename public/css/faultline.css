@@ -1,0 +1,43 @@
+/* ==========================================================================
+   Faultline — stylesheet entry point
+   --------------------------------------------------------------------------
+   One <link> for the whole application. Everything below is assigned to a
+   cascade layer at import time, so a file's position in the cascade is a
+   property of this list rather than of where a rule happens to sit inside a
+   40 000-character stylesheet.
+
+   LAYER ORDER — and why it is this order
+   --------------------------------------------------------------------------
+     reset       normalise the handful of UA defaults we care about
+     tokens      custom properties only; never emits a rule with a selector
+     base        element defaults built from tokens
+     layout      the shell and the layout primitives (no colour decisions)
+     components  the shared vocabulary: panel, badge, table, button, chip
+     features    surface-specific styling (topology, live, cases, recorder)
+     evidence    the evidence-class visual language
+     utilities   single-purpose escape hatches
+
+   `evidence` sits AFTER `features` deliberately. Faultline's central rule is
+   that a simulated capture must never read as a measurement and an Analyst
+   hypothesis must never read as a deterministic finding. Putting the layer
+   that enforces that last means no feature stylesheet can weaken it by
+   accident, whatever selector it uses. The epistemic boundary is enforced by
+   the cascade itself, not by everyone remembering to be careful.
+
+   There is no `overrides` layer. The previous stylesheet needed one because
+   panel modules injected <style> into <head> after the sheet loaded and won on
+   source order; the fix was a wall of `body .thing` selectors. Those panels now
+   live in `features`, so the specificity war has no participants.
+   ========================================================================== */
+
+@layer reset, tokens, base, layout, components, features, evidence, utilities;
+
+@import url("./reset.css") layer(reset);
+@import url("./tokens.css") layer(tokens);
+@import url("./base.css") layer(base);
+@import url("./layout.css") layer(layout);
+@import url("./components.css") layer(components);
+@import url("./chronology.css") layer(components);
+@import url("./features.css") layer(features);
+@import url("./evidence.css") layer(evidence);
+@import url("./utilities.css") layer(utilities);

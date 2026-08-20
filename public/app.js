@@ -95,7 +95,7 @@ function renderProbeFleet() {
     <article class="probe-tile">
       <div class="probe-tile-head">
         <div>
-          <h4>${escapeHtml(probe.name)}</h4>
+          <h3>${escapeHtml(probe.name)}</h3>
           <p>${escapeHtml(probe.location || probe.id)}</p>
         </div>
         <span class="probe-health ${escapeHtml(probe.health)}">${escapeHtml(probe.health)}</span>
@@ -179,25 +179,56 @@ function topologyNodeFault(node, domain) {
   return false;
 }
 
-function topologyPositions(topology, width, height) {
+/**
+ * Node positions in a normalised 0-100 space.
+ *
+ * Previously this took the canvas's measured pixel width (clamped to a 720px
+ * minimum) and returned pixel coordinates, while the SVG that draws the links
+ * used a viewBox scaled to the element's real width. Under 720px the two
+ * disagreed: the links scaled down and the nodes did not, so the lines visibly
+ * detached from the boxes they connected.
+ *
+ * Percentages remove the disagreement rather than papering over it — the SVG
+ * viewBox is 0 0 100 100 and the nodes are placed with percentage offsets, so
+ * both are laid out by the same arithmetic at every width, and the renderer no
+ * longer has to measure the DOM to draw itself.
+ */
+function topologyPositions(topology) {
   const positions = new Map();
-  const clampX = value => Math.max(75, Math.min(width - 75, value));
-  const clampY = value => Math.max(55, Math.min(height - 55, value));
+  // Margins keep a node box inside the canvas at the narrow end of the range.
+  // 12% keeps a node box fully inside the canvas: the stylesheet caps node
+  // width at 24cqi, so half a node is always under 12% of the canvas width.
+  const clampX = value => Math.max(12, Math.min(88, value));
+  const clampY = value => Math.max(12, Math.min(88, value));
 
-  // Lay the primary path out by role so both collector schemas position correctly.
-  for (const [role, fraction] of [["endpoint", .10], ["access", .26], ["gateway", .42], ["boundary", .58]]) {
+  // The path from this machine to the target, in order, using whichever roles
+  // the collector actually produced.
+  //
+  // Spacing is even across the whole lane rather than fixed fractions with the
+  // public hops squeezed into the last third. The old split gave the four local
+  // roles 48% of the width and every transit segment plus the target the
+  // remaining 34%, so a three-hop path put its last three nodes 8.5% apart —
+  // about 65px on a 760px canvas, against a 140px node. They overlapped.
+  const chain = [];
+  for (const role of ["endpoint", "access", "gateway", "boundary"]) {
     const node = topology.nodes.find(item => item.role === role);
-    if (node) positions.set(node.id, { x: clampX(width * fraction), y: clampY(height * .43) });
+    if (node) chain.push(node);
   }
-
-  // Public path segments and the target service continue along the same lane.
-  const transit = topology.nodes.filter(node => node.role === "transit");
+  for (const node of topology.nodes.filter(node => node.role === "transit")) chain.push(node);
   const targetNode = topology.nodes.find(node => node.role === "target");
-  const tail = [...transit, ...(targetNode ? [targetNode] : [])];
-  tail.forEach((node, index) => {
-    const fraction = .62 + ((index + 1) / (tail.length + 1)) * .34;
-    positions.set(node.id, { x: clampX(width * fraction), y: clampY(height * .43) });
+  if (targetNode) chain.push(targetNode);
+
+  const lane = 76;
+  chain.forEach((node, index) => {
+    const fraction = chain.length === 1 ? 50 : 12 + (index / (chain.length - 1)) * lane;
+    positions.set(node.id, { x: clampX(fraction), y: clampY(43) });
   });
+
+  // How many nodes share the lane is application data, not a measurement of the
+  // DOM, so the stylesheet is told and sizes the boxes to fit. This is the only
+  // number the renderer passes to CSS, and it replaces the alternative of
+  // measuring the canvas and setting pixel widths from JavaScript.
+  positions.chainLength = chain.length;
 
   const neighbours = topology.nodes.filter(node => node.role === "neighbour");
   neighbours.forEach((node, index) => {
@@ -206,16 +237,16 @@ function topologyPositions(topology, width, height) {
     const start = Math.PI / 2 - spread / 2;
     const angle = count === 1 ? Math.PI / 2 : start + (spread * index / (count - 1));
     positions.set(node.id, {
-      x: clampX(width * .57 + Math.cos(angle) * Math.min(260, width * .27)),
-      y: clampY(height * .5 + Math.sin(angle) * Math.min(145, height * .32))
+      x: clampX(57 + Math.cos(angle) * 27),
+      y: clampY(50 + Math.sin(angle) * 32)
     });
   });
 
   topology.nodes.forEach((node, index) => {
     if (!positions.has(node.id)) {
       positions.set(node.id, {
-        x: clampX(width * .3 + (index % 4) * 150),
-        y: clampY(75 + Math.floor(index / 4) * 105)
+        x: clampX(30 + (index % 4) * 17),
+        y: clampY(19 + Math.floor(index / 4) * 27)
       });
     }
   });
@@ -276,13 +307,15 @@ function drawTopology(topology, faultDomain, isLive) {
   grid.className = "topology-grid";
   canvas.append(grid);
 
-  const width = Math.max(canvas.clientWidth, 720);
-  const height = Math.max(canvas.clientHeight, 390);
-  const positions = topologyPositions(topology, width, height);
+  const positions = topologyPositions(topology);
+  canvas.style.setProperty("--fl-topo-chain", String(positions.chainLength || 5));
   const ns = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(ns, "svg");
   svg.classList.add("topology-links");
-  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  // The same 0-100 space the node offsets use, stretched to whatever the canvas
+  // happens to be. `vector-effect: non-scaling-stroke` in the stylesheet keeps
+  // the line weights even under the non-uniform scale.
+  svg.setAttribute("viewBox", "0 0 100 100");
   svg.setAttribute("preserveAspectRatio", "none");
   canvas.append(svg);
 
@@ -331,8 +364,8 @@ function drawTopology(topology, faultDomain, isLive) {
     for (const [id, element] of nodeEls.entries()) {
       const point = positions.get(id);
       if (!point) continue;
-      element.style.left = `${point.x}px`;
-      element.style.top = `${point.y}px`;
+      element.style.left = `${point.x}%`;
+      element.style.top = `${point.y}%`;
     }
     for (const link of topology.links || []) {
       const line = lineById.get(link.id);
@@ -354,8 +387,9 @@ function drawTopology(topology, faultDomain, isLive) {
       element.setPointerCapture(event.pointerId);
       const rect = canvas.getBoundingClientRect();
       const move = moveEvent => {
-        const x = Math.max(72, Math.min(width - 72, (moveEvent.clientX - rect.left) * (width / rect.width)));
-        const y = Math.max(48, Math.min(height - 48, (moveEvent.clientY - rect.top) * (height / rect.height)));
+        // Pointer pixels converted into the same 0-100 space the layout uses.
+        const x = Math.max(12, Math.min(88, ((moveEvent.clientX - rect.left) / rect.width) * 100));
+        const y = Math.max(12, Math.min(88, ((moveEvent.clientY - rect.top) / rect.height) * 100));
         positions.set(id, { x, y });
         placeNodes();
       };

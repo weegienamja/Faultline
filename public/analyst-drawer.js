@@ -167,7 +167,7 @@ function askForm() {
                 autocomplete="off" spellcheck="false" ${busy ? "disabled" : ""}></textarea>
       <button class="fl-btn fl-btn-primary fl-btn-sm" type="submit" ${busy ? "disabled" : ""}>${busy ? "…" : "Ask"}</button>
     </form>
-    <p class="fl-meta" style="margin-top:6px">
+    <p class="fl-meta fl-mt-2">
       Explains evidence. Does not produce Faultline findings. Local only.
     </p>`;
 }
@@ -218,7 +218,7 @@ function renderTurn(turn) {
         <span class="fl-label">Analyst interpretation · hypotheses, not findings</span>
         <ul class="fl-analyst-list">${response.possibleProblems.map(entry =>
           `<li>${escapeHtml(entry.description)}${refChips(entry.basis, resolvable)}</li>`).join("")}</ul>
-        <p class="fl-meta" style="margin-top:8px">Suggested by the local model. Faultline has not determined these.</p>
+        <p class="fl-meta fl-mt-2">Suggested by the local model. Faultline has not determined these.</p>
       </div>`);
     }
 
@@ -284,7 +284,7 @@ function render() {
     ? turns.map(renderTurn).join("")
     : `<div class="fl-analyst-block" data-kind="finding">
          <span class="fl-label">Ask about this screen</span>
-         <p class="fl-meta" style="margin-bottom:10px">
+         <p class="fl-meta fl-mb-3">
            The Analyst reads Faultline's evidence through read-only tools. It explains findings; it never makes them.
          </p>
          <div class="fl-starters">${suggestions.map(question =>
@@ -319,7 +319,7 @@ function installState() {
   if (status.state === "MODEL_NOT_INSTALLED") {
     return `<div class="fl-analyst-block" data-kind="finding">
       <span class="fl-label">Local AI is optional</span>
-      <p class="fl-meta" style="margin-bottom:10px">
+      <p class="fl-meta fl-mb-3">
         Faultline can use a local model to explain diagnostic evidence and answer questions about the
         current network state. No deterministic diagnosis is delegated to the model.
       </p>
@@ -328,8 +328,8 @@ function installState() {
         <div><dt>${escapeHtml(status.model)}</dt><dd>${badge("Not installed", "warn")}</dd></div>
         <div><dt>Download</dt><dd>~5.2 GB</dd></div>
       </dl>
-      <div style="margin-top:12px"><button class="fl-btn fl-btn-primary fl-btn-sm" type="button" data-analyst="install">Install model</button></div>
-      <p class="fl-meta" style="margin-top:8px">Downloads from Ollama's registry to this machine. Nothing is installed until you choose it.</p>
+      <div class="fl-mt-3"><button class="fl-btn fl-btn-primary fl-btn-sm" type="button" data-analyst="install">Install model</button></div>
+      <p class="fl-meta fl-mt-2">Downloads from Ollama's registry to this machine. Nothing is installed until you choose it.</p>
     </div>`;
   }
 
@@ -436,7 +436,13 @@ async function newConversation() {
 function setOpen(open) {
   drawer.hidden = !open;
   app.dataset.analyst = open ? "open" : "closed";
-  toggle.setAttribute("aria-expanded", String(open));
+  // Every control that opens the drawer reports the drawer's state, not just
+  // the one in the topbar. The rail gained a second control, and a control that
+  // declares aria-controls while never updating aria-expanded tells assistive
+  // technology the region is permanently collapsed.
+  for (const control of document.querySelectorAll('[aria-controls="analyst-drawer"]')) {
+    control.setAttribute("aria-expanded", String(open));
+  }
   sessionStorage.setItem("faultlineAnalystOpen", open ? "1" : "0");
   if (open) render();
 }
