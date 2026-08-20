@@ -1,5 +1,5 @@
 import "./intelligence-panel.js";
-import { words } from "./shell.js";
+import { auth, words } from "./shell.js";
 
 const openButton = document.getElementById("invite-open");
 const dialog = document.getElementById("invite-dialog");
@@ -101,7 +101,7 @@ openButton.addEventListener("click", async () => {
   resultBox.hidden = true;
 
   if (!adminToken()) {
-    document.getElementById("auth-open")?.click();
+    auth.promptUnlock();
     return;
   }
 

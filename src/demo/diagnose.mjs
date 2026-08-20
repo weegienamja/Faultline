@@ -194,11 +194,18 @@ export async function runDemoDiagnostic(targetInput, options = {}) {
             ms: tls?.elapsedMs ?? null,
             detail: tls ? (tls.ok ? `${tls.protocol} · ${tls.cipher}` : tls.error) : "target is not HTTPS"
           }),
+          // PASS here means the HTTP exchange COMPLETED, which is the question
+          // a connectivity tool is asking: a 403 from a bot filter proves the
+          // path works and is not a network fault. But green next to a 4xx
+          // reads as "Faultline thinks a 403 is healthy", so a non-success
+          // status says what the PASS does and does not cover.
           stage("HTTP", http ? (http.ok ? "pass" : "fail") : "not-measured", {
             ms: http?.ttfbMs ?? null,
             detail: http
               ? (http.ok
-                  ? `HTTP ${http.status}${http.redirects.length ? ` after ${http.redirects.length} redirect(s)` : ""}`
+                  ? `HTTP ${http.status}${http.redirects.length ? ` after ${http.redirects.length} redirect(s)` : ""}${
+                      http.status >= 400 ? " · answered, not a success status" : ""
+                    }`
                   : http.error)
               : "no HTTP URL for this target"
           })

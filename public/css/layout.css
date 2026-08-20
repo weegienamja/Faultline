@@ -500,6 +500,16 @@
     border-block-end: 1px solid var(--fl-line);
   }
 
+  /* The mark is a 20px square rotated 45deg, so it paints 28px wide — 4px
+     outside its own box on each side. In the vertical rail the brand's inline
+     padding absorbed that; the icon-rail rules above zero that padding, and in
+     the horizontal rail the brand sits flush at x=0, which clipped the left
+     corner of the logo off the screen. Give it back exactly the overhang. */
+  .fl-brand {
+    padding-inline: 0.3rem;
+    flex: 0 0 auto;
+  }
+
   .fl-nav {
     display: flex;
     gap: var(--fl-s1);

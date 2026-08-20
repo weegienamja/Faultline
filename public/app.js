@@ -1,5 +1,5 @@
 import { buildLivePathTopology, normaliseTopology } from "./topology-view.js";
-import { runtime, state, words } from "./shell.js";
+import { auth, runtime, state, words } from "./shell.js";
 
 const ids = [
   "incident-list", "fault-domain", "confidence", "confidence-ring", "diagnosis-summary",
@@ -450,13 +450,10 @@ function renderEmptyOverview() {
                   <a class="fl-btn" href="#/recorder">Start the Flight Recorder</a>
                   <button class="fl-btn" type="button" data-action="invite">New diagnostic</button>`
       })
-    : state({
-        icon: "◌",
-        tone: "locked",
-        title: "Live data is locked",
-        body: words.lockedBody("The collected diagnostics archive"),
-        actions: words.lockedAction
-      })}</section>`;
+    // On a public demo this is not a credential wall the visitor can pass; it
+    // is an operator archive that belongs to a Faultline someone runs
+    // themselves. auth.lockedState says that, and points at the demo.
+    : auth.lockedState("The collected diagnostics archive")}</section>`;
 
   renderProbeFleet();
   els["topology-panel"].hidden = true;

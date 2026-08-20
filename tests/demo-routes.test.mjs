@@ -33,8 +33,10 @@ function startServer(port, dataFile, env = {}) {
       FAULTLINE_RUNTIME: "hosted",
       VERCEL: "1",
       VERCEL_REGION: "test1",
-      // Enough headroom for the policy sweep below, which deliberately spends a
-      // slot per refused target (see src/demo/limits.mjs).
+      // Headroom for the sweeps below. A statically refused target is refunded
+      // against the live budget and charged to the wider refusal bucket
+      // instead (see src/demo/limits.mjs), but the sweeps also run real
+      // diagnostics, and this keeps the suite independent of timing.
       FAULTLINE_DEMO_RATE_PER_MIN: "120",
       FAULTLINE_DEMO_RATE_INSTANCE_PER_MIN: "600",
       ...env
@@ -145,6 +147,46 @@ test("the hosted public demo is usable without a credential, and nothing else is
       assert.equal(json.status, 200);
       assert.equal(json.body.incident.simulated, true);
       assert.ok(json.body.integrity.digest);
+    });
+
+    await t.test("the capsule OPENS, and only downloads when asked", async () => {
+      // "Open the capsule" is a link with target=_blank. Served as an
+      // attachment the browser downloaded a file and left the tab blank, so the
+      // one artefact arguing the evidence is portable was never actually seen.
+      const opened = await request(base, "/api/demo/incidents/ipv6-path-failure/capsule");
+      assert.match(opened.headers.get("content-disposition"), /^inline;/);
+      assert.equal(opened.headers.get("x-content-type-options"), "nosniff");
+
+      const csp = opened.headers.get("content-security-policy");
+      assert.match(csp, /default-src 'none'/, "a capsule fetches nothing");
+      assert.match(csp, /script-src 'unsafe-inline'/, "its own inline integrity check still runs");
+      assert.doesNotMatch(csp, /connect-src|https:/, "nothing in a capsule may reach the network");
+
+      const downloaded = await request(base, "/api/demo/incidents/ipv6-path-failure/capsule?download=1");
+      assert.match(downloaded.headers.get("content-disposition"), /^attachment;/);
+      assert.match(downloaded.headers.get("content-disposition"), /faultline-FLR-DEMO-IPV6\.html/);
+    });
+
+    await t.test("a refused target does not spend the visitor's diagnostic budget", async () => {
+      // Every one of these is refused on the string alone: no lookup, no
+      // socket. The demo used to charge each of them against the same ten
+      // requests a real diagnostic comes out of, so exploring the allowlist
+      // locked a visitor out before they had run anything.
+      const refused = [
+        "127.0.0.1", "localhost", "ftp://github.com", "https://github.com:22",
+        "notallowed.test", "github.com.evil.test", "https://user:pass@github.com",
+        "github.com/../x", "", "a".repeat(300), "metadata.google.internal", "::1"
+      ];
+      for (const target of refused) {
+        const response = await request(base, "/api/demo/diagnose", {
+          method: "POST",
+          body: JSON.stringify({ target })
+        });
+        assert.ok(
+          response.status === 400 || response.status === 403,
+          `${target || "(empty)"} should be refused by policy, got ${response.status}`
+        );
+      }
     });
 
     await t.test("a bad investigation reference is refused, never used as a path", async () => {

@@ -84,7 +84,7 @@ function hero() {
         ${source("measured", vantageLabel())}
         <span>Real measurements originate from Faultline's hosted deployment — not from your device, browser or LAN.</span>
       </p>
-      <p class="fl-status-line" id="demo-status" data-tone="info"></p>
+      <p class="fl-status-line" id="demo-status" role="status" aria-live="polite" data-tone="info"></p>
     </div>
   </section>`;
 }
@@ -449,7 +449,12 @@ function timelineTable(rows) {
       <td data-label="Window">${escapeHtml(row.window)}</td>
       <td data-label="State">${badge(String(row.state).toUpperCase(), statusOf(row.state), { code: true })}</td>
       <td data-label="Target">${escapeHtml(row.targetTcp || "—")}${row.targetTcpError ? ` <small>${escapeHtml(row.targetTcpError)}</small>` : ""}</td>
-      <td data-label="Interface">${escapeHtml(row.activeInterface || "—")}${row.vpn ? " <small>VPN</small>" : ""}</td>
+      <td data-label="Interface">${escapeHtml(row.activeInterface || "—")}${
+        // The tag marks a tunnel as a tunnel. An adapter already called
+        // "Corp VPN" rendered as "Corp VPN VPN", which reads as a typo in the
+        // one table that has to look like a faithful record.
+        row.vpn && !/\bvpn\b/i.test(String(row.activeInterface || "")) ? " <small>VPN</small>" : ""
+      }</td>
       <td data-label="Resolvers"><code>${escapeHtml((row.resolvers || []).join(", ") || "—")}</code></td>
       <td data-label="Answer"><code>${escapeHtml(row.resolvedAddress || "—")}</code></td>
     </tr>`).join("")}</tbody>

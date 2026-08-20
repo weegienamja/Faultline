@@ -82,7 +82,8 @@
 
       <div class="fl-rail-foot">
         <span class="fl-dot" id="rail-auth-dot" data-status="idle"></span>
-        <span id="rail-auth-text">Live data locked</span>
+        <span id="rail-auth-text" data-local-only>Live data locked</span>
+        <span id="rail-auth-text-demo" data-demo-only>Public demo</span>
       </div>
     </aside>
 
@@ -267,10 +268,20 @@
         <section class="fl-view" data-view="topology" data-view-title="Topology &amp; Paths" data-view-group="Isolate">
           <div class="fl-view-head">
             <div>
-              <p class="fl-body fl-prose">
+              <!-- Two paragraphs, gated by the runtime attribute the server
+                   stamps onto <html>, so the first paint already says the true
+                   one. A local framing on a page served from a datacentre would
+                   read as a map of the visitor's own network. -->
+              <p class="fl-body fl-prose" data-local-only>
                 Local topology inferred from routing, adapter and neighbour evidence, extended with
                 observed public hops. Inferred relationships are drawn differently from observed ones —
                 Faultline does not claim topology it did not measure.
+              </p>
+              <p class="fl-body fl-prose" data-demo-only>
+                Topology is inferred from the routing, adapter and neighbour evidence of the machine
+                being investigated, extended with observed public hops. A hosted deployment has none
+                of a visitor's, so it draws no map here — Faultline does not claim topology it did
+                not measure.
               </p>
             </div>
           </div>

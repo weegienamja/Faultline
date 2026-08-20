@@ -77,7 +77,16 @@ export const words = {
     return runtime.isPublicDemo
       ? `<button class="fl-btn fl-btn-primary" data-goto="demo">Open the hosted demo</button>`
       : `<button class="fl-btn fl-btn-primary" data-action="unlock">Unlock live data</button>`;
-  }
+  },
+  /**
+   * Where a measurement this deployment takes actually comes from.
+   *
+   * Panels used to hard-code "Measured locally", which is true of an operator's
+   * own install and a lie on a hosted one. They ask here instead.
+   */
+  get measuredHere() { return runtime.isHosted ? runtime.vantageLabel : "Measured locally"; },
+  /** The machine a local install is running on, named in a way hosting cannot make false. */
+  get thisMachine() { return runtime.isHosted ? "the machine running Faultline" : "this machine"; }
 };
 
 export function escapeHtml(value) {
@@ -313,6 +322,17 @@ export function onView(name, fn) {
 
 function start() {
   readViews();
+  // The brand mark is the one control every visitor tries. On a public demo it
+  // pointed at Overview - an operator archive that is locked here - so clicking
+  // the logo from the demo landed on "Live data is locked". It goes where the
+  // deployment's own front door is instead.
+  if (runtime.isPublicDemo) {
+    const brand = document.querySelector(".fl-brand");
+    if (brand) {
+      brand.setAttribute("href", "#/demo");
+      brand.setAttribute("aria-label", "Faultline hosted demo");
+    }
+  }
   apply(routeFromHash());
   window.addEventListener("hashchange", () => apply(routeFromHash()));
 }
@@ -349,6 +369,22 @@ export const auth = {
       body: words.lockedBody(what),
       actions: words.lockedAction
     });
+  },
+  /**
+   * Ask for the credential, but ONLY where asking is a route the person can take.
+   *
+   * A public visitor cannot hold the operator's admin token, so putting that
+   * dialog in front of them turns an ordinary click into "I need the
+   * developer's password to use this" - the single impression this demo most
+   * has to avoid. On a public demo the panel's own inline explanation is the
+   * whole answer and nothing is prompted.
+   *
+   * Returns true when the dialog was opened, so callers can branch.
+   */
+  promptUnlock() {
+    if (runtime.isPublicDemo) return false;
+    document.getElementById("auth-open")?.click();
+    return true;
   }
 };
 

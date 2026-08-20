@@ -91,10 +91,23 @@ export function createDemoRouter({
       }
 
       const html = renderInvestigationCapsule(investigation);
+      // The capsule is the Preserve half of the demo, and the control that
+      // opens it says "Open the capsule". Served as an attachment it never
+      // opened: the browser downloaded a file and the tab stayed blank, so the
+      // one artefact that argues the evidence is portable was the one thing a
+      // visitor never saw. It is INLINE by default and downloadable on request,
+      // keeping the same filename either way.
+      const download = url.searchParams.get("download") === "1";
       res.writeHead(200, {
         "content-type": "text/html; charset=utf-8",
         "cache-control": "no-store",
-        "content-disposition": `attachment; filename="${investigation.capsuleFilename}"`
+        // A capsule is self-contained: its only script is the inline integrity
+        // check Faultline writes into it, and it fetches nothing. Pinning that
+        // shape means an inline render cannot reach the network or frame
+        // anything, whatever ends up in the evidence it is describing.
+        "content-security-policy": "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:; base-uri 'none'; form-action 'none'",
+        "x-content-type-options": "nosniff",
+        "content-disposition": `${download ? "attachment" : "inline"}; filename="${investigation.capsuleFilename}"`
       });
       res.end(html);
       return true;
@@ -125,15 +138,25 @@ export function createDemoRouter({
           throw error;
         }
 
-        const result = await runDiagnostic(String(payload.target ?? ""), {
-          allowlist,
-          vantages: payload.vantages,
-          // A caller may turn optional enrichment OFF (faster, fewer external
-          // calls) but may not turn anything ON that policy does not already
-          // permit. There is no caller-controlled destination here at all.
-          distributed: payload.distributed !== false,
-          enrich: payload.enrich !== false
-        });
+        let result;
+        try {
+          result = await runDiagnostic(String(payload.target ?? ""), {
+            allowlist,
+            vantages: payload.vantages,
+            // A caller may turn optional enrichment OFF (faster, fewer external
+            // calls) but may not turn anything ON that policy does not already
+            // permit. There is no caller-controlled destination here at all.
+            distributed: payload.distributed !== false,
+            enrich: payload.enrich !== false
+          });
+        } catch (error) {
+          // Refused on the string alone - it never resolved and never
+          // connected. Give the live slot back and charge the wider refusal
+          // bucket, so exploring the allowlist does not lock a visitor out of
+          // the diagnostic the demo exists to show.
+          if (error?.preNetwork) release.refund();
+          throw error;
+        }
 
         json(res, 201, result);
         return true;

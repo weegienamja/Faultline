@@ -666,10 +666,21 @@
 
       &::before {
         content: attr(data-label);
+        grid-column: 1;
         font-size: var(--fl-fs-micro);
         text-transform: uppercase;
         letter-spacing: 0.06em;
         color: var(--fl-text-3);
+      }
+
+      /* Every element in the value stays in the VALUE column.
+         A cell like `FAIL <small>ENETUNREACH</small>` is two grid items, and
+         without this the second auto-placed onto a new row under the label —
+         so the sample table read "TARGET / ENETUNREACH" with the state stranded
+         beside it. They line up beside each other instead. */
+      & > * {
+        grid-column: 2;
+        align-self: baseline;
       }
     }
 

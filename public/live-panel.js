@@ -11,7 +11,7 @@
 // the runtime capability model instead, so there is one answer to "who measured
 // this" across the whole product.
 
-import { runtime, words } from "./shell.js";
+import { auth, runtime, words } from "./shell.js";
 
 const SOURCE_LABELS = {
   local: "LOCAL",
@@ -67,7 +67,7 @@ panel.innerHTML = `
       <span class="section-label">REAL NETWORK EVIDENCE</span>
       <h2 class="fl-panel-title fl-mt-1">Test a real target</h2>
       <p class="fl-body fl-prose fl-mt-2">
-        Runs genuine DNS, TCP, TLS, HTTP, ICMP and path measurements from ${runtime.isHosted ? "the Faultline runtime serving this page" : "this machine"}, then adds public routing,
+        Runs genuine ${runtime.isHosted ? "DNS, TCP, TLS and HTTP" : "DNS, TCP, TLS, HTTP, ICMP and path"} measurements from ${runtime.isHosted ? "the Faultline runtime serving this page" : "this machine"}, then adds public routing,
         outage and network-ownership context. Everything below is measured or retrieved live.
       </p>
       ${runtime.isPublicDemo ? `<p class="fl-body fl-prose fl-mt-2">
@@ -85,17 +85,17 @@ panel.innerHTML = `
     </div>
   </div>
 
-  <div class="live-modes" id="live-modes">
+  <div class="live-modes" id="live-modes"${runtime.isPublicDemo ? ' hidden aria-hidden="true"' : ""}>
     <button class="live-mode active" type="button" data-mode="public">Test a public service</button>
     <button class="live-mode" type="button" data-mode="device">${runtime.isHosted ? "Test this runtime" : "Test this device"}</button>
-    <button class="live-mode" type="button" data-mode="environment">Load my environment</button>
+    <button class="live-mode" type="button" data-mode="environment">${runtime.isHosted ? "Load an environment manifest" : "Load my environment"}</button>
   </div>
 
-  <form class="live-form" id="live-form">
+  <form class="live-form" id="live-form"${runtime.isPublicDemo ? ' hidden aria-hidden="true"' : ""}>
     <input type="text" id="live-target" placeholder="example.com · 1.1.1.1 · https://example.com/health" autocomplete="off" spellcheck="false" value="example.com" />
     <button class="primary-button" type="submit" id="live-run">Run live diagnostic</button>
   </form>
-  <p class="live-status" id="live-status"></p>
+  <p class="live-status" id="live-status" role="status" aria-live="polite"></p>
 
   <div id="live-environment" hidden>
     <div class="live-env-actions">
@@ -123,6 +123,13 @@ const modes = panel.querySelector("#live-modes");
 const envBlock = panel.querySelector("#live-environment");
 const envManifest = panel.querySelector("#env-manifest");
 const envResult = panel.querySelector("#env-result");
+
+// On a public demo the controls above are hidden, so the view would otherwise
+// end at a row of source badges over an empty screen. Every other operator
+// surface answers with the same designed state; this one should too.
+if (runtime.isPublicDemo && results) {
+  results.innerHTML = `<section class="fl-panel">${auth.lockedState("The unrestricted live diagnostic")}</section>`;
+}
 
 let mode = "public";
 
@@ -509,7 +516,7 @@ form.addEventListener("submit", async event => {
       : error.message;
     // Prompting a public visitor for a credential they do not have is a dead
     // end; on the hosted demo the useful move is the demo diagnostic instead.
-    if (error.status === 401 && !runtime.isPublicDemo) document.getElementById("auth-open")?.click();
+    if (error.status === 401) auth.promptUnlock();
   } finally {
     runButton.disabled = false;
   }
@@ -555,7 +562,7 @@ async function submitManifest(path, activated) {
     renderManifest(data, activated);
   } catch (error) {
     envResult.innerHTML = `<p class="live-status error">${escapeHtml(error.message)}</p>`;
-    if (error.status === 401) document.getElementById("auth-open")?.click();
+    if (error.status === 401) auth.promptUnlock();
   }
 }
 
