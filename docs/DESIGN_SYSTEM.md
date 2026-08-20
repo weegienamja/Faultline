@@ -24,7 +24,7 @@ inside a large stylesheet.
 | Layer | File | Owns |
 |---|---|---|
 | `reset` | `reset.css` | the handful of UA defaults worth normalising |
-| `tokens` | `tokens.css` | custom properties only — never a painted declaration |
+| `tokens` | `tokens.css` | custom properties only - never a painted declaration |
 | `base` | `base.css` | element defaults built from tokens |
 | `layout` | `layout.css` | the shell and the three layout primitives |
 | `components` | `components.css`, `chronology.css` | the shared vocabulary |
@@ -53,12 +53,12 @@ specificity back are gone.
 | **Everything else** | neutral | `--fl-text*`, `--fl-surface*`, `--fl-line*` |
 
 Chrome colour never appears inside a data region. Status colour is never
-decorative. Hierarchy inside a panel comes from weight, size and spacing — not
+decorative. Hierarchy inside a panel comes from weight, size and spacing, not
 from hue.
 
 **There is one chrome colour, not two.** The palette previously spent a mint
 brand (`oklch 78.6% .142 168`) and a green OK status (`oklch 79.7% .164 160`)
-eight degrees of hue apart at the same lightness — the same colour to the eye —
+eight degrees of hue apart at the same lightness, the same colour to the eye,
 so the brand mark, the primary button and a passing measurement were
 indistinguishable. Chrome is now a signal cyan at hue 208, 48 degrees off the OK
 green, and it replaced the old blue accent as well. One interactive colour, and
@@ -74,13 +74,13 @@ Status vocabulary is centralised in `statusOf()` in `shell.js`. Panels translate
 their domain words (`PASS`, `SUPPORTED`, `stale`, `CONTRADICTED`, …) through it
 instead of picking a colour.
 
-`data-status` resolves to three slots — `--fl-status`, `--fl-status-soft`,
-`--fl-status-line` — and components read those. A status-bearing component is
+`data-status` resolves to three slots - `--fl-status`, `--fl-status-soft`,
+`--fl-status-line` - and components read those. A status-bearing component is
 one rule, not four near-identical ones.
 
 ## 3. Type
 
-Six sizes. Nothing below 11px — the panels that shipped 8px uppercase labels are
+Six sizes. Nothing below 11px - the panels that shipped 8px uppercase labels are
 the clearest "prototype" tell in a dense interface.
 
 | Token | Size | Use |
@@ -101,13 +101,13 @@ Uppercase micro-labels are `600` weight, `.08em` tracking, `--fl-text-3`. They
 are labels, not accents; they are never coloured.
 
 Every figure a reader might compare down a column is `tabular-nums`. Machine
-values — addresses, IDs, interface names — use `.fl-value`, which is monospace
+values - addresses, IDs, interface names - use `.fl-value`, which is monospace
 and breaks anywhere, because a 63-character hostname label must wrap rather than
 push a dashboard column wide.
 
 ## 4. Spacing, radius, elevation
 
-- **Spacing**: 4px base — `--fl-s1` … `--fl-s8`. `--fl-gutter` is the one fluid
+- **Spacing**: 4px base - `--fl-s1` … `--fl-s8`. `--fl-gutter` is the one fluid
   value, so page padding tightens on a genuinely small surface with no query.
 - **Radius**: `4` chip, `6` control, `8` card, `999` pill. No other values. The
   injected panel sheets between them used 8, 9, 10, 11, 14 and 999.
@@ -125,12 +125,12 @@ Touch targets come from `@media (pointer: coarse)`, not from a width guess: a
 
 Two mechanisms for two jobs.
 
-**Viewport media queries — the shell only.** Three of them, down from thirteen.
+**Viewport media queries - the shell only.** Three of them, down from thirteen.
 Whether the navigation rail is labelled, iconised or horizontal is a property of
 the window, and the drawer's column-vs-overlay decision is a sibling
 relationship no container can see.
 
-**Container queries — everything else.** A component adapts to the space it was
+**Container queries - everything else.** A component adapts to the space it was
 actually given. This is what makes a 600px desktop window behave like a 600px
 region rather than like a phone, and what lets the same panel render correctly
 in a wide dashboard column and in the 400px Analyst drawer with no
@@ -138,7 +138,7 @@ page-specific rule.
 
 **There are no breakpoint tokens.** Three of them used to exist, documented as
 the single source of truth for the layout thresholds, and they were referenced
-zero times — a media or container query condition cannot consume a custom
+zero times - a media or container query condition cannot consume a custom
 property. They were documentation dressed as configuration, and the thresholds
 had already drifted behind them. The real values are written literally at each
 query with the reason beside them:
@@ -165,18 +165,18 @@ Named containers, because they nest:
 Three layout primitives replace the 12-column grid, whose only real users were a
 5/7 and an 8/4 split decided by viewport width:
 
-- `.fl-cards` — peers that fill the space. `repeat(auto-fit, minmax(min(100%,
+- `.fl-cards` - peers that fill the space. `repeat(auto-fit, minmax(min(100%,
   var(--fl-card-min, 18rem)), 1fr))`. Fully intrinsic; no query at all. The
   `min(100%, …)` is what stops the track overflowing a narrow container.
-- `.fl-split` — a primary region with a secondary one beside it. Stacks by
+- `.fl-split` - a primary region with a secondary one beside it. Stacks by
   default, goes side by side only when its own container is wide enough.
-- `.fl-stack` / `.fl-row` — vertical rhythm and wrapping inline groups.
+- `.fl-stack` / `.fl-row` - vertical rhythm and wrapping inline groups.
 
 The shell is a rail plus a sticky topbar over a scrolling content column. Views
 are real routed destinations (`#/bisect`), not anchors into one long page.
 
-Navigation is grouped by the product's four verbs — **Capture, Isolate, Explain,
-Preserve** (plus Manage) — so the rail teaches the product model rather than
+Navigation is grouped by the product's four verbs - **Capture, Isolate, Explain,
+Preserve** (plus Manage) - so the rail teaches the product model rather than
 listing screens.
 
 ## 6. Components
@@ -204,7 +204,7 @@ Build with the helpers in `shell.js` (`panel()`, `tile()`, `badge()`,
 markup, so a change to a primitive reaches every surface.
 
 `.fl-table[data-stack]` requires `data-label` on each `<td>`. The `<thead>` stays
-in the accessibility tree, visually hidden — nothing is dropped, the columns are
+in the accessibility tree, visually hidden - nothing is dropped, the columns are
 relabelled individually because the header has scrolled away.
 
 ## 7. Evidence is the visual language
@@ -213,8 +213,8 @@ Faultline's backend maintains strict epistemic boundaries. The interface carries
 them as plainly as the data model does, because a user who cannot tell them
 apart on screen has lost the property the product exists to provide.
 
-Five classes, separated by **four independent signals**, so no single failure —
-colour blindness, greyscale, a screenshot, a printed capsule — collapses two
+Five classes, separated by **four independent signals**, so no single failure -
+colour blindness, greyscale, a screenshot, a printed capsule - collapses two
 into one:
 
 | Class | Frame | Ground | Glyph | Weight |
@@ -245,7 +245,7 @@ Live Diagnostics runs a rule engine. Network Bisect runs experiments. The double
 rule, the raised ground and the filled chrome chip belong to Bisect and to
 nothing else; a rule-engine verdict that borrowed them would be claiming a
 controlled experiment that never happened. Every class differs from every other
-on **at least two** of the four signals — verified by computed style, not by
+on **at least two** of the four signals - verified by computed style, not by
 eye.
 
 - The **inline-start rule** is what says "Faultline asserts this". Interpretation
@@ -254,7 +254,7 @@ eye.
   a screenshot, which is exactly where a scenario could otherwise be mistaken
   for a capture of a real network.
 - Every class that is not a plain measurement **states its own limit in words**,
-  inside the block, every time — not in a legend elsewhere on the page.
+  inside the block, every time - not in a legend elsewhere on the page.
 - `.fl-panel:has([data-evidence="simulated"])` marks the panel header, so a user
   who scrolled past the banner still cannot read scripted numbers as
   measurements. `.fl-evidence-set:has(…)` marks a group that *mixes* scripted
@@ -274,7 +274,7 @@ A rail runs the width of it, coloured by the state of each phase. **At the
 trigger the rail steps down, and at recovery it steps back up.** The
 displacement is the product's name made functional: the offset marks exactly
 where the observed state changed, and the eye finds it before it reads a label.
-It is used here and nowhere else — drawing it on unrelated surfaces would turn a
+It is used here and nowhere else - drawing it on unrelated surfaces would turn a
 diagnostic into a motif.
 
 The phases share grid rows through `subgrid`, so "state", "duration" and
@@ -294,11 +294,11 @@ dropped.
 Every surface needs all of these. An empty surface must say what it will contain
 and how to fill it, or it reads as broken.
 
-- **Empty** — what goes here, and the action that produces it.
-- **Loading** — skeletons at the shape of the incoming content.
-- **Error** — what failed, in the API's own words, plus a retry.
-- **Locked** — `auth.lockedState()`, so every gated panel reads identically.
-- **Busy** — `aria-busy="true"` on a control, so the state is announced as well
+- **Empty** - what goes here, and the action that produces it.
+- **Loading** - skeletons at the shape of the incoming content.
+- **Error** - what failed, in the API's own words, plus a retry.
+- **Locked** - `auth.lockedState()`, so every gated panel reads identically.
+- **Busy** - `aria-busy="true"` on a control, so the state is announced as well
   as drawn.
 
 **Do not render placeholder data to make a screen look finished.**
@@ -328,7 +328,7 @@ and how to fill it, or it reads as broken.
   accessibility tree.
 - Every control that opens a region reports that region's state. `setOpen()` in
   the Analyst drawer writes `aria-expanded` to *all* `[aria-controls]` controls,
-  not just the one it was written for — the rail and the topbar both open the
+  not just the one it was written for - the rail and the topbar both open the
   drawer, and a control that declares `aria-controls` while never updating
   `aria-expanded` tells assistive technology the region is permanently collapsed.
 - `touch-action` is claimed by the smallest element that needs it. The topology
@@ -337,7 +337,7 @@ and how to fill it, or it reads as broken.
 
 ## 12. Extending it
 
-1. If a token is missing, add it to `tokens.css` — never to a component.
+1. If a token is missing, add it to `tokens.css` - never to a component.
 2. If a component is missing, add it to `components.css` and a helper to
    `shell.js`.
 3. **Panels do not inject stylesheets.** An injected `<style>` is unlayered and
@@ -350,7 +350,7 @@ and how to fill it, or it reads as broken.
    not fit at 11px, the answer is to stop rendering it, not to shrink it.
 7. Prefer a prefixed class name to a scoping mechanism. Live Diagnostics' inner
    classes were held apart with `@scope`, which worked but made a large surface
-   depend on that feature being supported — where it is not, the whole block is
+   depend on that feature being supported - where it is not, the whole block is
    discarded. `.live-*` achieves the same containment with ordinary selectors.
 8. New surfaces get `data-evidence` if they display anything that is not a
    direct measurement. That is not optional; it is the product's argument. If
