@@ -1,7 +1,7 @@
-# Network Bisect — adaptive fault isolation
+# Network Bisect - adaptive fault isolation
 
 `git bisect` finds the commit that broke a build. Network Bisect finds the
-**network condition** that changes whether a target works — and it chooses which
+**network condition** that changes whether a target works - and it chooses which
 experiment to run next rather than sweeping every test.
 
 ```bash
@@ -32,14 +32,14 @@ Every step is recorded, so a run reads as reasoning rather than as output:
 
 ```text
   Baseline
-  FAIL 3/3 — ECONNREFUSED
+  FAIL 3/3 - ECONNREFUSED
 
   Baseline fails consistently. Isolating which condition changes that.
 
   [1] IP address family: IPv4 only
       Highest discrimination score (6.6). Separates 10 live explanations into
       3 predicted outcomes (3/3/4).
-      PASS 3/3 — HTTP 200
+      PASS 3/3 - HTTP 200
 
   Confirming (interleaved A/B; A = baseline)
       A- B+ A- B+ A- B+   held under alternation
@@ -85,8 +85,8 @@ The engine interprets a healthy baseline completely differently from a failing o
 
 | Baseline | What the run becomes |
 |---|---|
-| `FAILED_BASELINE` | true fault isolation — look for `FAIL → PASS` |
-| `HEALTHY_BASELINE` | differential capability analysis — nothing is broken |
+| `FAILED_BASELINE` | true fault isolation - look for `FAIL → PASS` |
+| `HEALTHY_BASELINE` | differential capability analysis - nothing is broken |
 | `INTERMITTENT_BASELINE` | isolation **refused**, flake rate reported |
 
 A healthy baseline never produces a "fault". `github.com` not answering over
@@ -112,7 +112,7 @@ For a candidate experiment, every live hypothesis states what it expects.
 That partitions the live set by predicted outcome. If they all predict the same
 thing, the experiment cannot change what is believed, and it scores zero.
 
-Otherwise the score uses the **expected size of the surviving hypothesis set** —
+Otherwise the score uses the **expected size of the surviving hypothesis set** -
 the standard "expected remaining candidates" measure from decision-tree and
 Mastermind-style solvers:
 
@@ -135,13 +135,13 @@ Worked examples with **N = 6**:
 | 1 / 5 | `(1/6)·1 + (5/6)·5` = **4.33** | 1.67 |
 | 6 / 0 | `(6/6)·6` = **6.00** | 0.00 |
 
-So a balanced 3/3 split outranks a lopsided 1/5 at equal cost — the property a
+So a balanced 3/3 split outranks a lopsided 1/5 at equal cost - the property a
 bisection strategy needs. Hypotheses answering `UNKNOWN` make no commitment and
 are excluded from the partition rather than lumped into a group they never
 claimed.
 
 Ties break deterministically: lower cost, then lower intrusiveness, then registry
-order, then id. **The same evidence always produces the same plan** — there is a
+order, then id. **The same evidence always produces the same plan** - there is a
 test for it.
 
 ### Predictions
@@ -195,7 +195,7 @@ interface `PRIMARY` regardless of what it is called.
 
 Classifications: `PRIMARY`, `ETHERNET`, `WIFI`, `VPN`, `VIRTUAL`, `HOST_ONLY`,
 `LOOPBACK`, `UNKNOWN`. A vendor is never asserted from a description string
-alone — "host-only" is used because the OS also reports no default route through
+alone - "host-only" is used because the OS also reports no default route through
 it. On non-Windows hosts route state is `UNKNOWN`, which the planner treats as
 "cannot decide" rather than "no route".
 
