@@ -292,9 +292,13 @@ Writes still use a temporary file followed by rename. The store remains intentio
 
 ## Dashboard access model
 
-Demo incidents remain public.
+There is no public incident feed. Faultline used to serve a fixed set of
+hand-written incidents unauthenticated so a fresh install looked populated; it
+no longer does, and an installation with no collected evidence presents an empty
+state rather than sample data.
 
-Live diagnostic data and registered probe health require the administrator credential. The browser keeps that credential in `sessionStorage`, not in URLs or persistent local storage.
+Collected diagnostics, live diagnostic data and registered probe health all
+require the administrator credential. The browser keeps that credential in `sessionStorage`, not in URLs or persistent local storage.
 
 Live telemetry and probe metadata rendered through HTML templates are escaped before insertion.
 

@@ -59,7 +59,7 @@ export function dot(status = "idle") {
   return `<span class="fl-dot" data-status="${escapeHtml(status)}"></span>`;
 }
 
-/** Where a number came from: measured | inferred | external | demo. */
+/** Where a number came from: measured | inferred | external | simulated. */
 export function source(kind, label = kind) {
   return `<span class="fl-source" data-kind="${escapeHtml(kind)}">${escapeHtml(label)}</span>`;
 }

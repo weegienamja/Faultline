@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { incidents } from "../src/engine/incidents.mjs";
+import { incidents } from "./fixtures/reference-incidents.mjs";
 import { diagnose } from "../src/engine/diagnose.mjs";
 import {
   dbscan,

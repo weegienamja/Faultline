@@ -172,13 +172,6 @@
   background: var(--fl-chrome-soft);
 }
 
-.fl-source[data-kind="demo"] {
-  --fl-ev-glyph: "\25CB";
-  border-style: dashed;
-  color: var(--fl-text-3);
-  background: transparent;
-}
-
 /* --------------------------------------------------------------------------
    Live Diagnostics source badges
    --------------------------------------------------------------------------
@@ -249,13 +242,6 @@
   color: var(--fl-warn);
   border-color: var(--fl-warn-line);
   background: var(--fl-warn-soft);
-}
-
-.src-demo {
-  --fl-ev-glyph: "\25CB";
-  border-style: dashed;
-  color: var(--fl-text-3);
-  background: transparent;
 }
 
 /* ==========================================================================

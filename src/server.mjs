@@ -4,7 +4,6 @@ import { extname, join, normalize, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { diagnose } from "./engine/diagnose.mjs";
 import { correlateAgentRun } from "./engine/correlate.mjs";
-import { incidents } from "./engine/incidents.mjs";
 import { bearerToken, generateCredential, hashCredential, isSessionExpired, verifyCredential, verifySessionRole } from "./security/auth.mjs";
 import { assertLiteralTargetAllowed } from "./security/target.mjs";
 import { claimDiagnosticInvitation, createDiagnosticSession, exchangeClientLaunch, findSessionByInvitationToken, normaliseSessionInput, publicSession } from "./session/service.mjs";
@@ -200,18 +199,6 @@ async function requireInvitation(req) {
   }
 
   return { session, token };
-}
-
-function demoIncidents() {
-  return incidents.map(incident => ({
-    ...incident,
-    source: "demo",
-    vantages: {
-      endpoint: true,
-      remoteProbe: typeof incident.metrics.externalProbeHealthy === "boolean"
-    },
-    diagnosis: diagnose(incident.metrics)
-  }));
 }
 
 async function createAgentRun(payload, session) {
@@ -430,13 +417,12 @@ const server = createServer(async (req, res) => {
       });
     }
 
-    if (req.method === "GET" && url.pathname === "/api/demo-incidents") {
-      return json(res, 200, demoIncidents());
-    }
-
+    // Real collected runs only. This used to append a fixed set of hand-written
+    // incidents so a fresh install looked populated; it no longer does. An empty
+    // Faultline returns an empty list and the interface says so.
     if (req.method === "GET" && url.pathname === "/api/incidents") {
       requireAdmin(req);
-      return json(res, 200, [...await liveIncidents(5), ...demoIncidents()]);
+      return json(res, 200, await liveIncidents(20));
     }
 
     if (req.method === "POST" && url.pathname === "/api/probes") {

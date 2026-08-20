@@ -1,4 +1,5 @@
 import { buildLivePathTopology, normaliseTopology } from "./topology-view.js";
+import { state } from "./shell.js";
 
 const ids = [
   "incident-list", "fault-domain", "confidence", "confidence-ring", "diagnosis-summary",
@@ -26,8 +27,7 @@ const escapeHtml = value => String(value ?? "")
 
 function sourceLabel(incident) {
   if (incident.source === "correlated") return '<b class="source-live">2 VANTAGES</b>';
-  if (incident.source === "agent") return '<b class="source-live">ENDPOINT ONLY</b>';
-  return "DEMO";
+  return '<b class="source-live">ENDPOINT ONLY</b>';
 }
 
 function applyAuthState() {
@@ -272,8 +272,9 @@ window.addEventListener("faultline-live-result", event => {
 });
 
 function renderTopology(incident) {
-  // Once a live diagnostic has produced a real path, keep showing it rather
-  // than reverting to a demo incident's synthetic topology.
+  // A completed live diagnostic produces a genuinely measured path. Keep it on
+  // screen rather than reverting to whatever topology the selected incident
+  // happened to carry.
   if (liveTopology) {
     drawTopology(liveTopology, liveFaultDomain, true);
     return;
@@ -422,9 +423,56 @@ function renderRoute(incident) {
   `).join("");
 }
 
+/**
+ * The Overview with nothing to show.
+ *
+ * Two genuinely different situations, and they need different words: the
+ * credential is missing, or there is simply no evidence yet. Neither is an
+ * error, and neither is a reason to invent an incident — the screen says which
+ * one it is and points at the surfaces that produce real evidence.
+ */
+function renderEmptyOverview() {
+  const analysis = document.getElementById("overview-analysis");
+  const empty = document.getElementById("overview-empty");
+  if (analysis) analysis.hidden = true;
+  if (!empty) return;
+
+  empty.innerHTML = `<section class="fl-panel">${adminToken
+    ? state({
+        icon: "◷",
+        title: "No diagnostics collected yet",
+        body: "Faultline shows evidence it has actually collected. Run a live diagnostic, start the Flight Recorder, or send a one-time invitation to an endpoint, and the incident appears here.",
+        actions: `<a class="fl-btn fl-btn-primary" href="#/live">Run a live diagnostic</a>
+                  <a class="fl-btn" href="#/recorder">Start the Flight Recorder</a>
+                  <button class="fl-btn" type="button" data-action="invite">New diagnostic</button>`
+      })
+    : state({
+        icon: "◌",
+        tone: "locked",
+        title: "Live data is locked",
+        body: "Collected diagnostics require the Faultline admin credential. It is held in this browser tab only and never persisted.",
+        actions: `<button class="fl-btn fl-btn-primary" data-action="unlock">Unlock live data</button>`
+      })}</section>`;
+
+  renderProbeFleet();
+  els["topology-panel"].hidden = true;
+  els["route-panel"].hidden = true;
+  // Downstream panels clear rather than keep the last incident on screen.
+  window.dispatchEvent(new CustomEvent("faultline-incident", { detail: { incident: null, incidents, probes } }));
+}
+
 function render() {
   const incident = incidents[activeIndex];
-  if (!incident) return;
+  if (!incident) {
+    renderEmptyOverview();
+    return;
+  }
+
+  const analysis = document.getElementById("overview-analysis");
+  const empty = document.getElementById("overview-empty");
+  if (analysis) analysis.hidden = false;
+  if (empty) empty.innerHTML = "";
+
   const result = incident.diagnosis;
   const m = incident.metrics;
 
@@ -442,11 +490,14 @@ function render() {
   els.connection.textContent = incident.connection;
 
   const twoVantages = incident.vantages?.remoteProbe === true || incident.source === "correlated";
-  els["incident-status"].textContent = incident.source === "demo" ? "Demo incident" : twoVantages ? "2 vantage points" : "Endpoint only";
-  els["incident-status"].dataset.status = incident.source === "demo" ? "idle" : "info";
-  els["measured-at"].textContent = incident.updatedAt || incident.collectedAt
-    ? new Date(incident.updatedAt || incident.collectedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
-    : "demo data";
+  els["incident-status"].textContent = twoVantages ? "2 vantage points" : "Endpoint only";
+  els["incident-status"].dataset.status = "info";
+  // Every incident on this screen is now a real collected run, so there is
+  // always a collection time to show.
+  const at = incident.updatedAt || incident.collectedAt;
+  els["measured-at"].textContent = at
+    ? new Date(at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+    : "unknown";
 
   const path = [
     { label: "Endpoint", value: incident.connection, status: m.gatewayLoss >= 5 ? "fail" : "pass" },
@@ -522,6 +573,8 @@ async function loadIncidents({ initial = false } = {}) {
   const activeId = incidents[activeIndex]?.id;
   let next;
 
+  // Locked, or a rejected credential, means no data — not sample data. There
+  // is no unauthenticated incident feed to fall back to any more.
   if (adminToken) {
     try {
       [next, probes] = await Promise.all([
@@ -532,11 +585,11 @@ async function loadIncidents({ initial = false } = {}) {
       if (error.status !== 401) throw error;
       probes = [];
       setAdminToken("");
-      next = await fetchJson("/api/demo-incidents");
+      next = [];
     }
   } else {
     probes = [];
-    next = await fetchJson("/api/demo-incidents");
+    next = [];
   }
 
   const newestLive = next.find(incident => incident.source === "agent" || incident.source === "correlated");
@@ -558,6 +611,10 @@ els["auth-open"].addEventListener("click", () => {
 });
 
 els["auth-cancel"].addEventListener("click", () => els["auth-dialog"].close());
+
+document.addEventListener("click", event => {
+  if (event.target.closest("[data-action='invite']")) document.getElementById("invite-open")?.click();
+});
 
 els["auth-form"].addEventListener("submit", async event => {
   event.preventDefault();

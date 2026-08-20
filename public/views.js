@@ -42,7 +42,12 @@ function renderOverviewTiles(detail) {
   const host = document.getElementById("overview-tiles");
   if (!host) return;
   const { incident, incidents = [], probes = [] } = detail || {};
-  if (!incident) return;
+  // No incident means the Overview is showing its empty state; the tiles clear
+  // rather than keeping the last incident's figures on screen.
+  if (!incident) {
+    host.innerHTML = "";
+    return;
+  }
 
   const m = incident.metrics || {};
   const severity = severityOf(incident);
@@ -76,10 +81,10 @@ function renderOverviewTiles(detail) {
       status: probes.length && online === 0 ? "crit" : "idle"
     }),
     tile({
-      label: "Reference incidents",
+      label: "Collected diagnostics",
       value: String(incidents.length),
-      sub: worst ? `${worst} failing` : "worked examples",
-      status: "idle"
+      sub: worst ? `${worst} failing` : incidents.length === 1 ? "this one" : "all healthy",
+      status: worst ? "warn" : "idle"
     })
   ].join("");
 }

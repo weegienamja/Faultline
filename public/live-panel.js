@@ -2,8 +2,8 @@
 //
 // Every value rendered here comes from a real measurement or a real public API
 // response returned by /api/live/diagnostics. Nothing is simulated. Each block
-// carries an explicit source badge so LIVE/LOCAL/PUBLIC-INTERNET data can never
-// be confused with the DEMO scenarios.
+// carries an explicit source badge so a local reading, a live measurement and
+// third-party routing context are never read as the same kind of evidence.
 
 const SOURCE_LABELS = {
   local: "LOCAL",
@@ -15,8 +15,7 @@ const SOURCE_LABELS = {
   peeringdb: "PEERINGDB",
   radar: "CLOUDFLARE RADAR",
   deterministic: "DETERMINISTIC",
-  inferred: "INFERRED",
-  demo: "DEMO"
+  inferred: "INFERRED"
 };
 
 function escapeHtml(value) {
@@ -59,8 +58,7 @@ panel.innerHTML = `
       <h2 class="fl-panel-title fl-mt-1">Test a real target</h2>
       <p class="fl-body fl-prose fl-mt-2">
         Runs genuine DNS, TCP, TLS, HTTP, ICMP and path measurements from this machine, then adds public routing,
-        outage and network-ownership context. Everything below is measured or retrieved live. The
-        <span class="src-badge src-demo">sample</span> incidents on the Overview remain synthetic.
+        outage and network-ownership context. Everything below is measured or retrieved live.
       </p>
     </div>
     <div class="fl-row-end">

@@ -82,11 +82,14 @@ DBSCAN is useful for the prototype because:
 
 A production system would tune and validate the density parameters against a substantially larger evidence set rather than treating these prototype values as universal thresholds.
 
-## Demo pattern
+## Test fixture
 
-The deterministic demo dataset contains six incidents.
+The clustering behaviour is pinned by a fixed six-incident fixture at
+[`tests/fixtures/reference-incidents.mjs`](../tests/fixtures/reference-incidents.mjs).
+It is used **only** by the tests. Nothing in `src/` imports it, and the running
+product never serves it.
 
-Three independent support scenarios intentionally share an upstream-degradation signature:
+Three of the six intentionally share an upstream-degradation signature:
 
 ```text
 FL-1042
@@ -98,18 +101,26 @@ Their common measured characteristics include healthy local-gateway loss, elevat
 
 The DNS, VPN and local-network scenarios are sufficiently different to remain outliers at the preview density threshold.
 
-This gives the repository a repeatable demonstration of both clustering **and** valid noise handling.
+That split is what makes the assertions meaningful: it exercises both clustering **and** valid noise handling against a dataset that does not move.
 
 ## Dashboard behaviour
 
-The Incident Intelligence panel is client-side and only analyses incidents the existing UI is already authorised to view.
+The Incident Intelligence panel is client-side and only analyses incidents the existing UI is already authorised to view. It analyses collected evidence, and never sample data.
 
 ```text
 locked dashboard
-      -> public demo incidents only
+      -> nothing to analyse; the panel says the credential is required
 
-admin-unlocked dashboard
-      -> authorised live incidents + demo incidents
+admin-unlocked, no diagnostics collected
+      -> nothing to analyse; the panel points at Live Diagnostics
+         and the Flight Recorder
+
+admin-unlocked, fewer than minPoints (3) collected
+      -> the panel states how many more are needed rather than
+         presenting a degenerate clustering as a result
+
+admin-unlocked, enough collected
+      -> authorised live incidents only
 ```
 
 No new endpoint exposes private incident data solely for the Data Science feature.

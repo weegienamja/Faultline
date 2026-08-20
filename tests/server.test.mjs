@@ -86,7 +86,9 @@ test("persists and authenticates a complete two-vantage diagnostic", { timeout: 
     const health = await request(base, "/api/health");
     assert.equal(health.status, 200);
     assert.equal(health.body.contractCatalog, true);
-    assert.equal((await request(base, "/api/demo-incidents")).status, 200);
+    // There is no unauthenticated incident feed. Faultline no longer serves a
+    // fixed set of sample incidents to make a fresh install look populated.
+    assert.equal((await request(base, "/api/demo-incidents")).status, 404);
     assert.equal((await request(base, "/api/incidents")).status, 401);
 
     // Unmatched API routes must return JSON 404, not the SPA HTML fallback.

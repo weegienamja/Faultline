@@ -1,9 +1,8 @@
 # Live network and Internet data
 
-Faultline's demo incidents exist to illustrate known failure shapes. This document
-covers the **live** path: real measurements taken from the machine running the
-control plane, real measurements taken from public vantage points, and public
-Internet context retrieved from open data sources.
+This document covers the **live** path: real measurements taken from the machine
+running the control plane, real measurements taken from public vantage points,
+and public Internet context retrieved from open data sources.
 
 > **The deterministic engine stays authoritative.** Public Internet intelligence
 > can corroborate evidence. It never establishes root cause, and it never changes

@@ -1,3 +1,16 @@
+// Reference incident set — TEST FIXTURE ONLY.
+//
+// Six hand-written incidents covering known failure shapes. They used to be
+// served by the running product (`GET /api/demo-incidents`, and mixed into
+// `GET /api/incidents`) so that a fresh install looked populated. That is no
+// longer what the product does: an empty Faultline is allowed to look empty,
+// and the interface asks the user to collect real evidence instead.
+//
+// They are kept here because the incident-intelligence tests genuinely need a
+// fixed, hand-tuned dataset: three of these six sit close together in feature
+// space and three do not, which is what makes the DBSCAN clustering assertions
+// meaningful and repeatable. Nothing in src/ imports this file.
+
 export const incidents = [
   {
     id: "FL-1042",

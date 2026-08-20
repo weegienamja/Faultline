@@ -145,9 +145,11 @@ Treat `.faultline` files as sensitive until exchanged.
 
 ## Dashboard access
 
-Demo incidents are public.
+Nothing about collected evidence is public. A locked dashboard shows an empty
+state, not sample incidents.
 
-Live diagnostic telemetry and registered-probe health require the admin credential. Use **Unlock live data** in the browser. The credential is stored in `sessionStorage`, not in the URL.
+Collected diagnostics, live diagnostic telemetry and registered-probe health all
+require the admin credential. Use **Unlock live data** in the browser. The credential is stored in `sessionStorage`, not in the URL.
 
 ## Persistent data
 

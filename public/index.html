@@ -98,6 +98,13 @@
              ================================================================= -->
         <section class="fl-view" data-view="overview" data-view-title="Overview" data-view-group="Operations">
 
+          <!-- Everything below reports on ONE collected incident. With no
+               incidents there is nothing to report, so the whole group is
+               hidden and #overview-empty says why. Faultline no longer ships
+               fabricated incidents to fill it. -->
+          <div id="overview-empty"></div>
+
+          <div id="overview-analysis" hidden>
           <div class="fl-tiles" id="overview-tiles"></div>
 
           <div class="fl-split fl-mt-3">
@@ -195,22 +202,18 @@
           <section class="fl-panel">
             <header class="fl-panel-head">
               <div>
-                <span class="fl-label">Reference incidents</span>
-                <h2 class="fl-panel-title">Worked examples</h2>
+                <span class="fl-label">Collected diagnostics</span>
+                <h2 class="fl-panel-title">Select an incident</h2>
               </div>
               <div class="fl-panel-head-actions">
-                <span class="fl-source" data-kind="demo">Sample data</span>
+                <span class="fl-source" data-kind="measured">Measured</span>
               </div>
             </header>
             <div class="fl-panel-body">
-              <p class="fl-body fl-prose fl-mb-3">
-                Fixed reference incidents covering known failure classes. Selecting one loads it into
-                the analysis above so the reasoning can be inspected without an active fault.
-                Real measurements come from Live Diagnostics.
-              </p>
               <div class="incident-strip" id="incident-list"></div>
             </div>
           </section>
+          </div>
         </section>
 
         <!-- =================================================================
@@ -405,9 +408,8 @@
       </div>
       <div class="fl-dialog-body">
         <p class="fl-body">
-          Reference incidents stay public. Live measurement, registered-probe health and telemetry
-          require the Faultline admin credential. It is kept in this browser tab only and is never
-          persisted.
+          Collected diagnostics, registered-probe health and live measurement all require the
+          Faultline admin credential. It is kept in this browser tab only and is never persisted.
         </p>
         <label class="fl-field">
           <span class="fl-label">Admin token</span>
