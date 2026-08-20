@@ -227,7 +227,7 @@ function distributedPanel(run) {
   }
 
   const summary = distributed.data.summary || {};
-  const results = distributed.data.results || distributed.data.probes || [];
+  const vantages = distributed.data.vantages || [];
   return panel({
     label: "Independent vantage",
     title: "Measured from public probes",
@@ -237,31 +237,41 @@ function distributedPanel(run) {
         ${tile({ label: "Reachable", value: String(summary.reachable ?? 0), status: summary.unreachable ? "warn" : "ok" })}
         ${tile({ label: "Median latency", value: summary.medianLatencyMs == null ? "—" : String(summary.medianLatencyMs), unit: "ms", status: "idle" })}
       </div>
-      ${Array.isArray(results) && results.length ? `<div class="fl-table-wrap fl-mt-3"><table class="fl-table" data-stack>
-        <thead><tr><th>Probe</th><th>Network</th><th>Latency</th><th>Loss</th></tr></thead>
-        <tbody>${results.slice(0, 6).map(entry => `<tr>
-          <td data-label="Probe">${escapeHtml([entry.city, entry.country].filter(Boolean).join(", ") || entry.id || "probe")}</td>
-          <td data-label="Network">${escapeHtml(entry.network || (entry.asn ? `AS${entry.asn}` : "—"))}</td>
+      ${vantages.length ? `<div class="fl-table-wrap fl-mt-3"><table class="fl-table" data-stack>
+        <thead><tr><th>Vantage</th><th>Network</th><th>Resolved to</th><th>Latency</th><th>Loss</th></tr></thead>
+        <tbody>${vantages.slice(0, 6).map(entry => `<tr data-status="${entry.lossPct === 100 ? "crit" : "ok"}">
+          <td data-label="Vantage">${escapeHtml(entry.location || [entry.city, entry.country].filter(Boolean).join(", ") || "probe")}</td>
+          <td data-label="Network">${escapeHtml(entry.network || "—")}${entry.asn ? ` <small>AS${entry.asn}</small>` : ""}</td>
+          <td data-label="Resolved to"><code>${escapeHtml(entry.resolvedAddress || "—")}</code></td>
           <td data-label="Latency">${entry.latencyMs == null ? "—" : ms(entry.latencyMs)}</td>
           <td data-label="Loss">${entry.lossPct == null ? "—" : `${entry.lossPct}%`}</td>
         </tr>`).join("")}</tbody>
       </table></div>` : ""}`,
-    foot: `<span>These probes are not this deployment. Two independent vantages agreeing is what separates "the service is down" from "the path from here is down".</span>`
+    foot: `<span>These probes are not this deployment. Two independent vantages agreeing is what separates "the service is down" from "the path from here is down". Where they resolve the name to different addresses, that is anycast or geo-DNS doing its job — and the same evidence a resolver fault would produce.</span>`
   });
 }
 
 function contextPanel(run) {
   const context = run.internetContext;
   if (!context?.enriched) return "";
-  const routing = context.routing?.data || context.routing || {};
-  const metadata = context.networkMetadata?.data || {};
+  // Each source returns a flat record; tolerate a wrapped one too rather than
+  // silently rendering an empty panel if a projection changes.
+  const unwrap = value => value?.data || value || {};
+  const routing = unwrap(context.routing);
+  const metadata = unwrap(context.networkMetadata);
+  const outage = unwrap(context.outageContext);
+  const visibility = routing.visibility || {};
+
   const rows = [
     ["Resolved address", run.target.resolvedAddress],
     ["Announced prefix", routing.prefix],
     ["Origin ASN", routing.originAsn ? `AS${routing.originAsn}` : null],
     ["Network", routing.asnName || metadata.name],
-    ["RPKI", routing.rpkiStatus],
-    ["Country", metadata.country || routing.country]
+    ["Registry", routing.registry],
+    ["RPKI", routing.rpkiStatus ? `${routing.rpkiStatus}${routing.rpkiValidator ? ` (${routing.rpkiValidator})` : ""}` : null],
+    ["RIS visibility", visibility.percent != null ? `${visibility.percent}% of ${visibility.risPeersTotal} peers` : null],
+    ["Network type", metadata.networkType],
+    ["Peering policy", metadata.peeringPolicy]
   ].filter(([, value]) => value);
 
   if (!rows.length) return "";
@@ -269,9 +279,10 @@ function contextPanel(run) {
   return panel({
     label: "Public Internet context",
     title: "Routing and ownership",
-    meta: source("external", "RIPESTAT"),
-    body: `<dl class="fl-kv">${rows.map(([term, value]) => `<div><dt>${escapeHtml(term)}</dt><dd><code>${escapeHtml(value)}</code></dd></div>`).join("")}</dl>`,
-    foot: `<span>Context, never proof. Routing and ownership metadata is deliberately excluded from the deterministic engine's input so a third-party API can never move a fault domain.</span>`
+    meta: `${source("external", "RIPESTAT")}${metadata.name ? source("external", "PEERINGDB") : ""}`,
+    body: `<dl class="fl-kv">${rows.map(([term, value]) => `<div><dt>${escapeHtml(term)}</dt><dd><code>${escapeHtml(value)}</code></dd></div>`).join("")}</dl>
+      ${outage.summary ? `<p class="fl-body fl-mt-3">${source("external", "IODA")} ${escapeHtml(outage.summary)}</p>` : ""}`,
+    foot: `<span>Context, never proof. Routing, ownership and outage metadata is deliberately excluded from the deterministic engine's input so a third-party API can never move a fault domain.</span>`
   });
 }
 
