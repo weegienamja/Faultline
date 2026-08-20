@@ -77,9 +77,17 @@ function activeIndex() {
   return active ? Number(active.dataset.index || 0) : 0;
 }
 
-// DBSCAN needs at least minPoints neighbours to call anything a cluster, so
-// below that there is nothing to say and the panel says so rather than
-// presenting a degenerate result as an analysis.
+// Two different questions, two different thresholds.
+//
+//   MIN_COMPARE  pairwise similarity needs a pair, and nothing more. Two
+//                diagnostics produce a real, useful comparison.
+//   MIN_POINTS   DBSCAN needs this many neighbours before calling anything a
+//                dense group, so below it there is no cluster to report.
+//
+// Collapsing the two into one threshold meant that at exactly two diagnostics
+// the panel withheld a similarity score it could already compute, and said
+// similarity needed two incidents while two were sitting in front of it.
+const MIN_COMPARE = 2;
 const MIN_POINTS = 3;
 
 function render() {
@@ -99,11 +107,10 @@ function render() {
     return;
   }
 
-  if (!analysis || data.length < MIN_POINTS) {
-    const n = data.length;
-    summary.textContent = `${n} diagnostic${n === 1 ? "" : "s"} collected. Density-based clustering needs at least ${MIN_POINTS} before a group means anything.`;
-    patternCard.innerHTML = `<p class="intelligence-empty">Collect ${MIN_POINTS - n} more diagnostic${MIN_POINTS - n === 1 ? "" : "s"} and Faultline will look for a shared evidence signature across them.</p>`;
-    similarCard.innerHTML = `<p class="intelligence-empty">Similarity ranking needs at least two incidents to compare.</p>`;
+  if (!analysis || data.length < MIN_COMPARE) {
+    summary.textContent = "One diagnostic collected. There is nothing to compare it with yet.";
+    patternCard.innerHTML = `<p class="intelligence-empty">Collect a second diagnostic and Faultline will rank how similar their measured evidence is.</p>`;
+    similarCard.innerHTML = "";
     method.textContent = "";
     return;
   }
@@ -112,7 +119,16 @@ function render() {
   const insight = analysis.incidents[incident.id];
   const cluster = insight?.clusterId ? analysis.clusters.find(item => item.id === insight.clusterId) : null;
 
-  if (cluster) {
+  // Enough to compare, not yet enough to cluster. The similarity block below
+  // still runs — that is the part that works at this size.
+  if (data.length < MIN_POINTS) {
+    const short = MIN_POINTS - data.length;
+    summary.textContent = `${data.length} diagnostics collected, ranked by measured similarity below. Density-based clustering needs ${MIN_POINTS}, so no pattern is claimed yet.`;
+    patternCard.innerHTML = `
+      <h3>Not enough diagnostics to cluster</h3>
+      <p class="intelligence-empty">Similarity between individual diagnostics is available now. DBSCAN needs ${MIN_POINTS} before a group is dense enough to mean anything, so ${short} more would let Faultline look for a shared evidence signature rather than a single comparison.</p>
+    `;
+  } else if (cluster) {
     summary.textContent = `${cluster.size} diagnostics form ${cluster.id}, a dense group with a similar measured evidence signature. This does not change the deterministic fault-domain result.`;
     patternCard.innerHTML = `
       <h3>${escapeHtml(cluster.id)} · ${cluster.size} related diagnostics</h3>
@@ -145,7 +161,9 @@ function render() {
     </div>
   `;
 
-  method.textContent = `${analysis.method.name}: ε=${analysis.method.epsilon}, minPts=${analysis.method.minPoints}. ${analysis.featureSpace.incidentCount} visible incidents analysed using standardised numerical telemetry, binary network states and one-hot Connectivity Contract outcomes. Fault domain is not used to fit clusters.`;
+  method.textContent = data.length < MIN_POINTS
+    ? `Pairwise similarity over ${analysis.featureSpace.incidentCount} collected diagnostics, using standardised numerical telemetry, binary network states and one-hot Connectivity Contract outcomes. Fault domain is not used. ${analysis.method.name} clustering is not applied below minPts=${analysis.method.minPoints}.`
+    : `${analysis.method.name}: ε=${analysis.method.epsilon}, minPts=${analysis.method.minPoints}. ${analysis.featureSpace.incidentCount} visible incidents analysed using standardised numerical telemetry, binary network states and one-hot Connectivity Contract outcomes. Fault domain is not used to fit clusters.`;
 }
 
 async function refresh() {
@@ -153,7 +171,7 @@ async function refresh() {
     const visible = await fetchVisibleIncidents();
     locked = visible.locked;
     data = visible.incidents;
-    analysis = data.length >= MIN_POINTS ? analyseEvidencePatterns(data) : null;
+    analysis = data.length >= MIN_COMPARE ? analyseEvidencePatterns(data) : null;
     render();
   } catch (error) {
     summary.textContent = `Incident intelligence unavailable: ${error.message}`;

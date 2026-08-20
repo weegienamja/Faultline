@@ -52,7 +52,17 @@ function renderOverviewTiles(detail) {
   const m = incident.metrics || {};
   const severity = severityOf(incident);
   const online = probes.filter(p => p.health === "online").length;
-  const worst = incidents.filter(i => severityOf(i) === "crit").length;
+
+  // The aggregate across everything collected, not just the failing ones. It
+  // previously counted only crit and called anything else "all healthy", so a
+  // set of degraded diagnostics with nothing outright failing reported itself
+  // as healthy.
+  const counts = { crit: 0, warn: 0, ok: 0 };
+  for (const item of incidents) counts[severityOf(item)] += 1;
+  const collected = [
+    counts.crit ? `${counts.crit} failing` : null,
+    counts.warn ? `${counts.warn} degraded` : null
+  ].filter(Boolean).join(" · ") || "all healthy";
 
   host.innerHTML = [
     tile({
@@ -83,8 +93,8 @@ function renderOverviewTiles(detail) {
     tile({
       label: "Collected diagnostics",
       value: String(incidents.length),
-      sub: worst ? `${worst} failing` : incidents.length === 1 ? "this one" : "all healthy",
-      status: worst ? "warn" : "idle"
+      sub: collected,
+      status: counts.crit ? "crit" : counts.warn ? "warn" : "ok"
     })
   ].join("");
 }

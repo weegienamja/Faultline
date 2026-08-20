@@ -91,6 +91,14 @@ test("persists and authenticates a complete two-vantage diagnostic", { timeout: 
     assert.equal((await request(base, "/api/demo-incidents")).status, 404);
     assert.equal((await request(base, "/api/incidents")).status, 401);
 
+    // And an authorised caller on a fresh installation gets nothing, rather
+    // than a set of fabricated incidents. This is the property the whole
+    // demo-removal change exists to establish, so it is asserted directly:
+    // an empty store means an empty feed.
+    const emptyFeed = await request(base, "/api/incidents", { token: ADMIN_TOKEN });
+    assert.equal(emptyFeed.status, 200);
+    assert.deepEqual(emptyFeed.body, [], "a fresh installation must report no incidents");
+
     // Unmatched API routes must return JSON 404, not the SPA HTML fallback.
     const unmatched = await request(base, "/api/definitely-not-a-route");
     assert.equal(unmatched.status, 404);
@@ -150,18 +158,27 @@ test("persists and authenticates a complete two-vantage diagnostic", { timeout: 
     assert.equal(remote.body.diagnosis.faultDomain, "access_path");
     assert.equal(remote.body.vantages.remoteProbe, true);
 
+    // One real diagnostic has been created, so the feed contains exactly that
+    // one. Asserting the length as well as the id is what actually catches a
+    // regression here: checking body[0].id alone passed just as happily when
+    // six fabricated incidents were appended behind it.
     const live = await request(base, "/api/incidents", { token: ADMIN_TOKEN });
     assert.equal(live.status, 200);
-    assert.equal(live.body[0].id, sessionId);
+    assert.equal(live.body.length, 1, "only the collected diagnostic should be listed");
+    assert.deepEqual(live.body.map(item => item.id), [sessionId]);
+    assert.equal(live.body[0].source, "correlated");
 
     await stopServer(server);
     server = await startServer(port, dataFile);
 
     const restored = await request(base, "/api/incidents", { token: ADMIN_TOKEN });
     assert.equal(restored.status, 200);
-    assert.equal(restored.body[0].id, sessionId);
+    assert.equal(restored.body.length, 1, "a restart must not reintroduce sample incidents");
+    assert.deepEqual(restored.body.map(item => item.id), [sessionId]);
     assert.equal(restored.body[0].source, "correlated");
     assert.equal(restored.body[0].vantages.remoteProbe, true);
+    // Nothing in the feed may be synthetic.
+    assert.equal(restored.body.some(item => item.source === "demo" || item.simulated === true), false);
   } finally {
     await stopServer(server);
     await rm(dir, { recursive: true, force: true });
