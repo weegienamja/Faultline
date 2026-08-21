@@ -95,7 +95,20 @@ export function isAllowlisted(host, allowlist) {
  * IP, credentials in the authority, a non-web scheme, a non-web port - is
  * refused here rather than being normalised into something that looks safe.
  */
-export function parseDemoTarget(value, { allowlist = readAllowlist() } = {}) {
+export function parseDemoTarget(value, options) {
+  try {
+    return parseDemoTargetStrict(value, options);
+  } catch (error) {
+    // Every refusal inside parseDemoTargetStrict is a string check: no lookup,
+    // no socket, nothing left this process. Marking them lets the router hand
+    // the caller's live-diagnostic budget back rather than spending it on a
+    // typo. See the refund note in limits.mjs.
+    if (error instanceof DemoPolicyError) error.preNetwork = true;
+    throw error;
+  }
+}
+
+function parseDemoTargetStrict(value, { allowlist = readAllowlist() } = {}) {
   const input = String(value ?? "").trim();
   if (!input) throw new DemoPolicyError("A target hostname is required.");
   if (input.length > 255) throw new DemoPolicyError("Target is too long.");
@@ -218,8 +231,12 @@ export function createRedirectGuard({ allowlist = readAllowlist(), timeoutMs = 3
 /** Reject a promise that overruns its budget, so no stage can hang a Function. */
 export function withTimeout(promise, ms, message = "Operation timed out.") {
   return new Promise((resolve, reject) => {
+    // NOT unref'd, deliberately. An unref'd timer does not hold the event loop
+    // open, so a budget whose only pending work IS the timer can be skipped
+    // entirely - the timeout then never fires and the thing it was guarding
+    // hangs instead. Both settle paths clear it, so a cleared timer cannot keep
+    // a Function alive past the work it was bounding either way.
     const timer = setTimeout(() => reject(new DemoPolicyError(message, { code: "DEMO_TIMEOUT", statusCode: 504 })), ms);
-    timer.unref?.();
     promise.then(
       value => { clearTimeout(timer); resolve(value); },
       error => { clearTimeout(timer); reject(error); }

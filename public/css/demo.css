@@ -342,21 +342,37 @@ html[data-public-demo="true"] [data-local-only] { display: none !important; }
 /* The topbar at rail-collapse width.
 
    Three nowrap actions plus the demo flag do not fit beside a page title at
-   390px, and the actions do not shrink — so the demo call to action is the one
-   that goes. It costs nothing here: the rail's first item is Hosted Demo, and
-   on the hosted deployment the demo IS the landing view, so the button is only
-   ever a shortcut to where the visitor already is.
+   390px and the actions do not shrink, so something has to go. It used to be
+   the demo call to action — which left a PUBLIC demo whose only two phone-sized
+   buttons were "Analyst" and "Operator sign-in". A visitor's first impression on
+   a phone was therefore a tool asking them to sign in, with no way to run
+   anything, which is the exact reading this deployment cannot afford.
+
+   What goes instead is the chrome that is genuinely duplicated:
+
+     Analyst          the rail's EXPLAIN entry opens the same drawer at every
+                      width, so the topbar copy is redundant, not lost.
+     Operator sign-in an operator surface, not a visitor one. It keeps a home on
+                      Settings › Credentials in this session, which the rail
+                      reaches at every width.
 
    The flag stays. It is the smallest element in the bar and the one carrying
    the claim that this is a demonstration deployment, which is exactly the thing
    that must not be the first casualty of a narrow screen. */
 @media (width <= 52rem) {
-  .fl-topbar-actions [data-demo-only] {
+  .fl-topbar-actions #analyst-toggle {
+    display: none;
+  }
+
+  html[data-public-demo="true"] .fl-topbar-actions #auth-open {
     display: none;
   }
 
   .fl-demo-flag {
     padding-inline: var(--fl-s1);
     letter-spacing: 0.04em;
+    /* The flag is nowrap and the title truncates, so without a floor between
+       them the ellipsis ran straight into the flag's border. */
+    margin-inline-end: var(--fl-s1);
   }
 }

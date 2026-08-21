@@ -27,6 +27,13 @@ const MINUTE = 60_000;
 
 export const DEMO_LIMITS = Object.freeze({
   perClientPerMinute: 10,
+  /**
+   * How many statically REFUSED targets one client may bounce off per minute.
+   *
+   * Wider than the live budget because a refusal costs no network activity, and
+   * still bounded because "unbounded" is not a thing this router offers.
+   */
+  refusedPerClientPerMinute: 40,
   perInstancePerMinute: 60,
   maxConcurrent: 3,
   /** Whole-diagnostic budget. A Function that runs longer is killed anyway. */
@@ -43,15 +50,29 @@ function bounded(value, fallback, min, max) {
 /**
  * Deployment-tunable limits.
  *
- * A refused request still costs a slot, deliberately: not charging for one
- * would make this endpoint a free, unlimited oracle for probing the policy
- * itself. The consequence is that a visitor experimenting with target names
- * can reach the limit, so the ceiling is configurable per deployment rather
- * than being a constant somebody has to fork the code to change.
+ * A request that is REFUSED BY STATIC POLICY - a bad scheme, a port that is not
+ * 80/443, a literal address, a hostname that is not on the allowlist - is
+ * refunded against the live budget and charged to a separate, wider bucket
+ * instead. It resolved nothing, connected to nothing and cost this deployment
+ * a regex, and the policy it bounced off is already published in full at
+ * /api/demo/capabilities, so charging it bought no secrecy. What it did buy was
+ * the demo locking out any visitor who typed three hostnames to find out what
+ * the allowlist was - the ten-request budget spent on error messages before a
+ * single diagnostic ran.
+ *
+ * A refusal that happens AFTER resolution (an address that validates as
+ * private, a redirect to somewhere it may not follow) is NOT refunded: that one
+ * really did make this deployment do work on the network.
  */
 export function readLimits(env = process.env) {
   return Object.freeze({
     perClientPerMinute: bounded(env.FAULTLINE_DEMO_RATE_PER_MIN, DEMO_LIMITS.perClientPerMinute, 1, 120),
+    refusedPerClientPerMinute: bounded(
+      env.FAULTLINE_DEMO_REFUSED_RATE_PER_MIN,
+      DEMO_LIMITS.refusedPerClientPerMinute,
+      1,
+      600
+    ),
     perInstancePerMinute: bounded(env.FAULTLINE_DEMO_RATE_INSTANCE_PER_MIN, DEMO_LIMITS.perInstancePerMinute, 1, 600),
     maxConcurrent: bounded(env.FAULTLINE_DEMO_MAX_CONCURRENT, DEMO_LIMITS.maxConcurrent, 1, 16),
     requestBudgetMs: bounded(env.FAULTLINE_DEMO_REQUEST_BUDGET_MS, DEMO_LIMITS.requestBudgetMs, 5_000, 60_000)
@@ -154,11 +175,45 @@ export function createDemoLimiter({ limits = readLimits(), now = () => Date.now(
 
       inFlight += 1;
       let released = false;
-      return () => {
+      let refunded = false;
+
+      const release = () => {
         if (released) return;
         released = true;
         inFlight -= 1;
       };
+
+      /**
+       * Hand the live slot back, because the request never reached the network.
+       *
+       * Charged to the refusal bucket instead, so a client bouncing off policy
+       * is still bounded - it just stops spending the budget that exists to
+       * bound outbound work on requests that produced none. Throws
+       * RateLimitError once that wider bucket is exhausted.
+       */
+      release.refund = () => {
+        if (refunded) return;
+        refunded = true;
+
+        const at2 = now();
+        const refusedKey = `refused:${key}`;
+        const entry = clients.get(refusedKey) || { windowStartedAt: at2, count: 0 };
+
+        // Give the live slot back first. A throw from the refusal bucket must
+        // not leave the client charged for a request that did nothing.
+        client.count = Math.max(0, client.count - 1);
+        instanceCount = Math.max(0, instanceCount - 1);
+
+        clients.set(refusedKey, entry);
+        consumeWindow(
+          entry,
+          at2,
+          limits.refusedPerClientPerMinute,
+          "Too many refused targets in a row."
+        );
+      };
+
+      return release;
     },
 
     snapshot() {
@@ -169,6 +224,7 @@ export function createDemoLimiter({ limits = readLimits(), now = () => Date.now(
     describe() {
       return {
         perClientPerMinute: limits.perClientPerMinute,
+        refusedPerClientPerMinute: limits.refusedPerClientPerMinute,
         perInstancePerMinute: limits.perInstancePerMinute,
         maxConcurrent: limits.maxConcurrent,
         requestBudgetMs: limits.requestBudgetMs,

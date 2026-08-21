@@ -1,4 +1,4 @@
-import { words } from "./shell.js";
+import { auth, runtime, words } from "./shell.js";
 
 /** Why this surface is unavailable, phrased for the runtime it is in. */
 function lockedMessage(what) {
@@ -103,7 +103,7 @@ const diagnosticDialog = createDiagnosticDialog();
 const panel = document.createElement("section");
 panel.className = "panel cases-panel";
 panel.id = "case-workspaces";
-panel.innerHTML = `<div class="cases-head"><div><span class="section-label">SUPPORT CASES</span><h2 class="fl-panel-title fl-mt-1">Cases &amp; evidence packages</h2></div><div class="cases-actions"><button class="secondary-button" id="case-refresh">Refresh</button><button class="primary-button" id="case-new">New case</button></div></div><p class="cases-muted" id="case-summary"></p><div class="case-layout"><div class="case-list" id="case-list"></div><article class="case-detail" id="case-detail"><p class="cases-muted">Select a case to inspect its diagnostics and evidence timeline.</p></article></div>`;
+panel.innerHTML = `<div class="cases-head"><div><span class="section-label">SUPPORT CASES</span><h2 class="fl-panel-title fl-mt-1">Cases &amp; evidence packages</h2></div><div class="cases-actions"${runtime.isPublicDemo ? ' hidden aria-hidden="true"' : ""}><button class="secondary-button" id="case-refresh">Refresh</button><button class="primary-button" id="case-new">New case</button></div></div><p class="cases-muted" id="case-summary"></p><div class="case-layout"><div class="case-list" id="case-list"></div><article class="case-detail" id="case-detail"><p class="cases-muted">Select a case to inspect its diagnostics and evidence timeline.</p></article></div>`;
 if (lowerGrid?.dataset?.mount) lowerGrid.appendChild(panel);
 else lowerGrid?.parentNode?.insertBefore(panel, lowerGrid);
 
@@ -111,7 +111,7 @@ const summary = panel.querySelector("#case-summary");
 const list = panel.querySelector("#case-list");
 const detail = panel.querySelector("#case-detail");
 panel.querySelector("#case-new").addEventListener("click", () => {
-  if (!token()) return document.getElementById("auth-open")?.click();
+  if (!token()) return void auth.promptUnlock();
   createCaseDialog.showModal();
 });
 panel.querySelector("#case-refresh").addEventListener("click", refresh);
