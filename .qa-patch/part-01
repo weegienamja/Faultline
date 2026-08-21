@@ -1,0 +1,136 @@
+lose their IPv6 route, so it cannot run this. The
++// controls are therefore presented as an operator surface rather than offered
++// and then refused: an enabled primary button that only ever produces a red
++// line is worse than no button at all.
++const demoGated = runtime.isPublicDemo;
++
+ if (host) host.innerHTML = `
+   <div class="fl-view-head">
+     <div>
+       <p class="fl-body fl-prose">
+         Forms competing explanations for what the network is doing, then runs the controlled
+         experiment that best separates them — stopping as soon as the evidence has isolated a
+-        boundary. Nothing on this machine is reconfigured: every condition is applied per connection.
++        boundary. Nothing on ${escapeHtml(words.thisMachine)} is reconfigured: every condition is
++        applied per connection.
+       </p>
++      ${demoGated ? `<p class="fl-body fl-prose fl-mt-2">
++        Isolation runs where the fault is. This deployment has no path to a visitor's adapters,
++        resolvers or routes, so it does not run one here — the three recorded investigations on
++        the hosted demo drive this same engine end to end.
++      </p>` : ""}
+     </div>
+     <div class="fl-view-head-actions">
+-      <span class="fl-source" data-kind="measured">Measured locally</span>
++      ${demoGated
++        ? `<span class="fl-source" data-kind="inferred">Requires Faultline Agent</span>`
++        : `<span class="fl-source" data-kind="measured">${escapeHtml(words.measuredHere)}</span>`}
+     </div>
+   </div>
+ 
+-  <form class="fl-controlbar" id="bisect-form">
++  <form class="fl-controlbar" id="bisect-form"${demoGated ? ' aria-hidden="true" hidden' : ""}>
+     <div class="fl-control-group fl-grow">
+       <span class="fl-label">Target</span>
+       <input class="fl-input fl-input-mono fl-grow" type="text" id="bisect-target"
+@@ -121,7 +137,7 @@ function idleState() {
+     ? `<section class="fl-panel">${state({
+         icon: "⑂",
+         title: "No isolation run yet",
+-        body: "Enter a target and run an isolation. Faultline will make real connections from this machine, varying one condition at a time, and report which condition changes the outcome.",
++        body: `Enter a target and run an isolation. Faultline will make real connections from ${words.thisMachine}, varying one condition at a time, and report which condition changes the outcome.`,
+         actions: `<button class="fl-btn fl-btn-primary" type="button" data-run-bisect>Isolate now</button>`
+       })}</section>`
+     : `<section class="fl-panel">${auth.lockedState("Running an isolation from the dashboard")}</section>`;
+@@ -382,7 +398,7 @@ form?.addEventListener("submit", async event => {
+     setStatus(runtime.isPublicDemo
+       ? `${words.lockedBody("Network Bisect")} The recorded investigations on the hosted demo show a full isolation run.`
+       : `Unlock live data with the Faultline admin credential first. The CLI needs no credential: npm run bisect -- ${target}`, "error");
+-    document.getElementById("auth-open")?.click();
++    auth.promptUnlock();
+     return;
+   }
+ 
+diff --git a/public/cases-panel.js b/public/cases-panel.js
+index a00a875..e76ad23 100644
+--- a/public/cases-panel.js
++++ b/public/cases-panel.js
+@@ -1,4 +1,4 @@
+-import { words } from "./shell.js";
++import { auth, runtime, words } from "./shell.js";
+ 
+ /** Why this surface is unavailable, phrased for the runtime it is in. */
+ function lockedMessage(what) {
+@@ -103,7 +103,7 @@ const diagnosticDialog = createDiagnosticDialog();
+ const panel = document.createElement("section");
+ panel.className = "panel cases-panel";
+ panel.id = "case-workspaces";
+-panel.innerHTML = `<div class="cases-head"><div><span class="section-label">SUPPORT CASES</span><h2 class="fl-panel-title fl-mt-1">Cases &amp; evidence packages</h2></div><div class="cases-actions"><button class="secondary-button" id="case-refresh">Refresh</button><button class="primary-button" id="case-new">New case</button></div></div><p class="cases-muted" id="case-summary"></p><div class="case-layout"><div class="case-list" id="case-list"></div><article class="case-detail" id="case-detail"><p class="cases-muted">Select a case to inspect its diagnostics and evidence timeline.</p></article></div>`;
++panel.innerHTML = `<div class="cases-head"><div><span class="section-label">SUPPORT CASES</span><h2 class="fl-panel-title fl-mt-1">Cases &amp; evidence packages</h2></div><div class="cases-actions"${runtime.isPublicDemo ? ' hidden aria-hidden="true"' : ""}><button class="secondary-button" id="case-refresh">Refresh</button><button class="primary-button" id="case-new">New case</button></div></div><p class="cases-muted" id="case-summary"></p><div class="case-layout"><div class="case-list" id="case-list"></div><article class="case-detail" id="case-detail"><p class="cases-muted">Select a case to inspect its diagnostics and evidence timeline.</p></article></div>`;
+ if (lowerGrid?.dataset?.mount) lowerGrid.appendChild(panel);
+ else lowerGrid?.parentNode?.insertBefore(panel, lowerGrid);
+ 
+@@ -111,7 +111,7 @@ const summary = panel.querySelector("#case-summary");
+ const list = panel.querySelector("#case-list");
+ const detail = panel.querySelector("#case-detail");
+ panel.querySelector("#case-new").addEventListener("click", () => {
+-  if (!token()) return document.getElementById("auth-open")?.click();
++  if (!token()) return void auth.promptUnlock();
+   createCaseDialog.showModal();
+ });
+ panel.querySelector("#case-refresh").addEventListener("click", refresh);
+diff --git a/public/css/components.css b/public/css/components.css
+index e72be83..fe08eee 100644
+--- a/public/css/components.css
++++ b/public/css/components.css
+@@ -666,11 +666,22 @@
+ 
+       &::before {
+         content: attr(data-label);
++        grid-column: 1;
+         font-size: var(--fl-fs-micro);
+         text-transform: uppercase;
+         letter-spacing: 0.06em;
+         color: var(--fl-text-3);
+       }
++
++      /* Every element in the value stays in the VALUE column.
++         A cell like `FAIL <small>ENETUNREACH</small>` is two grid items, and
++         without this the second auto-placed onto a new row under the label —
++         so the sample table read "TARGET / ENETUNREACH" with the state stranded
++         beside it. They line up beside each other instead. */
++      & > * {
++        grid-column: 2;
++        align-self: baseline;
++      }
+     }
+ 
+     & td:first-child {
+diff --git a/public/css/demo.css b/public/css/demo.css
+index 01a0a01..1858baa 100644
+--- a/public/css/demo.css
++++ b/public/css/demo.css
+@@ -342,21 +342,37 @@ html[data-public-demo="true"] [data-local-only] { display: none !important; }
+ /* The topbar at rail-collapse width.
+ 
+    Three nowrap actions plus the demo flag do not fit beside a page title at
+-   390px, and the actions do not shrink — so the demo call to action is the one
+-   that goes. It costs nothing here: the rail's first item is Hosted Demo, and
+-   on the hosted deployment the demo IS the landing view, so the button is only
+-   ever a shortcut to where the visitor already is.
++   390px and the actions do not shrink, so something has to go. It used to be
++   the demo call to action — which left a PUBLIC demo whose only two phone-sized
++   buttons were "Analyst" and "Operator sign-in". A visitor's first impression on
++   a phone was therefore a tool asking them to sign in, with no way to run
++   anything, which is the exact reading this deployment cannot afford.
++
++   What goes instead is the chrome that is genuinely duplicated:
++
++     Analyst          the rail's EXPLAIN entry opens the same drawer at every
++                      width, so the topbar copy is redundant, not lost.
++     Operator sign-in an operator surface, not a visitor one. It keeps a home on
++                      Settings › Credentials in this session, which the rail
++                      reaches at every width.
+ 
+    The flag stays. It is the smallest element in the bar and the one carrying
+    the clai
