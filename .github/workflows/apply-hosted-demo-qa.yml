@@ -1,0 +1,61 @@
+name: Apply hosted demo QA handoff
+
+on:
+  push:
+    branches:
+      - feature/vercel-hosted-demo
+
+permissions:
+  contents: write
+
+jobs:
+  apply-qa-patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out staged handoff
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: feature/vercel-hosted-demo
+
+      - name: Reconstruct and verify supplied patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .qa-patch/part-* > /tmp/faultline-hosted-demo-qa.patch
+          actual="$(sha256sum /tmp/faultline-hosted-demo-qa.patch | awk '{print $1}')"
+          expected="bb181a51c00fa27c1553a802c0ceff8ee802fa797d1d1f7397073eede634862f"
+          test "$actual" = "$expected"
+          echo "Verified QA patch: $actual"
+
+      - name: Apply QA commit on the verified base
+        shell: bash
+        run: |
+          set -euo pipefail
+          git reset --hard daea89186de0b49fd28e018a3acd7eb7c18a396a
+          git config user.name "Claude"
+          git config user.email "noreply@anthropic.com"
+          git am /tmp/faultline-hosted-demo-qa.patch
+          git status --short
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install and run full checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run check
+
+      - name: Publish cleaned feature branch
+        shell: bash
+        env:
+          STAGED_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          git push origin HEAD:refs/heads/feature/vercel-hosted-demo \
+            --force-with-lease=refs/heads/feature/vercel-hosted-demo:${STAGED_SHA}
