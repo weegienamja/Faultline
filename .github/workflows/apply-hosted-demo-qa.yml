@@ -1,7 +1,7 @@
 name: Apply hosted demo QA handoff
 
 on:
-  push:
+  pull_request:
     branches:
       - feature/vercel-hosted-demo
 
@@ -54,7 +54,7 @@ jobs:
       - name: Publish cleaned feature branch
         shell: bash
         env:
-          STAGED_SHA: ${{ github.sha }}
+          STAGED_SHA: ${{ github.event.pull_request.base.sha }}
         run: |
           set -euo pipefail
           git push origin HEAD:refs/heads/feature/vercel-hosted-demo \
