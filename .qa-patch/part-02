@@ -1,0 +1,166 @@
+m that this is a demonstration deployment, which is exactly the thing
+    that must not be the first casualty of a narrow screen. */
+ @media (width <= 52rem) {
+-  .fl-topbar-actions [data-demo-only] {
++  .fl-topbar-actions #analyst-toggle {
++    display: none;
++  }
++
++  html[data-public-demo="true"] .fl-topbar-actions #auth-open {
+     display: none;
+   }
+ 
+   .fl-demo-flag {
+     padding-inline: var(--fl-s1);
+     letter-spacing: 0.04em;
++    /* The flag is nowrap and the title truncates, so without a floor between
++       them the ellipsis ran straight into the flag's border. */
++    margin-inline-end: var(--fl-s1);
+   }
+ }
+diff --git a/public/css/layout.css b/public/css/layout.css
+index 89d4845..09e852e 100644
+--- a/public/css/layout.css
++++ b/public/css/layout.css
+@@ -500,6 +500,16 @@
+     border-block-end: 1px solid var(--fl-line);
+   }
+ 
++  /* The mark is a 20px square rotated 45deg, so it paints 28px wide — 4px
++     outside its own box on each side. In the vertical rail the brand's inline
++     padding absorbed that; the icon-rail rules above zero that padding, and in
++     the horizontal rail the brand sits flush at x=0, which clipped the left
++     corner of the logo off the screen. Give it back exactly the overhang. */
++  .fl-brand {
++    padding-inline: 0.3rem;
++    flex: 0 0 auto;
++  }
++
+   .fl-nav {
+     display: flex;
+     gap: var(--fl-s1);
+diff --git a/public/demo-panel.js b/public/demo-panel.js
+index 20c6d4b..f77dee9 100644
+--- a/public/demo-panel.js
++++ b/public/demo-panel.js
+@@ -84,7 +84,7 @@ function hero() {
+         ${source("measured", vantageLabel())}
+         <span>Real measurements originate from Faultline's hosted deployment — not from your device, browser or LAN.</span>
+       </p>
+-      <p class="fl-status-line" id="demo-status" data-tone="info"></p>
++      <p class="fl-status-line" id="demo-status" role="status" aria-live="polite" data-tone="info"></p>
+     </div>
+   </section>`;
+ }
+@@ -449,7 +449,12 @@ function timelineTable(rows) {
+       <td data-label="Window">${escapeHtml(row.window)}</td>
+       <td data-label="State">${badge(String(row.state).toUpperCase(), statusOf(row.state), { code: true })}</td>
+       <td data-label="Target">${escapeHtml(row.targetTcp || "—")}${row.targetTcpError ? ` <small>${escapeHtml(row.targetTcpError)}</small>` : ""}</td>
+-      <td data-label="Interface">${escapeHtml(row.activeInterface || "—")}${row.vpn ? " <small>VPN</small>" : ""}</td>
++      <td data-label="Interface">${escapeHtml(row.activeInterface || "—")}${
++        // The tag marks a tunnel as a tunnel. An adapter already called
++        // "Corp VPN" rendered as "Corp VPN VPN", which reads as a typo in the
++        // one table that has to look like a faithful record.
++        row.vpn && !/\bvpn\b/i.test(String(row.activeInterface || "")) ? " <small>VPN</small>" : ""
++      }</td>
+       <td data-label="Resolvers"><code>${escapeHtml((row.resolvers || []).join(", ") || "—")}</code></td>
+       <td data-label="Answer"><code>${escapeHtml(row.resolvedAddress || "—")}</code></td>
+     </tr>`).join("")}</tbody>
+diff --git a/public/index.html b/public/index.html
+index 2548d6c..79b40d8 100644
+--- a/public/index.html
++++ b/public/index.html
+@@ -82,7 +82,8 @@
+ 
+       <div class="fl-rail-foot">
+         <span class="fl-dot" id="rail-auth-dot" data-status="idle"></span>
+-        <span id="rail-auth-text">Live data locked</span>
++        <span id="rail-auth-text" data-local-only>Live data locked</span>
++        <span id="rail-auth-text-demo" data-demo-only>Public demo</span>
+       </div>
+     </aside>
+ 
+@@ -267,11 +268,21 @@
+         <section class="fl-view" data-view="topology" data-view-title="Topology &amp; Paths" data-view-group="Isolate">
+           <div class="fl-view-head">
+             <div>
+-              <p class="fl-body fl-prose">
++              <!-- Two paragraphs, gated by the runtime attribute the server
++                   stamps onto <html>, so the first paint already says the true
++                   one. A local framing on a page served from a datacentre would
++                   read as a map of the visitor's own network. -->
++              <p class="fl-body fl-prose" data-local-only>
+                 Local topology inferred from routing, adapter and neighbour evidence, extended with
+                 observed public hops. Inferred relationships are drawn differently from observed ones —
+                 Faultline does not claim topology it did not measure.
+               </p>
++              <p class="fl-body fl-prose" data-demo-only>
++                Topology is inferred from the routing, adapter and neighbour evidence of the machine
++                being investigated, extended with observed public hops. A hosted deployment has none
++                of a visitor's, so it draws no map here — Faultline does not claim topology it did
++                not measure.
++              </p>
+             </div>
+           </div>
+ 
+diff --git a/public/invite-admin.js b/public/invite-admin.js
+index 753ad8e..2f4d5f0 100644
+--- a/public/invite-admin.js
++++ b/public/invite-admin.js
+@@ -1,5 +1,5 @@
+ import "./intelligence-panel.js";
+-import { words } from "./shell.js";
++import { auth, words } from "./shell.js";
+ 
+ const openButton = document.getElementById("invite-open");
+ const dialog = document.getElementById("invite-dialog");
+@@ -101,7 +101,7 @@ openButton.addEventListener("click", async () => {
+   resultBox.hidden = true;
+ 
+   if (!adminToken()) {
+-    document.getElementById("auth-open")?.click();
++    auth.promptUnlock();
+     return;
+   }
+ 
+diff --git a/public/live-panel.js b/public/live-panel.js
+index 1eb9038..47b060d 100644
+--- a/public/live-panel.js
++++ b/public/live-panel.js
+@@ -11,7 +11,7 @@
+ // the runtime capability model instead, so there is one answer to "who measured
+ // this" across the whole product.
+ 
+-import { runtime, words } from "./shell.js";
++import { auth, runtime, words } from "./shell.js";
+ 
+ const SOURCE_LABELS = {
+   local: "LOCAL",
+@@ -67,7 +67,7 @@ panel.innerHTML = `
+       <span class="section-label">REAL NETWORK EVIDENCE</span>
+       <h2 class="fl-panel-title fl-mt-1">Test a real target</h2>
+       <p class="fl-body fl-prose fl-mt-2">
+-        Runs genuine DNS, TCP, TLS, HTTP, ICMP and path measurements from ${runtime.isHosted ? "the Faultline runtime serving this page" : "this machine"}, then adds public routing,
++        Runs genuine ${runtime.isHosted ? "DNS, TCP, TLS and HTTP" : "DNS, TCP, TLS, HTTP, ICMP and path"} measurements from ${runtime.isHosted ? "the Faultline runtime serving this page" : "this machine"}, then adds public routing,
+         outage and network-ownership context. Everything below is measured or retrieved live.
+       </p>
+       ${runtime.isPublicDemo ? `<p class="fl-body fl-prose fl-mt-2">
+@@ -85,17 +85,17 @@ panel.innerHTML = `
+     </div>
+   </div>
+ 
+-  <div class="live-modes" id="live-modes">
++  <div class="live-modes" id="live-modes"${runtime.isPublicDemo ? ' hidden aria-hidden="true"' : ""}>
+     <button class="live-mode active" type="button" data-mode="public">Test a public service</button>
+     <button class="live-mode" type="button" data-mode="device">${runtime.isHosted ? "Test this runtime" : "Test this device"}</button>
+-    <button class="live-mode" type="button" data-mode="environment">Load my environment</button>
++    <button class="live-mode" type="button" data-mode="environment">${runtime.isHosted ? "Load an environment manifest" : "Load my environment"}</button>
+   </div>
+ 
+-  <form class="live-form" id="live-form">
++  <form class="live-form" id="live-form"${runtime.isPublicDemo ? ' hidden aria-hidden="true"' : ""}>
+     <input type="text" id="live-target" placeholder="example.com · 1.1.1.1 · https://example.com/health" autocomplete="off" spellcheck="false" value="example.com" />
+     <button class="primary-button" type="submit" id="live-run">Run live diagnostic</button>
+   </form>
+-  <p class="live-status" id="live-status"></p>
++   
