@@ -1,0 +1,147 @@
+   deployment and gates the operator surfaces only.
++            </p>` : ""}
++            <!-- The topbar drops this control on a narrow screen so the public
++                 call to action can keep its place. Settings is reachable from
++                 the rail at every width, so the operator path lives here too
++                 rather than becoming unreachable on a phone. -->
++            <div class="fl-state-actions fl-state-actions-start fl-mt-3">
++              <button class="fl-btn" type="button" data-action="unlock">${escapeHtml(words.unlockAction)}</button>
++            </div>
+             <p class="fl-body fl-mt-3">
+               SDK credentials belong in the support application's backend. The end-user widget only ever
+               receives a one-time invitation URL.
+@@ -287,7 +312,11 @@ function renderSettings() {
+ 
+ function paintSettingsAuth() {
+   const cell = document.getElementById("settings-auth");
+-  if (cell) cell.innerHTML = auth.unlocked ? badge("Unlocked", "ok") : badge("Locked", "idle");
++  if (cell) {
++    cell.innerHTML = auth.unlocked
++      ? badge("Unlocked", "ok")
++      : badge(runtime.isPublicDemo ? "Not used by this demo" : "Locked", "idle");
++  }
+   void paintAnalystSettings();
+ }
+ 
+@@ -309,6 +338,17 @@ async function paintAnalystSettings() {
+     if (cell) cell.innerHTML = html;
+   };
+ 
++  // On a hosted runtime the Analyst is not one credential away: there is no
++  // local Ollama for it to reach, and Faultline will not substitute a cloud
++  // model. "Locked" would imply a door; this one has no key.
++  if (runtime.isHosted) {
++    set("analyst-settings-provider", "Ollama · local only");
++    set("analyst-settings-model", "—");
++    set("analyst-settings-endpoint", "—");
++    set("analyst-settings-status", badge("Requires local agent", "idle"));
++    return;
++  }
++
+   if (!auth.unlocked) {
+     set("analyst-settings-provider", "—");
+     set("analyst-settings-model", "—");
+@@ -343,11 +383,19 @@ function renderTopologyFallback() {
+   if (!slot) return;
+   const hasTopology = !document.getElementById("topology-panel")?.hidden;
+   const hasRoute = !document.getElementById("route-panel")?.hidden;
++  // The old empty state promised a map that a hosted deployment can never draw
++  // - the adapter, routing and neighbour evidence it is inferred from only
++  // exists on the endpoint - and sent the visitor to a locked operator page to
++  // get it. Say which evidence is missing, and offer the route that works.
+   slot.innerHTML = (hasTopology || hasRoute) ? "" : `<section class="fl-panel">${state({
+     icon: "◇",
+-    title: "No topology evidence yet",
+-    body: "Topology is inferred from adapter, routing and neighbour evidence collected during a diagnostic. Run one against a real target and the map appears here.",
+-    actions: `<button class="fl-btn fl-btn-primary" data-goto="live">Run a live diagnostic</button>`
++    title: runtime.isHosted ? "No endpoint topology evidence here" : "No topology evidence yet",
++    body: runtime.isHosted
++      ? `Topology is inferred from adapter, routing and neighbour evidence, which is collected on the machine being investigated. ${runtime.vantageLabel} has none of a visitor's, so this deployment draws no map. The recorded VPN routing investigation shows the same evidence from a real capture.`
++      : "Topology is inferred from adapter, routing and neighbour evidence collected during a diagnostic. Run one against a real target and the map appears here.",
++    actions: runtime.isPublicDemo
++      ? `<button class="fl-btn fl-btn-primary" data-goto="demo">Open the hosted demo</button>`
++      : `<button class="fl-btn fl-btn-primary" data-goto="live">Run a live diagnostic</button>`
+   })}</section>`;
+ }
+ 
+diff --git a/src/demo/diagnose.mjs b/src/demo/diagnose.mjs
+index 237d047..aced1ec 100644
+--- a/src/demo/diagnose.mjs
++++ b/src/demo/diagnose.mjs
+@@ -194,11 +194,18 @@ export async function runDemoDiagnostic(targetInput, options = {}) {
+             ms: tls?.elapsedMs ?? null,
+             detail: tls ? (tls.ok ? `${tls.protocol} · ${tls.cipher}` : tls.error) : "target is not HTTPS"
+           }),
++          // PASS here means the HTTP exchange COMPLETED, which is the question
++          // a connectivity tool is asking: a 403 from a bot filter proves the
++          // path works and is not a network fault. But green next to a 4xx
++          // reads as "Faultline thinks a 403 is healthy", so a non-success
++          // status says what the PASS does and does not cover.
+           stage("HTTP", http ? (http.ok ? "pass" : "fail") : "not-measured", {
+             ms: http?.ttfbMs ?? null,
+             detail: http
+               ? (http.ok
+-                  ? `HTTP ${http.status}${http.redirects.length ? ` after ${http.redirects.length} redirect(s)` : ""}`
++                  ? `HTTP ${http.status}${http.redirects.length ? ` after ${http.redirects.length} redirect(s)` : ""}${
++                      http.status >= 400 ? " · answered, not a success status" : ""
++                    }`
+                   : http.error)
+               : "no HTTP URL for this target"
+           })
+diff --git a/src/demo/limits.mjs b/src/demo/limits.mjs
+index ef1eb9a..ac66d70 100644
+--- a/src/demo/limits.mjs
++++ b/src/demo/limits.mjs
+@@ -27,6 +27,13 @@ const MINUTE = 60_000;
+ 
+ export const DEMO_LIMITS = Object.freeze({
+   perClientPerMinute: 10,
++  /**
++   * How many statically REFUSED targets one client may bounce off per minute.
++   *
++   * Wider than the live budget because a refusal costs no network activity, and
++   * still bounded because "unbounded" is not a thing this router offers.
++   */
++  refusedPerClientPerMinute: 40,
+   perInstancePerMinute: 60,
+   maxConcurrent: 3,
+   /** Whole-diagnostic budget. A Function that runs longer is killed anyway. */
+@@ -43,15 +50,29 @@ function bounded(value, fallback, min, max) {
+ /**
+  * Deployment-tunable limits.
+  *
+- * A refused request still costs a slot, deliberately: not charging for one
+- * would make this endpoint a free, unlimited oracle for probing the policy
+- * itself. The consequence is that a visitor experimenting with target names
+- * can reach the limit, so the ceiling is configurable per deployment rather
+- * than being a constant somebody has to fork the code to change.
++ * A request that is REFUSED BY STATIC POLICY - a bad scheme, a port that is not
++ * 80/443, a literal address, a hostname that is not on the allowlist - is
++ * refunded against the live budget and charged to a separate, wider bucket
++ * instead. It resolved nothing, connected to nothing and cost this deployment
++ * a regex, and the policy it bounced off is already published in full at
++ * /api/demo/capabilities, so charging it bought no secrecy. What it did buy was
++ * the demo locking out any visitor who typed three hostnames to find out what
++ * the allowlist was - the ten-request budget spent on error messages before a
++ * single diagnostic ran.
++ *
++ * A refusal that happens AFTER resolution (an address that validates as
++ * private, a redirect to somewhere it may not follow) is NOT refunded: that one
++ * really did make this deployment do work on the network.
+  */
+ export function readLimits(env = process.env) {
+   return Object.freeze({
+     perClientPerMinute: bounded(env.FAULTLINE_DEMO_RATE_PER_MIN, DEMO_LIMITS.perClientPerMinute, 1, 120),
++    refusedPerClientPerMinute: bounded(
++      env.FAULTLINE_DEMO_REFUSED_RATE_PER_MIN,
++      DEMO_LIMITS.refusedPerClientPerMinute,
++      1,
++      600
++    ),
+     perInstancePerMinute: bounded(env.FAULTLINE_DEMO_RATE_INSTANCE_PER_MIN, DEMO_LIMITS.perInstancePerMinute, 1, 600),
+     maxConcurrent: bounded(env.FAULTLINE_DEMO_MAX_CONCURRENT, DEMO_LIMITS.maxConcurrent, 1, 16),
+     requestBudgetMs: bounded(env.FAULTLINE_DEMO_REQUEST_BUDGET_MS, DEMO_LIMITS.requestBudgetMs, 5_000, 60_000)
+@@ -154,11 +175,45 @@ export function createDemoLimiter({ limits = readLimits(), now = () => Date.now(
+ 
+       inFlight += 1;
+      
