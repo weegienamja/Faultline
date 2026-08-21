@@ -413,8 +413,6 @@ Faultline is licensed under the **GNU Affero General Public License v3.0 only (`
 
 Copyright (C) 2026 Jamie Blair.
 
-Versions of Faultline that were previously released under the MIT License remain subject to the rights already granted for those versions. The current code and subsequent contributions are licensed as stated above unless separately agreed in writing.
-
 ### Commercial licensing
 
 A separate commercial licence may be available for organisations that want to embed, redistribute, modify, or offer Faultline under terms that do not require compliance with the AGPL. Contact the project owner through this GitHub repository to discuss commercial licensing.
