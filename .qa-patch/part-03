@@ -1,0 +1,165 @@
+<p class="live-status" id="live-status" role="status" aria-live="polite"></p>
+ 
+   <div id="live-environment" hidden>
+     <div class="live-env-actions">
+@@ -124,6 +124,13 @@ const envBlock = panel.querySelector("#live-environment");
+ const envManifest = panel.querySelector("#env-manifest");
+ const envResult = panel.querySelector("#env-result");
+ 
++// On a public demo the controls above are hidden, so the view would otherwise
++// end at a row of source badges over an empty screen. Every other operator
++// surface answers with the same designed state; this one should too.
++if (runtime.isPublicDemo && results) {
++  results.innerHTML = `<section class="fl-panel">${auth.lockedState("The unrestricted live diagnostic")}</section>`;
++}
++
+ let mode = "public";
+ 
+ function token() {
+@@ -509,7 +516,7 @@ form.addEventListener("submit", async event => {
+       : error.message;
+     // Prompting a public visitor for a credential they do not have is a dead
+     // end; on the hosted demo the useful move is the demo diagnostic instead.
+-    if (error.status === 401 && !runtime.isPublicDemo) document.getElementById("auth-open")?.click();
++    if (error.status === 401) auth.promptUnlock();
+   } finally {
+     runButton.disabled = false;
+   }
+@@ -555,7 +562,7 @@ async function submitManifest(path, activated) {
+     renderManifest(data, activated);
+   } catch (error) {
+     envResult.innerHTML = `<p class="live-status error">${escapeHtml(error.message)}</p>`;
+-    if (error.status === 401) document.getElementById("auth-open")?.click();
++    if (error.status === 401) auth.promptUnlock();
+   }
+ }
+ 
+diff --git a/public/shell.js b/public/shell.js
+index 3349e69..c0d2796 100644
+--- a/public/shell.js
++++ b/public/shell.js
+@@ -77,7 +77,16 @@ export const words = {
+     return runtime.isPublicDemo
+       ? `<button class="fl-btn fl-btn-primary" data-goto="demo">Open the hosted demo</button>`
+       : `<button class="fl-btn fl-btn-primary" data-action="unlock">Unlock live data</button>`;
+-  }
++  },
++  /**
++   * Where a measurement this deployment takes actually comes from.
++   *
++   * Panels used to hard-code "Measured locally", which is true of an operator's
++   * own install and a lie on a hosted one. They ask here instead.
++   */
++  get measuredHere() { return runtime.isHosted ? runtime.vantageLabel : "Measured locally"; },
++  /** The machine a local install is running on, named in a way hosting cannot make false. */
++  get thisMachine() { return runtime.isHosted ? "the machine running Faultline" : "this machine"; }
+ };
+ 
+ export function escapeHtml(value) {
+@@ -313,6 +322,17 @@ export function onView(name, fn) {
+ 
+ function start() {
+   readViews();
++  // The brand mark is the one control every visitor tries. On a public demo it
++  // pointed at Overview - an operator archive that is locked here - so clicking
++  // the logo from the demo landed on "Live data is locked". It goes where the
++  // deployment's own front door is instead.
++  if (runtime.isPublicDemo) {
++    const brand = document.querySelector(".fl-brand");
++    if (brand) {
++      brand.setAttribute("href", "#/demo");
++      brand.setAttribute("aria-label", "Faultline hosted demo");
++    }
++  }
+   apply(routeFromHash());
+   window.addEventListener("hashchange", () => apply(routeFromHash()));
+ }
+@@ -349,6 +369,22 @@ export const auth = {
+       body: words.lockedBody(what),
+       actions: words.lockedAction
+     });
++  },
++  /**
++   * Ask for the credential, but ONLY where asking is a route the person can take.
++   *
++   * A public visitor cannot hold the operator's admin token, so putting that
++   * dialog in front of them turns an ordinary click into "I need the
++   * developer's password to use this" - the single impression this demo most
++   * has to avoid. On a public demo the panel's own inline explanation is the
++   * whole answer and nothing is prompted.
++   *
++   * Returns true when the dialog was opened, so callers can branch.
++   */
++  promptUnlock() {
++    if (runtime.isPublicDemo) return false;
++    document.getElementById("auth-open")?.click();
++    return true;
+   }
+ };
+ 
+diff --git a/public/views.js b/public/views.js
+index 6455a05..2833da3 100644
+--- a/public/views.js
++++ b/public/views.js
+@@ -16,7 +16,9 @@ import { mount, panel, tile, state, badge, source, disclose, auth, goTo, current
+ 
+ function paintAuthIndicator() {
+   const dot = document.getElementById("rail-auth-dot");
+-  const text = document.getElementById("rail-auth-text");
++  // Two spans exist so the FIRST paint is already right for the runtime; only
++  // the one the CSS gate leaves visible needs updating afterwards.
++  const text = document.getElementById(runtime.isPublicDemo ? "rail-auth-text-demo" : "rail-auth-text");
+   if (!dot || !text) return;
+   dot.dataset.status = auth.unlocked ? "ok" : "idle";
+   text.textContent = auth.unlocked ? words.railUnlocked : words.railLocked;
+@@ -156,7 +158,7 @@ POST …/:changeId/baseline
+ POST …/:changeId/post-change
+ GET  …/:changeId/comparison
+ GET  …/:changeId/evidence</pre>`,
+-          foot: `<a href="https://github.com/weegienamja/Faultline/blob/main/docs/CHANGE_ASSURANCE.md">Change assurance reference</a>`
++          foot: `<a href="https://github.com/weegienamja/Faultline-Network-Diagnostics/blob/main/docs/CHANGE_ASSURANCE.md" target="_blank" rel="noopener">Change assurance reference</a>`
+         })}
+       </div>
+     </div>`;
+@@ -184,9 +186,15 @@ function renderEnvironment() {
+               hostname typed into a box.
+             </p>
+             <div class="fl-state-actions fl-state-actions-start">
+-              <button class="fl-btn fl-btn-primary" data-goto="live" data-live-mode="environment">Open manifest editor</button>
+-            </div>`,
+-          foot: `<span>Private addresses, local hostnames, MACs, SSIDs and VPN routes are never transmitted off this machine.</span>`
++              ${runtime.isPublicDemo
++                ? `<button class="fl-btn fl-btn-primary" data-goto="demo">Open the hosted demo</button>`
++                : `<button class="fl-btn fl-btn-primary" data-goto="live" data-live-mode="environment">Open manifest editor</button>`}
++            </div>
++            ${runtime.isPublicDemo ? `<p class="fl-body fl-mt-3">
++              A manifest describes the network being investigated, so it is loaded by the Faultline an
++              operator runs on that network. The hosted demo has no environment to declare.
++            </p>` : ""}`,
++          foot: `<span>Private addresses, local hostnames, MACs, SSIDs and VPN routes are never transmitted off ${escapeHtml(words.thisMachine)}.</span>`
+         })}
+       </div>
+       <div>
+@@ -208,8 +216,14 @@ function renderEnvironment() {
+ // Settings
+ // ---------------------------------------------------------------------------
+ 
++// The first row is the deployment's OWN measurement, and what that can do is a
++// runtime fact: a hosted Function has no raw socket and therefore no ICMP and
++// no traceroute, and calling its measurement "local" on a page served from a
++// datacentre is the exact confusion this product exists to avoid.
+ const SOURCES = [
+-  ["Local measurement", "DNS, TCP, TLS, HTTP, ICMP, path", "none", "measured"],
++  runtime.isHosted
++    ? [`${runtime.vantageLabel} measurement`, "DNS, TCP, TLS, HTTP", "none", "measured"]
++    : ["Local measurement", "DNS, TCP, TLS, HTTP, ICMP, path", "none", "measured"],
+   ["RIPEstat", "prefix, origin ASN, holder, RPKI, BGP", "none", "external"],
+   ["Globalping", "ping from public vantage points", "none", "external"],
+   ["RIPE Atlas", "connected public probes nearby", "none", "external"],
+@@ -252,6 +266,17 @@ function renderSettings() {
+               <div><dt>Storage</dt><dd>this browser tab only</dd></div>
+               <div><dt>Persisted</dt><dd>never</dd></div>
+             </dl>
++            ${runtime.isPublicDemo ? `<p class="fl-body fl-mt-3">
++              The public demo needs none of this. The credential belongs to whoever runs this
++            
