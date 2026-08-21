@@ -1,0 +1,68 @@
+name: Feature request
+description: Propose a useful capability or improvement for Faultline
+title: "[Feature]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Faultline prioritises practical network-diagnostics capabilities that produce useful, traceable evidence. Describe the problem first, then the proposed solution.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What real-world networking, support, operations, or developer problem is difficult today?
+      placeholder: Describe the user, situation, and pain point.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed capability
+      description: What should Faultline do?
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Expected evidence or output
+      description: What measurement, artifact, verdict, visualisation, export, or other result should the feature produce?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: execution
+    attributes:
+      label: Where should it run?
+      options:
+        - Local endpoint
+        - Hosted demo / server vantage
+        - Remote probe / agent
+        - Any of the above
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Existing alternatives
+      description: How is this problem solved today, manually or with other tools? What is missing from those approaches?
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional context
+      description: Add diagrams, references, examples, constraints, or implementation ideas if useful.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Submission checks
+      options:
+        - label: I have searched existing issues and the roadmap for a similar proposal.
+          required: true
+        - label: This request does not require Faultline to present simulated or inferred information as measured evidence.
+          required: true
