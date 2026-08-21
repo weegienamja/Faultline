@@ -1,5 +1,11 @@
 import "./cases-panel.js";
 import { analyseEvidencePatterns } from "./evidence-patterns.js";
+import { words } from "./shell.js";
+
+/** Why this surface is unavailable, phrased for the runtime it is in. */
+function lockedMessage(what) {
+  return words.lockedBody(what);
+}
 
 const strip = document.getElementById("incident-list");
 const lowerGrid = document.querySelector('[data-mount="intelligence"]') || document.querySelector(".lower-grid");
@@ -92,8 +98,8 @@ const MIN_POINTS = 3;
 
 function render() {
   if (locked) {
-    summary.textContent = "Pattern analysis runs over collected diagnostics, which require the Faultline admin credential.";
-    patternCard.innerHTML = `<p class="intelligence-empty">Unlock live data to analyse the diagnostics this installation has collected.</p>`;
+    summary.textContent = lockedMessage("Pattern analysis over collected diagnostics");
+    patternCard.innerHTML = `<p class="intelligence-empty">${lockedMessage("Cross-incident pattern analysis")}</p>`;
     similarCard.innerHTML = "";
     method.textContent = "";
     return;

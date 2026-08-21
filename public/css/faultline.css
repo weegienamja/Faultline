@@ -1,43 +1,38 @@
-/* ==========================================================================
-   Faultline — stylesheet entry point
-   --------------------------------------------------------------------------
-   One <link> for the whole application. Everything below is assigned to a
-   cascade layer at import time, so a file's position in the cascade is a
-   property of this list rather than of where a rule happens to sit inside a
-   40 000-character stylesheet.
+/* Faultline stylesheet entry point.
+   Keep production loading deliberately simple: each design-system module is
+   imported in source order without cascade-layer import syntax. This preserves
+   the intended reset -> tokens -> base -> layout -> components -> features ->
+   evidence -> utilities ordering while avoiding an extra browser parsing
+   dependency at the deployment boundary. */
 
-   LAYER ORDER — and why it is this order
-   --------------------------------------------------------------------------
-     reset       normalise the handful of UA defaults we care about
-     tokens      custom properties only; never emits a rule with a selector
-     base        element defaults built from tokens
-     layout      the shell and the layout primitives (no colour decisions)
-     components  the shared vocabulary: panel, badge, table, button, chip
-     features    surface-specific styling (topology, live, cases, recorder)
-     evidence    the evidence-class visual language
-     utilities   single-purpose escape hatches
+@import url("./reset.css");
+@import url("./tokens.css");
+@import url("./base.css");
+@import url("./layout.css");
+@import url("./components.css");
+@import url("./chronology.css");
+@import url("./features.css");
+@import url("./evidence.css");
+@import url("./demo.css");
+@import url("./utilities.css");
 
-   `evidence` sits AFTER `features` deliberately. Faultline's central rule is
-   that a simulated capture must never read as a measurement and an Analyst
-   hypothesis must never read as a deterministic finding. Putting the layer
-   that enforces that last means no feature stylesheet can weaken it by
-   accident, whatever selector it uses. The epistemic boundary is enforced by
-   the cascade itself, not by everyone remembering to be careful.
+/* First-paint resilience. The router marks one view active as soon as shell.js
+   evaluates. Until then, keep the landing view visible rather than showing an
+   empty workspace — which view that is depends on the runtime the server
+   stamped onto <html>, so a hosted demo never flashes an operator surface it
+   is about to navigate away from. */
+html:not([data-public-demo="true"]) .fl-content:not(:has(.fl-view.is-active)) .fl-view[data-view="overview"],
+html[data-public-demo="true"] .fl-content:not(:has(.fl-view.is-active)) .fl-view[data-view="demo"] {
+  display: block;
+}
 
-   There is no `overrides` layer. The previous stylesheet needed one because
-   panel modules injected <style> into <head> after the sheet loaded and won on
-   source order; the fix was a wall of `body .thing` selectors. Those panels now
-   live in `features`, so the specificity war has no participants.
-   ========================================================================== */
-
-@layer reset, tokens, base, layout, components, features, evidence, utilities;
-
-@import url("./reset.css") layer(reset);
-@import url("./tokens.css") layer(tokens);
-@import url("./base.css") layer(base);
-@import url("./layout.css") layer(layout);
-@import url("./components.css") layer(components);
-@import url("./chronology.css") layer(components);
-@import url("./features.css") layer(features);
-@import url("./evidence.css") layer(evidence);
-@import url("./utilities.css") layer(utilities);
+#overview-empty:empty::before {
+  content: "Faultline is live. Loading the diagnostic workspace…";
+  display: block;
+  padding: var(--fl-s5, 1.25rem);
+  border: 1px solid var(--fl-line, #3a3a42);
+  border-radius: var(--fl-r-card, 8px);
+  background: var(--fl-surface, #202027);
+  color: var(--fl-text-2, #b5b5c0);
+  font-size: var(--fl-fs-sm, 0.75rem);
+}

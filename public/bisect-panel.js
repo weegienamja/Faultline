@@ -12,7 +12,7 @@
 // to this screen.
 
 import {
-  escapeHtml, mount, panel, tile, state, badge, stateBadge, disclose, auth, statusOf
+  escapeHtml, mount, panel, tile, state, badge, stateBadge, disclose, auth, statusOf, runtime, words
 } from "./shell.js";
 
 // ---------------------------------------------------------------------------
@@ -55,21 +55,37 @@ const BASELINE_WHY = {
 // ---------------------------------------------------------------------------
 
 const host = mount("bisect");
+
+// A hosted deployment cannot bind a connection to a visitor's adapter, hand
+// itself their resolver, or lose their IPv6 route, so it cannot run this. The
+// controls are therefore presented as an operator surface rather than offered
+// and then refused: an enabled primary button that only ever produces a red
+// line is worse than no button at all.
+const demoGated = runtime.isPublicDemo;
+
 if (host) host.innerHTML = `
   <div class="fl-view-head">
     <div>
       <p class="fl-body fl-prose">
         Forms competing explanations for what the network is doing, then runs the controlled
         experiment that best separates them — stopping as soon as the evidence has isolated a
-        boundary. Nothing on this machine is reconfigured: every condition is applied per connection.
+        boundary. Nothing on ${escapeHtml(words.thisMachine)} is reconfigured: every condition is
+        applied per connection.
       </p>
+      ${demoGated ? `<p class="fl-body fl-prose fl-mt-2">
+        Isolation runs where the fault is. This deployment has no path to a visitor's adapters,
+        resolvers or routes, so it does not run one here — the three recorded investigations on
+        the hosted demo drive this same engine end to end.
+      </p>` : ""}
     </div>
     <div class="fl-view-head-actions">
-      <span class="fl-source" data-kind="measured">Measured locally</span>
+      ${demoGated
+        ? `<span class="fl-source" data-kind="inferred">Requires Faultline Agent</span>`
+        : `<span class="fl-source" data-kind="measured">${escapeHtml(words.measuredHere)}</span>`}
     </div>
   </div>
 
-  <form class="fl-controlbar" id="bisect-form">
+  <form class="fl-controlbar" id="bisect-form"${demoGated ? ' aria-hidden="true" hidden' : ""}>
     <div class="fl-control-group fl-grow">
       <span class="fl-label">Target</span>
       <input class="fl-input fl-input-mono fl-grow" type="text" id="bisect-target"
@@ -121,7 +137,7 @@ function idleState() {
     ? `<section class="fl-panel">${state({
         icon: "⑂",
         title: "No isolation run yet",
-        body: "Enter a target and run an isolation. Faultline will make real connections from this machine, varying one condition at a time, and report which condition changes the outcome.",
+        body: `Enter a target and run an isolation. Faultline will make real connections from ${words.thisMachine}, varying one condition at a time, and report which condition changes the outcome.`,
         actions: `<button class="fl-btn fl-btn-primary" type="button" data-run-bisect>Isolate now</button>`
       })}</section>`
     : `<section class="fl-panel">${auth.lockedState("Running an isolation from the dashboard")}</section>`;
@@ -379,8 +395,10 @@ form?.addEventListener("submit", async event => {
   const exhaustive = mode === "exhaustive";
 
   if (!auth.unlocked) {
-    setStatus(`Unlock live data with the Faultline admin credential first. The CLI needs no credential: npm run bisect -- ${target}`, "error");
-    document.getElementById("auth-open")?.click();
+    setStatus(runtime.isPublicDemo
+      ? `${words.lockedBody("Network Bisect")} The recorded investigations on the hosted demo show a full isolation run.`
+      : `Unlock live data with the Faultline admin credential first. The CLI needs no credential: npm run bisect -- ${target}`, "error");
+    auth.promptUnlock();
     return;
   }
 

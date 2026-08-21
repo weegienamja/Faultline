@@ -1,5 +1,5 @@
 import { buildLivePathTopology, normaliseTopology } from "./topology-view.js";
-import { state } from "./shell.js";
+import { auth, runtime, state, words } from "./shell.js";
 
 const ids = [
   "incident-list", "fault-domain", "confidence", "confidence-ring", "diagnosis-summary",
@@ -31,7 +31,11 @@ function sourceLabel(incident) {
 }
 
 function applyAuthState() {
-  els["auth-open"].textContent = adminToken ? "Live data unlocked" : "Unlock live data";
+  els["auth-open"].textContent = adminToken ? words.unlockedAction : words.unlockAction;
+  // The dialog is reached deliberately, so it should be titled with the same
+  // words as the control that opens it.
+  const dialogTitle = document.getElementById("auth-dialog-title");
+  if (dialogTitle) dialogTitle.textContent = words.unlockAction;
   els["auth-open"].classList.toggle("unlocked", Boolean(adminToken));
 }
 
@@ -75,9 +79,9 @@ function renderProbeFleet() {
   if (!adminToken) {
     els["probe-fleet"].innerHTML = `<div class="fl-state" data-tone="locked">
       <div class="fl-state-icon" aria-hidden="true">◌</div>
-      <p class="fl-state-title">Fleet health is locked</p>
-      <p class="fl-state-body">Registered probe identities and heartbeat health require the Faultline admin credential.</p>
-      <div class="fl-state-actions"><button class="fl-btn fl-btn-primary" data-action="unlock">Unlock live data</button></div>
+      <p class="fl-state-title">${runtime.isPublicDemo ? "Operator surface" : "Fleet health is locked"}</p>
+      <p class="fl-state-body">${words.lockedBody("Registered probe health")}</p>
+      <div class="fl-state-actions">${words.lockedAction}</div>
     </div>`;
     return;
   }
@@ -446,13 +450,10 @@ function renderEmptyOverview() {
                   <a class="fl-btn" href="#/recorder">Start the Flight Recorder</a>
                   <button class="fl-btn" type="button" data-action="invite">New diagnostic</button>`
       })
-    : state({
-        icon: "◌",
-        tone: "locked",
-        title: "Live data is locked",
-        body: "Collected diagnostics require the Faultline admin credential. It is held in this browser tab only and never persisted.",
-        actions: `<button class="fl-btn fl-btn-primary" data-action="unlock">Unlock live data</button>`
-      })}</section>`;
+    // On a public demo this is not a credential wall the visitor can pass; it
+    // is an operator archive that belongs to a Faultline someone runs
+    // themselves. auth.lockedState says that, and points at the demo.
+    : auth.lockedState("The collected diagnostics archive")}</section>`;
 
   renderProbeFleet();
   els["topology-panel"].hidden = true;

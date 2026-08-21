@@ -8,7 +8,7 @@
 // operator's trust, and Faultline's whole argument is that every value on
 // screen is traceable to a measurement.
 
-import { mount, panel, tile, state, badge, source, disclose, auth, goTo, currentView, escapeHtml } from "./shell.js";
+import { mount, panel, tile, state, badge, source, disclose, auth, goTo, currentView, escapeHtml, runtime, words } from "./shell.js";
 
 // ---------------------------------------------------------------------------
 // Rail credential indicator
@@ -16,10 +16,12 @@ import { mount, panel, tile, state, badge, source, disclose, auth, goTo, current
 
 function paintAuthIndicator() {
   const dot = document.getElementById("rail-auth-dot");
-  const text = document.getElementById("rail-auth-text");
+  // Two spans exist so the FIRST paint is already right for the runtime; only
+  // the one the CSS gate leaves visible needs updating afterwards.
+  const text = document.getElementById(runtime.isPublicDemo ? "rail-auth-text-demo" : "rail-auth-text");
   if (!dot || !text) return;
   dot.dataset.status = auth.unlocked ? "ok" : "idle";
-  text.textContent = auth.unlocked ? "Live data unlocked" : "Live data locked";
+  text.textContent = auth.unlocked ? words.railUnlocked : words.railLocked;
 }
 window.addEventListener("faultline-auth-changed", paintAuthIndicator);
 paintAuthIndicator();
@@ -156,7 +158,7 @@ POST …/:changeId/baseline
 POST …/:changeId/post-change
 GET  …/:changeId/comparison
 GET  …/:changeId/evidence</pre>`,
-          foot: `<a href="https://github.com/weegienamja/Faultline/blob/main/docs/CHANGE_ASSURANCE.md">Change assurance reference</a>`
+          foot: `<a href="https://github.com/weegienamja/Faultline-Network-Diagnostics/blob/main/docs/CHANGE_ASSURANCE.md" target="_blank" rel="noopener">Change assurance reference</a>`
         })}
       </div>
     </div>`;
@@ -184,9 +186,15 @@ function renderEnvironment() {
               hostname typed into a box.
             </p>
             <div class="fl-state-actions fl-state-actions-start">
-              <button class="fl-btn fl-btn-primary" data-goto="live" data-live-mode="environment">Open manifest editor</button>
-            </div>`,
-          foot: `<span>Private addresses, local hostnames, MACs, SSIDs and VPN routes are never transmitted off this machine.</span>`
+              ${runtime.isPublicDemo
+                ? `<button class="fl-btn fl-btn-primary" data-goto="demo">Open the hosted demo</button>`
+                : `<button class="fl-btn fl-btn-primary" data-goto="live" data-live-mode="environment">Open manifest editor</button>`}
+            </div>
+            ${runtime.isPublicDemo ? `<p class="fl-body fl-mt-3">
+              A manifest describes the network being investigated, so it is loaded by the Faultline an
+              operator runs on that network. The hosted demo has no environment to declare.
+            </p>` : ""}`,
+          foot: `<span>Private addresses, local hostnames, MACs, SSIDs and VPN routes are never transmitted off ${escapeHtml(words.thisMachine)}.</span>`
         })}
       </div>
       <div>
@@ -208,8 +216,14 @@ function renderEnvironment() {
 // Settings
 // ---------------------------------------------------------------------------
 
+// The first row is the deployment's OWN measurement, and what that can do is a
+// runtime fact: a hosted Function has no raw socket and therefore no ICMP and
+// no traceroute, and calling its measurement "local" on a page served from a
+// datacentre is the exact confusion this product exists to avoid.
 const SOURCES = [
-  ["Local measurement", "DNS, TCP, TLS, HTTP, ICMP, path", "none", "measured"],
+  runtime.isHosted
+    ? [`${runtime.vantageLabel} measurement`, "DNS, TCP, TLS, HTTP", "none", "measured"]
+    : ["Local measurement", "DNS, TCP, TLS, HTTP, ICMP, path", "none", "measured"],
   ["RIPEstat", "prefix, origin ASN, holder, RPKI, BGP", "none", "external"],
   ["Globalping", "ping from public vantage points", "none", "external"],
   ["RIPE Atlas", "connected public probes nearby", "none", "external"],
@@ -252,6 +266,17 @@ function renderSettings() {
               <div><dt>Storage</dt><dd>this browser tab only</dd></div>
               <div><dt>Persisted</dt><dd>never</dd></div>
             </dl>
+            ${runtime.isPublicDemo ? `<p class="fl-body fl-mt-3">
+              The public demo needs none of this. The credential belongs to whoever runs this
+              deployment and gates the operator surfaces only.
+            </p>` : ""}
+            <!-- The topbar drops this control on a narrow screen so the public
+                 call to action can keep its place. Settings is reachable from
+                 the rail at every width, so the operator path lives here too
+                 rather than becoming unreachable on a phone. -->
+            <div class="fl-state-actions fl-state-actions-start fl-mt-3">
+              <button class="fl-btn" type="button" data-action="unlock">${escapeHtml(words.unlockAction)}</button>
+            </div>
             <p class="fl-body fl-mt-3">
               SDK credentials belong in the support application's backend. The end-user widget only ever
               receives a one-time invitation URL.
@@ -287,7 +312,11 @@ function renderSettings() {
 
 function paintSettingsAuth() {
   const cell = document.getElementById("settings-auth");
-  if (cell) cell.innerHTML = auth.unlocked ? badge("Unlocked", "ok") : badge("Locked", "idle");
+  if (cell) {
+    cell.innerHTML = auth.unlocked
+      ? badge("Unlocked", "ok")
+      : badge(runtime.isPublicDemo ? "Not used by this demo" : "Locked", "idle");
+  }
   void paintAnalystSettings();
 }
 
@@ -308,6 +337,17 @@ async function paintAnalystSettings() {
     const cell = document.getElementById(id);
     if (cell) cell.innerHTML = html;
   };
+
+  // On a hosted runtime the Analyst is not one credential away: there is no
+  // local Ollama for it to reach, and Faultline will not substitute a cloud
+  // model. "Locked" would imply a door; this one has no key.
+  if (runtime.isHosted) {
+    set("analyst-settings-provider", "Ollama · local only");
+    set("analyst-settings-model", "—");
+    set("analyst-settings-endpoint", "—");
+    set("analyst-settings-status", badge("Requires local agent", "idle"));
+    return;
+  }
 
   if (!auth.unlocked) {
     set("analyst-settings-provider", "—");
@@ -343,11 +383,19 @@ function renderTopologyFallback() {
   if (!slot) return;
   const hasTopology = !document.getElementById("topology-panel")?.hidden;
   const hasRoute = !document.getElementById("route-panel")?.hidden;
+  // The old empty state promised a map that a hosted deployment can never draw
+  // - the adapter, routing and neighbour evidence it is inferred from only
+  // exists on the endpoint - and sent the visitor to a locked operator page to
+  // get it. Say which evidence is missing, and offer the route that works.
   slot.innerHTML = (hasTopology || hasRoute) ? "" : `<section class="fl-panel">${state({
     icon: "◇",
-    title: "No topology evidence yet",
-    body: "Topology is inferred from adapter, routing and neighbour evidence collected during a diagnostic. Run one against a real target and the map appears here.",
-    actions: `<button class="fl-btn fl-btn-primary" data-goto="live">Run a live diagnostic</button>`
+    title: runtime.isHosted ? "No endpoint topology evidence here" : "No topology evidence yet",
+    body: runtime.isHosted
+      ? `Topology is inferred from adapter, routing and neighbour evidence, which is collected on the machine being investigated. ${runtime.vantageLabel} has none of a visitor's, so this deployment draws no map. The recorded VPN routing investigation shows the same evidence from a real capture.`
+      : "Topology is inferred from adapter, routing and neighbour evidence collected during a diagnostic. Run one against a real target and the map appears here.",
+    actions: runtime.isPublicDemo
+      ? `<button class="fl-btn fl-btn-primary" data-goto="demo">Open the hosted demo</button>`
+      : `<button class="fl-btn fl-btn-primary" data-goto="live">Run a live diagnostic</button>`
   })}</section>`;
 }
 

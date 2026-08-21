@@ -17,6 +17,25 @@ npm run bisect -- github.com
 
 No account. No cloud AI. No API key for the core workflow. No Docker required. Network Bisect makes real connections from your machine and varies conditions per connection rather than reconfiguring the host.
 
+## Try it without installing anything
+
+**<https://faultline-network-diagnostics.vercel.app/>**
+
+A hosted demo, no account and no credential. It runs real DNS, TCP, TLS and HTTP
+measurements against allowlisted public services from Faultline's own hosted
+deployment, and correlates them against independent public vantages.
+
+Everything it measures is labelled `VERCEL VANTAGE`, because that is where the
+measurement was taken. It has no path to your Wi-Fi, gateway, routes or VPN, and
+it does not pretend otherwise. The endpoint half of the product is demonstrated
+by three **recorded investigations** — an IPv6 path failure, a DNS resolver
+disagreement and a VPN routing regression — replayed through the production
+Flight Recorder and Network Bisect engines and labelled as recorded evidence at
+every layer.
+
+See [Hosted demo](docs/HOSTED_DEMO.md) for the runtime model, the target policy
+and what the demo deliberately cannot do.
+
 ## Problems Faultline is built to investigate
 
 Faultline is aimed at faults that are difficult to prove with a single ping or traceroute, especially when the outcome changes with network conditions.
@@ -186,6 +205,10 @@ Public Internet context is supporting evidence. It does not move the determinist
 
 Private addresses, local hostnames, MAC addresses, SSIDs and VPN routes are not sent to public enrichment services.
 
+On a hosted deployment the `LOCAL` row is neither available nor claimed: the
+runtime reports that it cannot observe an endpoint, and measurements are labelled
+with the hosted vantage instead. See [Hosted demo](docs/HOSTED_DEMO.md).
+
 See [Live Internet Data](docs/LIVE_INTERNET_DATA.md).
 
 ## Faultline Analyst
@@ -311,6 +334,15 @@ Case-room token           one shared case and role
 
 The optional Analyst reuses the platform admin boundary, accepts only a validated loopback Ollama endpoint, and exposes read-only tools.
 
+The hosted public demo is the one unauthenticated surface, and it is a separate,
+narrower route rather than an existing one with the check removed. The operator
+diagnostic (`/api/live/diagnostics`) can name any target and spawns ICMP and
+traceroute, so it stays admin-authenticated. `/api/demo/diagnose` accepts only
+allowlisted public hostnames on ports 80 and 443, resolves them and validates
+every returned address as globally routable before connecting, re-validates each
+redirect hop, executes no local command, and is rate limited and time budgeted.
+See [Hosted demo](docs/HOSTED_DEMO.md).
+
 SDK credentials belong in the support application's backend. The end-user widget receives only a one-time invitation URL. Service-desk credentials are not stored by Faultline.
 
 ## Current limitations
@@ -325,6 +357,8 @@ Important limitations include:
 - Linux and macOS collection do not yet have Windows parity
 - several vendor integration surfaces are adapter boundaries rather than live vendor-certified OAuth integrations
 - change-assurance regression labels describe evidence differences, not causal inference
+- the hosted demo's rate limiting is per Function instance and is therefore best-effort rather than a globally durable quota; its target allowlist is the control that holds regardless
+- hosted storage is `/tmp` on an ephemeral instance and is not an archive
 - the packaged Windows client is unsigned
 - Analyst retained evidence is process-local and its suggestions are hypotheses rather than findings
 

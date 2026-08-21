@@ -10,7 +10,7 @@
 // chooses a model, and never sees a tool definition; it posts a question plus
 // the name of the current screen and renders what the server streams back.
 
-import { auth, badge, currentView, escapeHtml, goTo, mount, state } from "./shell.js";
+import { auth, badge, currentView, escapeHtml, goTo, mount, runtime, state } from "./shell.js";
 
 const host = mount("analyst");
 const drawer = document.getElementById("analyst-drawer");
@@ -254,6 +254,22 @@ function renderTurn(turn) {
 }
 
 function render() {
+  // The Analyst is a LOCAL model. A hosted deployment has no Ollama, and the
+  // right answer is to say exactly that rather than to substitute a cloud API
+  // or to imply the visitor is one credential away from it. The deterministic
+  // engine is unaffected: it is what decides a fault domain, with or without
+  // any model at all.
+  if (runtime.isHosted) {
+    shell(state({
+      icon: "◈",
+      tone: "locked",
+      title: "Faultline Analyst requires a local Faultline Agent",
+      body: "The Analyst runs against a loopback Ollama runtime on the machine being investigated. This hosted deployment has no local model, and Faultline does not substitute a cloud inference API: network evidence is never sent to a remote model. Every deterministic diagnosis on this demo is produced without it.",
+      actions: `<button class="fl-btn fl-btn-primary" data-goto="demo">Back to the hosted demo</button>`
+    }), "");
+    return;
+  }
+
   if (!auth.unlocked) {
     shell(auth.lockedState("The Faultline Analyst"), "");
     return;
