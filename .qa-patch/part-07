@@ -1,0 +1,49 @@
+e))
++    .filter(entry => !lines.slice(Math.max(0, entry.index - 2), entry.index + 1).some(near => GATE.test(near)));
++}
++
++test("no panel claims a LOCAL vantage without asking the runtime first", async () => {
++  const { readFile } = await import("node:fs/promises");
++
++  for (const file of VANTAGE_SOURCES) {
++    const text = await readFile(new URL(`../${file}`, import.meta.url), "utf8");
++
++    for (const phrase of ["Measured locally", "Local topology", "Local measurement"]) {
++      assert.deepEqual(
++        ungatedLines(text, phrase).map(entry => `${file}:${entry.number}`),
++        [],
++        `${file} renders "${phrase}" without a runtime branch; a hosted deployment would claim a reading it did not take`
++      );
++    }
++  }
++});
++
++test("a hosted runtime never labels its own measurements LOCAL", () => {
++  const hosted = capabilities({ VERCEL: "1", VERCEL_REGION: "iad1" });
++  assert.equal(hosted.vantage.label, "VERCEL VANTAGE");
++  assert.doesNotMatch(hosted.vantage.label, /local/i);
++  assert.doesNotMatch(hosted.vantage.longLabel, /\blocal\b/i);
++  // The description may - and should - mention the visitor's device, but only
++  // to disown it.
++  assert.match(hosted.vantage.description, /not from your device or LAN/i);
++
++  // The things it cannot see are reported as unavailable rather than healthy.
++  for (const key of ["endpointLocal", "localEnvironment", "icmpAndTraceroute", "endpointFlightRecorder"]) {
++    assert.equal(hosted[key], false, `${key} must be false on a hosted runtime`);
++  }
++});
++
++test("the hosted page ships both runtime variants of every local claim it makes", async () => {
++  const { readFile } = await import("node:fs/promises");
++  const html = await readFile(new URL("../public/index.html", import.meta.url), "utf8");
++
++  // The server stamps data-public-demo onto <html> and CSS picks one of each
++  // pair, so the FIRST paint is already correct with no JavaScript.
++  assert.match(html, /data-local-only>[\s\S]{0,120}Local topology/, "the local wording is gated");
++  assert.match(html, /data-demo-only>[\s\S]{0,200}Topology is inferred from the routing/, "the hosted wording exists");
++  assert.match(html, /id="rail-auth-text" data-local-only/, "the rail's local indicator is gated");
++  assert.match(html, /id="rail-auth-text-demo" data-demo-only/, "the rail has a public-demo indicator");
++});
+-- 
+2.43.0
+
