@@ -1,0 +1,175 @@
+ let released = false;
+-      return () => {
++      let refunded = false;
++
++      const release = () => {
+         if (released) return;
+         released = true;
+         inFlight -= 1;
+       };
++
++      /**
++       * Hand the live slot back, because the request never reached the network.
++       *
++       * Charged to the refusal bucket instead, so a client bouncing off policy
++       * is still bounded - it just stops spending the budget that exists to
++       * bound outbound work on requests that produced none. Throws
++       * RateLimitError once that wider bucket is exhausted.
++       */
++      release.refund = () => {
++        if (refunded) return;
++        refunded = true;
++
++        const at2 = now();
++        const refusedKey = `refused:${key}`;
++        const entry = clients.get(refusedKey) || { windowStartedAt: at2, count: 0 };
++
++        // Give the live slot back first. A throw from the refusal bucket must
++        // not leave the client charged for a request that did nothing.
++        client.count = Math.max(0, client.count - 1);
++        instanceCount = Math.max(0, instanceCount - 1);
++
++        clients.set(refusedKey, entry);
++        consumeWindow(
++          entry,
++          at2,
++          limits.refusedPerClientPerMinute,
++          "Too many refused targets in a row."
++        );
++      };
++
++      return release;
+     },
+ 
+     snapshot() {
+@@ -169,6 +224,7 @@ export function createDemoLimiter({ limits = readLimits(), now = () => Date.now(
+     describe() {
+       return {
+         perClientPerMinute: limits.perClientPerMinute,
++        refusedPerClientPerMinute: limits.refusedPerClientPerMinute,
+         perInstancePerMinute: limits.perInstancePerMinute,
+         maxConcurrent: limits.maxConcurrent,
+         requestBudgetMs: limits.requestBudgetMs,
+diff --git a/src/demo/policy.mjs b/src/demo/policy.mjs
+index 82f0498..d103995 100644
+--- a/src/demo/policy.mjs
++++ b/src/demo/policy.mjs
+@@ -95,7 +95,20 @@ export function isAllowlisted(host, allowlist) {
+  * IP, credentials in the authority, a non-web scheme, a non-web port - is
+  * refused here rather than being normalised into something that looks safe.
+  */
+-export function parseDemoTarget(value, { allowlist = readAllowlist() } = {}) {
++export function parseDemoTarget(value, options) {
++  try {
++    return parseDemoTargetStrict(value, options);
++  } catch (error) {
++    // Every refusal inside parseDemoTargetStrict is a string check: no lookup,
++    // no socket, nothing left this process. Marking them lets the router hand
++    // the caller's live-diagnostic budget back rather than spending it on a
++    // typo. See the refund note in limits.mjs.
++    if (error instanceof DemoPolicyError) error.preNetwork = true;
++    throw error;
++  }
++}
++
++function parseDemoTargetStrict(value, { allowlist = readAllowlist() } = {}) {
+   const input = String(value ?? "").trim();
+   if (!input) throw new DemoPolicyError("A target hostname is required.");
+   if (input.length > 255) throw new DemoPolicyError("Target is too long.");
+@@ -218,8 +231,12 @@ export function createRedirectGuard({ allowlist = readAllowlist(), timeoutMs = 3
+ /** Reject a promise that overruns its budget, so no stage can hang a Function. */
+ export function withTimeout(promise, ms, message = "Operation timed out.") {
+   return new Promise((resolve, reject) => {
++    // NOT unref'd, deliberately. An unref'd timer does not hold the event loop
++    // open, so a budget whose only pending work IS the timer can be skipped
++    // entirely - the timeout then never fires and the thing it was guarding
++    // hangs instead. Both settle paths clear it, so a cleared timer cannot keep
++    // a Function alive past the work it was bounding either way.
+     const timer = setTimeout(() => reject(new DemoPolicyError(message, { code: "DEMO_TIMEOUT", statusCode: 504 })), ms);
+-    timer.unref?.();
+     promise.then(
+       value => { clearTimeout(timer); resolve(value); },
+       error => { clearTimeout(timer); reject(error); }
+diff --git a/src/demo/routes.mjs b/src/demo/routes.mjs
+index ec5fbf9..01fe1b7 100644
+--- a/src/demo/routes.mjs
++++ b/src/demo/routes.mjs
+@@ -91,10 +91,23 @@ export function createDemoRouter({
+       }
+ 
+       const html = renderInvestigationCapsule(investigation);
++      // The capsule is the Preserve half of the demo, and the control that
++      // opens it says "Open the capsule". Served as an attachment it never
++      // opened: the browser downloaded a file and the tab stayed blank, so the
++      // one artefact that argues the evidence is portable was the one thing a
++      // visitor never saw. It is INLINE by default and downloadable on request,
++      // keeping the same filename either way.
++      const download = url.searchParams.get("download") === "1";
+       res.writeHead(200, {
+         "content-type": "text/html; charset=utf-8",
+         "cache-control": "no-store",
+-        "content-disposition": `attachment; filename="${investigation.capsuleFilename}"`
++        // A capsule is self-contained: its only script is the inline integrity
++        // check Faultline writes into it, and it fetches nothing. Pinning that
++        // shape means an inline render cannot reach the network or frame
++        // anything, whatever ends up in the evidence it is describing.
++        "content-security-policy": "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:; base-uri 'none'; form-action 'none'",
++        "x-content-type-options": "nosniff",
++        "content-disposition": `${download ? "attachment" : "inline"}; filename="${investigation.capsuleFilename}"`
+       });
+       res.end(html);
+       return true;
+@@ -125,15 +138,25 @@ export function createDemoRouter({
+           throw error;
+         }
+ 
+-        const result = await runDiagnostic(String(payload.target ?? ""), {
+-          allowlist,
+-          vantages: payload.vantages,
+-          // A caller may turn optional enrichment OFF (faster, fewer external
+-          // calls) but may not turn anything ON that policy does not already
+-          // permit. There is no caller-controlled destination here at all.
+-          distributed: payload.distributed !== false,
+-          enrich: payload.enrich !== false
+-        });
++        let result;
++        try {
++          result = await runDiagnostic(String(payload.target ?? ""), {
++            allowlist,
++            vantages: payload.vantages,
++            // A caller may turn optional enrichment OFF (faster, fewer external
++            // calls) but may not turn anything ON that policy does not already
++            // permit. There is no caller-controlled destination here at all.
++            distributed: payload.distributed !== false,
++            enrich: payload.enrich !== false
++          });
++        } catch (error) {
++          // Refused on the string alone - it never resolved and never
++          // connected. Give the live slot back and charge the wider refusal
++          // bucket, so exploring the allowlist does not lock a visitor out of
++          // the diagnostic the demo exists to show.
++          if (error?.preNetwork) release.refund();
++          throw error;
++        }
+ 
+         json(res, 201, result);
+         return true;
+diff --git a/src/integrations/http.mjs b/src/integrations/http.mjs
+index f8b05f3..153d6cc 100644
+--- a/src/integrations/http.mjs
++++ b/src/integrations/http.mjs
+@@ -6,7 +6,7 @@
+ // throwing into the diagnostic path.
+ 
+ const DEFAULT_TIMEOUT_MS = 6_000;
+-const USER_AGENT = "Faultline/1.5 (+https://github.com/weegienamja/Faultline)";
++const USER_AGENT = "Faultline/1.5 (+https://github.com/weegienamja/Faultline-Network-Diagnostics)";
+ 
+ const cache = new Map();
+ 
+diff --git a/tests/demo-routes.test.mjs b/tests/demo-routes.test.mjs
+index 35d6e2e..a103af5 100644
+--- a/tests/demo-routes.test.mjs
++++ b/tests/demo-routes.test.mjs
+@@ -33,8 +33,10 @@ function startServer(port, dataFile, env = {}) {
+       FAULTLINE_RUNTIME: 
