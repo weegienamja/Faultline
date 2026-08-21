@@ -4,6 +4,14 @@
 // response returned by /api/live/diagnostics. Nothing is simulated. Each block
 // carries an explicit source badge so a local reading, a live measurement and
 // third-party routing context are never read as the same kind of evidence.
+//
+// The vantage label is NOT hard-coded. On a hosted deployment this same panel
+// would otherwise print LOCAL next to a measurement taken from a datacentre,
+// which a reader would reasonably take to mean their own machine. It comes from
+// the runtime capability model instead, so there is one answer to "who measured
+// this" across the whole product.
+
+import { auth, runtime, words } from "./shell.js";
 
 const SOURCE_LABELS = {
   local: "LOCAL",
@@ -28,7 +36,9 @@ function escapeHtml(value) {
 }
 
 function badge(kind, extra = "") {
-  const label = SOURCE_LABELS[kind] || String(kind).toUpperCase();
+  const label = kind === "local"
+    ? runtime.vantageLabel
+    : SOURCE_LABELS[kind] || String(kind).toUpperCase();
   return `<span class="src-badge src-${escapeHtml(kind)}">${escapeHtml(label)}${extra ? ` · ${escapeHtml(extra)}` : ""}</span>`;
 }
 
@@ -57,26 +67,35 @@ panel.innerHTML = `
       <span class="section-label">REAL NETWORK EVIDENCE</span>
       <h2 class="fl-panel-title fl-mt-1">Test a real target</h2>
       <p class="fl-body fl-prose fl-mt-2">
-        Runs genuine DNS, TCP, TLS, HTTP, ICMP and path measurements from this machine, then adds public routing,
+        Runs genuine ${runtime.isHosted ? "DNS, TCP, TLS and HTTP" : "DNS, TCP, TLS, HTTP, ICMP and path"} measurements from ${runtime.isHosted ? "the Faultline runtime serving this page" : "this machine"}, then adds public routing,
         outage and network-ownership context. Everything below is measured or retrieved live.
       </p>
+      ${runtime.isPublicDemo ? `<p class="fl-body fl-prose fl-mt-2">
+        This is the operator control plane, and it stays behind the admin credential on a hosted deployment:
+        it can name any target and runs ICMP and traceroute, so an open version of it would be an abuse primitive.
+        The hosted demo runs a constrained version of the same measurement engine against allowlisted public
+        services, with no credential.
+      </p>
+      <div class="fl-state-actions fl-state-actions-start fl-mt-3">
+        <button class="fl-btn fl-btn-primary fl-btn-sm" type="button" data-goto="demo">Open the hosted demo</button>
+      </div>` : ""}
     </div>
     <div class="fl-row-end">
       ${badge("local")}${badge("live")}${badge("ripestat")}${badge("globalping")}${badge("ioda")}${badge("peeringdb")}
     </div>
   </div>
 
-  <div class="live-modes" id="live-modes">
+  <div class="live-modes" id="live-modes"${runtime.isPublicDemo ? ' hidden aria-hidden="true"' : ""}>
     <button class="live-mode active" type="button" data-mode="public">Test a public service</button>
-    <button class="live-mode" type="button" data-mode="device">Test this device</button>
-    <button class="live-mode" type="button" data-mode="environment">Load my environment</button>
+    <button class="live-mode" type="button" data-mode="device">${runtime.isHosted ? "Test this runtime" : "Test this device"}</button>
+    <button class="live-mode" type="button" data-mode="environment">${runtime.isHosted ? "Load an environment manifest" : "Load my environment"}</button>
   </div>
 
-  <form class="live-form" id="live-form">
+  <form class="live-form" id="live-form"${runtime.isPublicDemo ? ' hidden aria-hidden="true"' : ""}>
     <input type="text" id="live-target" placeholder="example.com · 1.1.1.1 · https://example.com/health" autocomplete="off" spellcheck="false" value="example.com" />
     <button class="primary-button" type="submit" id="live-run">Run live diagnostic</button>
   </form>
-  <p class="live-status" id="live-status"></p>
+  <p class="live-status" id="live-status" role="status" aria-live="polite"></p>
 
   <div id="live-environment" hidden>
     <div class="live-env-actions">
@@ -105,6 +124,13 @@ const envBlock = panel.querySelector("#live-environment");
 const envManifest = panel.querySelector("#env-manifest");
 const envResult = panel.querySelector("#env-result");
 
+// On a public demo the controls above are hidden, so the view would otherwise
+// end at a row of source badges over an empty screen. Every other operator
+// surface answers with the same designed state; this one should too.
+if (runtime.isPublicDemo && results) {
+  results.innerHTML = `<section class="fl-panel">${auth.lockedState("The unrestricted live diagnostic")}</section>`;
+}
+
 let mode = "public";
 
 function token() {
@@ -113,7 +139,7 @@ function token() {
 
 async function api(path, { method = "GET", body } = {}) {
   if (!token()) {
-    const error = new Error("Unlock live data with the Faultline admin credential to run a live diagnostic.");
+    const error = new Error(words.lockedBody("The unrestricted live diagnostic"));
     error.status = 401;
     throw error;
   }
@@ -452,7 +478,11 @@ modes.addEventListener("click", event => {
   form.hidden = mode === "environment";
   if (mode === "device") {
     targetInput.value = "1.1.1.1";
-    statusLine.textContent = "Device mode measures this machine's own network path, gateway, Wi-Fi, VPN and DNS while reaching the reference target.";
+    statusLine.textContent = runtime.isHosted
+      // A hosted runtime has no Wi-Fi, no gateway worth naming and no VPN, and
+      // it certainly has none of the visitor's. Say what it actually reads.
+      ? `Runtime mode measures the network path of the ${runtime.vantageLabel} host itself while reaching the reference target. It has no visibility of your device, LAN, Wi-Fi or VPN.`
+      : "Device mode measures this machine's own network path, gateway, Wi-Fi, VPN and DNS while reaching the reference target.";
   } else if (mode === "public") {
     statusLine.textContent = "";
   }
@@ -482,9 +512,11 @@ form.addEventListener("submit", async event => {
   } catch (error) {
     statusLine.classList.add("error");
     statusLine.textContent = error.status === 401
-      ? "Unlock live data with the Faultline admin credential first, then run the live diagnostic."
+      ? words.lockedBody("The unrestricted live diagnostic")
       : error.message;
-    if (error.status === 401) document.getElementById("auth-open")?.click();
+    // Prompting a public visitor for a credential they do not have is a dead
+    // end; on the hosted demo the useful move is the demo diagnostic instead.
+    if (error.status === 401) auth.promptUnlock();
   } finally {
     runButton.disabled = false;
   }
@@ -530,7 +562,7 @@ async function submitManifest(path, activated) {
     renderManifest(data, activated);
   } catch (error) {
     envResult.innerHTML = `<p class="live-status error">${escapeHtml(error.message)}</p>`;
-    if (error.status === 401) document.getElementById("auth-open")?.click();
+    if (error.status === 401) auth.promptUnlock();
   }
 }
 

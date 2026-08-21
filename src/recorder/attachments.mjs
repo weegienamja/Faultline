@@ -37,18 +37,25 @@ export function nextEvidenceId() {
  * confirmation, hypotheses, transcript, verdict, stopping reason and counters -
  * so this adds the attachment envelope rather than a second projection.
  */
-export function buildBisectAttachment({ incident, report, requestedAxes = [], now = () => new Date() }) {
+export function buildBisectAttachment({ incident, report, requestedAxes = [], simulated = false, now = () => new Date() }) {
   if (!incident?.id) throw new Error("An incident is required to attach evidence.");
+
+  // A Bisect run normally makes real connections, and is deterministic evidence
+  // even when the incident that prompted it was scripted. The hosted public
+  // demo is the exception: it REPLAYS an isolation run through the production
+  // engine against the recorded endpoint's behaviour, because a Vercel Function
+  // cannot bind a visitor's VPN adapter or lose their IPv6 path. That run is
+  // still deterministic reasoning, but its trial outcomes are scripted, and the
+  // attachment has to be able to say which of the two it is.
+  const replayed = simulated === true;
 
   return {
     id: nextEvidenceId(),
     incidentId: incident.id,
     kind: EVIDENCE_KIND.NETWORK_BISECT,
-    // A Bisect run makes real connections. It is deterministic evidence even
-    // when the incident that prompted it was scripted.
-    evidenceClass: "deterministic",
-    source: "measured",
-    simulated: false,
+    evidenceClass: replayed ? "simulated" : "deterministic",
+    source: replayed ? "replay" : "measured",
+    simulated: replayed,
     createdAt: now().toISOString(),
     // Why this experiment was run at all: the conditions the recorder observed.
     origin: {
@@ -60,12 +67,16 @@ export function buildBisectAttachment({ incident, report, requestedAxes = [], no
     },
     payload: bisectEvidence(report),
     epistemics: {
-      establishes: "Whether changing one condition changes the outcome, under paired confirmation.",
+      establishes: replayed
+        ? "How the production isolation engine reasons over the recorded endpoint's behaviour, and which condition it identifies as the discriminator."
+        : "Whether changing one condition changes the outcome, under paired confirmation.",
       limit: "A confirmed discriminator establishes association, not cause.",
       // The distinction the capsule must never blur.
-      relationToIncident: incident.simulated === true
-        ? "The incident was simulated; this experiment was not. Its measurements are real."
-        : "The incident and this experiment are both real measurements."
+      relationToIncident: replayed
+        ? "Both the incident and this experiment are replayed from a recorded scenario. Neither is a measurement of a real network."
+        : incident.simulated === true
+          ? "The incident was simulated; this experiment was not. Its measurements are real."
+          : "The incident and this experiment are both real measurements."
     }
   };
 }

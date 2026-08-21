@@ -1,0 +1,378 @@
+/* ==========================================================================
+   Hosted demo
+   --------------------------------------------------------------------------
+   The public deployment's landing surface. It borrows every colour, radius,
+   spacing step and status token from the design system rather than inventing
+   a "marketing" look, because the argument the demo has to make is that this
+   is the real product — a landing page in a different visual language would
+   undercut that before a single measurement appeared.
+
+   Nothing here introduces a new colour. `--fl-chrome` (cyan) stays the
+   interaction colour, the four status tokens stay the only semantic colours,
+   and the evidence-class treatment for simulated evidence is the one already
+   defined in evidence.css.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Runtime gating
+
+   The server stamps the runtime onto <html>, so these two rules are the whole
+   mechanism for showing demo-only and local-only chrome. No module toggles
+   `hidden` on a timer, and there is no flash of the wrong surface.
+   -------------------------------------------------------------------------- */
+
+html:not([data-public-demo="true"]) [data-demo-only] { display: none !important; }
+html[data-public-demo="true"] [data-local-only] { display: none !important; }
+
+/* --------------------------------------------------------------------------
+   The topbar flag
+   -------------------------------------------------------------------------- */
+
+.fl-demo-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--fl-s1);
+  padding: 0.15rem var(--fl-s2);
+  border: 1px solid var(--fl-chrome-line);
+  border-radius: var(--fl-r-pill);
+  background: var(--fl-chrome-soft);
+  color: var(--fl-chrome-hi);
+  font-family: var(--fl-mono);
+  font-size: var(--fl-fs-micro);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------------------------------
+   Hero
+   -------------------------------------------------------------------------- */
+
+.fl-demo-hero {
+  /* A single hairline of the interaction colour, so the entry point reads as
+     the primary action on the page without a coloured slab. */
+  border-color: var(--fl-chrome-line);
+  background:
+    linear-gradient(180deg, var(--fl-chrome-soft), transparent 40%),
+    var(--fl-surface);
+}
+
+.fl-demo-title {
+  margin: var(--fl-s1) 0 var(--fl-s3);
+  font-size: var(--fl-fs-lg);
+  line-height: var(--fl-lh-tight);
+  letter-spacing: -0.01em;
+  color: var(--fl-text);
+}
+
+.fl-demo-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fl-s2);
+  margin-block: var(--fl-s4) var(--fl-s3);
+}
+
+.fl-demo-form .fl-input {
+  flex: 1 1 22ch;
+  min-inline-size: 0;
+}
+
+.fl-demo-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--fl-s2);
+  margin-block-end: var(--fl-s4);
+}
+
+.fl-chip {
+  padding: 0.2rem var(--fl-s2);
+  border: 1px solid var(--fl-line);
+  border-radius: var(--fl-r-chip);
+  background: var(--fl-surface-2);
+  color: var(--fl-text-2);
+  font-family: var(--fl-mono);
+  font-size: var(--fl-fs-micro);
+  cursor: pointer;
+  transition: border-color var(--fl-dur-1) var(--fl-ease), color var(--fl-dur-1) var(--fl-ease);
+
+  &:hover,
+  &:focus-visible {
+    border-color: var(--fl-chrome-line);
+    color: var(--fl-chrome-hi);
+  }
+}
+
+.fl-demo-provenance {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--fl-s2);
+  margin: 0;
+  color: var(--fl-text-3);
+  font-size: var(--fl-fs-sm);
+  line-height: var(--fl-lh-body);
+}
+
+/* --------------------------------------------------------------------------
+   Vantage columns — who can see what
+
+   Three columns that must be readable side by side, because the comparison
+   IS the content. Below the container breakpoint they stack, and each keeps
+   its own heading so the grouping survives.
+   -------------------------------------------------------------------------- */
+
+.fl-vantage-grid {
+  display: grid;
+  gap: var(--fl-s3);
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+}
+
+.fl-vantage-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fl-s2);
+  padding: var(--fl-s3);
+  border: 1px solid var(--fl-line);
+  border-radius: var(--fl-r-control);
+  background: var(--fl-surface-2);
+  min-inline-size: 0;
+}
+
+.fl-vantage-col[data-tone="ok"] { border-color: var(--fl-ok-line); }
+.fl-vantage-col[data-tone="external"] { border-color: var(--fl-line-strong); }
+
+.fl-vantage-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fl-s2);
+}
+
+.fl-vantage-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--fl-s2);
+}
+
+.fl-vantage-list li {
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr);
+  gap: var(--fl-s2);
+  align-items: start;
+  font-size: var(--fl-fs-sm);
+  color: var(--fl-text);
+  min-inline-size: 0;
+}
+
+.fl-vantage-list li[data-mark="no"] { color: var(--fl-text-3); }
+
+.fl-vantage-list small {
+  display: block;
+  margin-block-start: 0.15rem;
+  color: var(--fl-text-3);
+  font-size: var(--fl-fs-micro);
+  line-height: var(--fl-lh-body);
+}
+
+.fl-vantage-mark {
+  font-family: var(--fl-mono);
+  line-height: 1.35;
+}
+
+.fl-vantage-list li[data-mark="yes"] .fl-vantage-mark { color: var(--fl-ok); }
+.fl-vantage-list li[data-mark="no"] .fl-vantage-mark { color: var(--fl-idle); }
+
+/* --------------------------------------------------------------------------
+   Stage strip — DNS → TCP → TLS → HTTP
+
+   Reads left to right in the order a browser performs them, so the stage that
+   failed is the point the eye stops.
+   -------------------------------------------------------------------------- */
+
+.fl-stage-strip {
+  display: grid;
+  gap: var(--fl-s2);
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  margin-block-start: var(--fl-s3);
+}
+
+.fl-stage {
+  display: grid;
+  gap: 0.15rem;
+  padding: var(--fl-s2) var(--fl-s3);
+  border: 1px solid var(--fl-line);
+  border-inline-start: 2px solid var(--fl-status, var(--fl-idle));
+  border-radius: var(--fl-r-control);
+  background: var(--fl-surface-2);
+  min-inline-size: 0;
+}
+
+.fl-stage-name {
+  font-family: var(--fl-mono);
+  font-size: var(--fl-fs-micro);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fl-text-3);
+}
+
+.fl-stage-state {
+  font-family: var(--fl-mono);
+  font-size: var(--fl-fs-base);
+  color: var(--fl-status, var(--fl-text));
+}
+
+.fl-stage-ms {
+  font-family: var(--fl-mono);
+  font-size: var(--fl-fs-sm);
+  color: var(--fl-text-2);
+}
+
+.fl-stage-detail {
+  font-size: var(--fl-fs-micro);
+  color: var(--fl-text-3);
+  line-height: var(--fl-lh-body);
+  overflow-wrap: anywhere;
+}
+
+/* --------------------------------------------------------------------------
+   Recorded investigation cards
+   -------------------------------------------------------------------------- */
+
+.fl-demo-cards {
+  display: grid;
+  gap: var(--fl-s3);
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+}
+
+.fl-demo-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fl-s2);
+  padding: var(--fl-s3);
+  border: 1px solid var(--fl-line);
+  border-radius: var(--fl-r-control);
+  background: var(--fl-surface-2);
+  min-inline-size: 0;
+  transition: border-color var(--fl-dur-1) var(--fl-ease);
+}
+
+.fl-demo-card[data-open] { border-color: var(--fl-chrome-line); }
+
+.fl-demo-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--fl-s2);
+}
+
+.fl-demo-card-head h3 {
+  margin: 0;
+  font-size: var(--fl-fs-md);
+  line-height: var(--fl-lh-tight);
+  color: var(--fl-text);
+}
+
+.fl-demo-card .fl-meta {
+  /* The "why this is recorded rather than measured" line. Quiet, but present
+     on every card: it is the sentence that keeps the demo honest. */
+  line-height: var(--fl-lh-body);
+}
+
+.fl-demo-card-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--fl-s2);
+  margin-block-start: auto;
+  padding-block-start: var(--fl-s2);
+}
+
+/* --------------------------------------------------------------------------
+   Investigation walkthrough
+   -------------------------------------------------------------------------- */
+
+.fl-demo-investigation {
+  display: grid;
+  gap: var(--fl-s3);
+  /* Marks the whole replayed block as one unit rather than four loose panels
+     that happen to be adjacent. */
+  padding-inline-start: var(--fl-s3);
+  border-inline-start: 2px solid var(--fl-ev-simulated);
+  margin-block: var(--fl-s4);
+}
+
+.fl-bisect-seq {
+  display: grid;
+  gap: var(--fl-s1);
+  padding: var(--fl-s3);
+  border: 1px solid var(--fl-line);
+  border-radius: var(--fl-r-control);
+  background: var(--fl-sunk);
+}
+
+.fl-bisect-seq code {
+  font-family: var(--fl-mono);
+  font-size: var(--fl-fs-md);
+  letter-spacing: 0.14em;
+  color: var(--fl-text);
+}
+
+/* Left-aligned action rows, where `fl-state-actions` would centre them. */
+.fl-state-actions-start {
+  justify-content: flex-start;
+}
+
+/* --------------------------------------------------------------------------
+   Narrow screens
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 40rem) {
+  .fl-demo-form .fl-btn { inline-size: 100%; }
+  .fl-demo-investigation {
+    padding-inline-start: var(--fl-s2);
+    margin-inline: 0;
+  }
+}
+
+/* The topbar at rail-collapse width.
+
+   Three nowrap actions plus the demo flag do not fit beside a page title at
+   390px and the actions do not shrink, so something has to go. It used to be
+   the demo call to action — which left a PUBLIC demo whose only two phone-sized
+   buttons were "Analyst" and "Operator sign-in". A visitor's first impression on
+   a phone was therefore a tool asking them to sign in, with no way to run
+   anything, which is the exact reading this deployment cannot afford.
+
+   What goes instead is the chrome that is genuinely duplicated:
+
+     Analyst          the rail's EXPLAIN entry opens the same drawer at every
+                      width, so the topbar copy is redundant, not lost.
+     Operator sign-in an operator surface, not a visitor one. It keeps a home on
+                      Settings › Credentials in this session, which the rail
+                      reaches at every width.
+
+   The flag stays. It is the smallest element in the bar and the one carrying
+   the claim that this is a demonstration deployment, which is exactly the thing
+   that must not be the first casualty of a narrow screen. */
+@media (width <= 52rem) {
+  .fl-topbar-actions #analyst-toggle {
+    display: none;
+  }
+
+  html[data-public-demo="true"] .fl-topbar-actions #auth-open {
+    display: none;
+  }
+
+  .fl-demo-flag {
+    padding-inline: var(--fl-s1);
+    letter-spacing: 0.04em;
+    /* The flag is nowrap and the title truncates, so without a floor between
+       them the ellipsis ran straight into the flag's border. */
+    margin-inline-end: var(--fl-s1);
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "scenario": "dns-resolver-split",
+  "title": "DNS resolver disagreement",
+  "description": "The endpoint's resolver changes from a public resolver to an internal one that answers the same name with a split-horizon address. DNS keeps succeeding, so a naive check reports DNS as healthy, but the answer now points at an address this endpoint cannot reach. The recorder observes the resolver AND the resolved address changing together; Network Bisect can vary the resolver axis and the address axis independently to establish which one changes the outcome.",
+  "target": "service.example.com",
+  "port": 443,
+  "intervalMs": 2000,
+  "phases": [
+    {
+      "label": "public resolver, public answer, service reachable",
+      "durationMs": 18000,
+      "targetTcp": "PASS",
+      "targetTcpMs": 24,
+      "ipv4": "PASS",
+      "ipv6": "INAPPLICABLE",
+      "targetDns": "PASS",
+      "targetDnsV4": 1,
+      "targetDnsV6": 0,
+      "resolvedAddress": "203.0.113.24",
+      "gatewayMs": 2,
+      "gatewayLossPct": 0,
+      "activeInterface": "Wi-Fi",
+      "gateway": "192.168.1.1",
+      "resolvers": [
+        "1.1.1.1"
+      ],
+      "wifiSsid": "office-5g",
+      "wifiBssid": "aa:bb:cc:dd:ee:01",
+      "vpn": false
+    },
+    {
+      "label": "internal resolver answers the same name with a split-horizon address",
+      "durationMs": 22000,
+      "note": "DNS still returns an answer, so resolution is not failing. The answer is a different address, and that address does not accept the connection from this endpoint. This is the case a pass/fail DNS check reports as healthy.",
+      "targetTcp": "FAIL",
+      "targetTcpError": "ETIMEDOUT",
+      "ipv4": "FAIL",
+      "ipv6": "INAPPLICABLE",
+      "targetDns": "PASS",
+      "targetDnsV4": 1,
+      "targetDnsV6": 0,
+      "resolvedAddress": "10.44.12.9",
+      "gatewayMs": 2,
+      "gatewayLossPct": 0,
+      "activeInterface": "Wi-Fi",
+      "gateway": "192.168.1.1",
+      "resolvers": [
+        "10.20.0.53"
+      ],
+      "wifiSsid": "office-5g",
+      "wifiBssid": "aa:bb:cc:dd:ee:01",
+      "vpn": false
+    },
+    {
+      "label": "public resolver restored, public answer returns, service reachable",
+      "durationMs": 18000,
+      "targetTcp": "PASS",
+      "targetTcpMs": 25,
+      "ipv4": "PASS",
+      "ipv6": "INAPPLICABLE",
+      "targetDns": "PASS",
+      "targetDnsV4": 1,
+      "targetDnsV6": 0,
+      "resolvedAddress": "203.0.113.24",
+      "gatewayMs": 2,
+      "gatewayLossPct": 0,
+      "activeInterface": "Wi-Fi",
+      "gateway": "192.168.1.1",
+      "resolvers": [
+        "1.1.1.1"
+      ],
+      "wifiSsid": "office-5g",
+      "wifiBssid": "aa:bb:cc:dd:ee:01",
+      "vpn": false
+    }
+  ]
+}

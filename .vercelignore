@@ -1,0 +1,22 @@
+# What the hosted deployment does NOT need.
+#
+# Kept explicit rather than inherited, because the hosted public demo READS
+# fixtures/recorder/*.json at runtime: the recorded investigations are replayed
+# from those scenario files through the production Flight Recorder. Excluding
+# them leaves the demo with three cards and nothing behind them, so this list
+# must never grow a `fixtures/` line.
+#
+# .npmignore and Dockerfile carry the same requirement for the packaged and
+# containerised builds; tests/packaging.test.mjs holds all of them to it.
+
+.github/
+build/
+docs/
+tests/
+coverage/
+data/
+Dockerfile
+.dockerignore
+docker-compose.yml
+ROADMAP.md
+.vercel/

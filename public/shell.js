@@ -9,6 +9,86 @@
 //      invented their own colours and markup. The helpers below are the only
 //      sanctioned way to render a badge, tile, state or panel frame.
 
+// ---------------------------------------------------------------------------
+// Runtime
+// ---------------------------------------------------------------------------
+// ONE place decides whether this is a hosted public demo or an operator's own
+// control plane. Ten modules each sniffing for a hostname would drift, and the
+// consequence of drift here is a panel telling a visitor that Faultline read
+// their Wi-Fi from a server in London.
+//
+// The synchronous half comes from attributes the server stamps onto <html>
+// when it serves the page, so the FIRST paint is already correct and there is
+// no flash of the wrong surface. The full capability document is fetched once
+// afterwards for the detail panels.
+
+const runtimeState = {
+  capabilities: null,
+  error: null
+};
+
+export const runtime = {
+  get isHosted() { return document.documentElement.dataset.runtime === "hosted"; },
+  get isPublicDemo() { return document.documentElement.dataset.publicDemo === "true"; },
+  /** The label a measurement taken by this deployment may carry. Never "LOCAL" when hosted. */
+  get vantageLabel() { return document.documentElement.dataset.vantageLabel || "LOCAL"; },
+  get vantageRegion() { return document.documentElement.dataset.vantageRegion || ""; },
+  get capabilities() { return runtimeState.capabilities; },
+
+  /** Resolves with the capability document, or null if it could not be read. */
+  async load() {
+    if (runtimeState.capabilities || runtimeState.error) return runtimeState.capabilities;
+    try {
+      const response = await fetch("/api/capabilities", { headers: { accept: "application/json" } });
+      if (!response.ok) throw new Error(String(response.status));
+      runtimeState.capabilities = await response.json();
+      window.dispatchEvent(new CustomEvent("faultline-runtime", { detail: runtimeState.capabilities }));
+    } catch (error) {
+      runtimeState.error = error;
+    }
+    return runtimeState.capabilities;
+  }
+};
+
+/**
+ * Runtime-dependent wording, in one place.
+ *
+ * Several panels have to describe the admin credential, and on a hosted public
+ * demo every one of them was telling a visitor to "unlock live data" - an
+ * instruction they cannot follow and should not want to. Rather than teaching
+ * each panel about hosting, they ask here for the sentence that is true of the
+ * runtime they are in.
+ */
+export const words = {
+  /** The topbar / call-to-action label for the credential dialog. */
+  get unlockAction() { return runtime.isPublicDemo ? "Operator sign-in" : "Unlock live data"; },
+  get unlockedAction() { return runtime.isPublicDemo ? "Operator session" : "Live data unlocked"; },
+  /** The rail's credential indicator. */
+  get railLocked() { return runtime.isPublicDemo ? "Public demo" : "Live data locked"; },
+  get railUnlocked() { return runtime.isPublicDemo ? "Operator session" : "Live data unlocked"; },
+  /** One sentence explaining why a gated surface is gated. */
+  lockedBody(what) {
+    return runtime.isPublicDemo
+      ? `${what} belongs to the Faultline control plane an operator runs on their own network. The hosted demo does not expose it.`
+      : `${what} requires the Faultline admin credential. It is held in this browser tab only and never persisted.`;
+  },
+  /** The button that follows `lockedBody`. */
+  get lockedAction() {
+    return runtime.isPublicDemo
+      ? `<button class="fl-btn fl-btn-primary" data-goto="demo">Open the hosted demo</button>`
+      : `<button class="fl-btn fl-btn-primary" data-action="unlock">Unlock live data</button>`;
+  },
+  /**
+   * Where a measurement this deployment takes actually comes from.
+   *
+   * Panels used to hard-code "Measured locally", which is true of an operator's
+   * own install and a lie on a hosted one. They ask here instead.
+   */
+  get measuredHere() { return runtime.isHosted ? runtime.vantageLabel : "Measured locally"; },
+  /** The machine a local install is running on, named in a way hosting cannot make false. */
+  get thisMachine() { return runtime.isHosted ? "the machine running Faultline" : "this machine"; }
+};
+
 export function escapeHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;")
@@ -155,9 +235,21 @@ function readViews() {
   }
 }
 
+/**
+ * The landing surface.
+ *
+ * On a hosted public demo, Overview is the wrong first screen: it reports on a
+ * collected incident, and a hosted deployment has none, so a visitor's first
+ * impression would be an empty workspace asking for a credential. The demo view
+ * is what the product can actually do here, so it is the default.
+ */
+function defaultView() {
+  return runtime.isPublicDemo && views.has("demo") ? "demo" : "overview";
+}
+
 function routeFromHash() {
   const raw = (location.hash || "").replace(/^#\/?/, "").trim();
-  return views.has(raw) ? raw : "overview";
+  return views.has(raw) ? raw : defaultView();
 }
 
 /**
@@ -230,6 +322,17 @@ export function onView(name, fn) {
 
 function start() {
   readViews();
+  // The brand mark is the one control every visitor tries. On a public demo it
+  // pointed at Overview - an operator archive that is locked here - so clicking
+  // the logo from the demo landed on "Live data is locked". It goes where the
+  // deployment's own front door is instead.
+  if (runtime.isPublicDemo) {
+    const brand = document.querySelector(".fl-brand");
+    if (brand) {
+      brand.setAttribute("href", "#/demo");
+      brand.setAttribute("aria-label", "Faultline hosted demo");
+    }
+  }
   apply(routeFromHash());
   window.addEventListener("hashchange", () => apply(routeFromHash()));
 }
@@ -249,15 +352,39 @@ export const auth = {
     else sessionStorage.removeItem("faultlineAdminToken");
     window.dispatchEvent(new CustomEvent("faultline-auth-changed"));
   },
-  /** Standard locked-surface state, so every gated panel reads identically. */
+  /**
+   * Standard locked-surface state, so every gated panel reads identically.
+   *
+   * On the hosted demo the honest message is different. This is not a surface
+   * the visitor is one credential away from using: it is an operator control
+   * plane for a Faultline someone runs themselves, and telling a recruiter to
+   * "unlock live data" on a public demo is a dead end. So it says what the
+   * surface is for, and points at the thing they CAN do.
+   */
   lockedState(what) {
     return state({
       icon: "◌",
       tone: "locked",
-      title: "Live data is locked",
-      body: `${what} requires the Faultline admin credential. It is held in this browser tab only and never persisted.`,
-      actions: `<button class="fl-btn fl-btn-primary" data-action="unlock">Unlock live data</button>`
+      title: runtime.isPublicDemo ? "Operator surface" : "Live data is locked",
+      body: words.lockedBody(what),
+      actions: words.lockedAction
     });
+  },
+  /**
+   * Ask for the credential, but ONLY where asking is a route the person can take.
+   *
+   * A public visitor cannot hold the operator's admin token, so putting that
+   * dialog in front of them turns an ordinary click into "I need the
+   * developer's password to use this" - the single impression this demo most
+   * has to avoid. On a public demo the panel's own inline explanation is the
+   * whole answer and nothing is prompted.
+   *
+   * Returns true when the dialog was opened, so callers can branch.
+   */
+  promptUnlock() {
+    if (runtime.isPublicDemo) return false;
+    document.getElementById("auth-open")?.click();
+    return true;
   }
 };
 

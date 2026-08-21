@@ -1,3 +1,10 @@
+import { auth, runtime, words } from "./shell.js";
+
+/** Why this surface is unavailable, phrased for the runtime it is in. */
+function lockedMessage(what) {
+  return words.lockedBody(what);
+}
+
 const lowerGrid = document.querySelector('[data-mount="cases"]') || document.querySelector(".lower-grid");
 const CASE_TOKEN_KEY = "faultlineAdminToken";
 let cases = [];
@@ -17,7 +24,7 @@ function token() {
 }
 
 async function request(path, options = {}) {
-  if (!token()) throw new Error("Unlock live data to use case workspaces.");
+  if (!token()) throw new Error(lockedMessage("The case workspace"));
   const response = await fetch(path, {
     method: options.method || "GET",
     cache: "no-store",
@@ -96,7 +103,7 @@ const diagnosticDialog = createDiagnosticDialog();
 const panel = document.createElement("section");
 panel.className = "panel cases-panel";
 panel.id = "case-workspaces";
-panel.innerHTML = `<div class="cases-head"><div><span class="section-label">SUPPORT CASES</span><h2 class="fl-panel-title fl-mt-1">Cases &amp; evidence packages</h2></div><div class="cases-actions"><button class="secondary-button" id="case-refresh">Refresh</button><button class="primary-button" id="case-new">New case</button></div></div><p class="cases-muted" id="case-summary">Unlock live data to manage support cases.</p><div class="case-layout"><div class="case-list" id="case-list"></div><article class="case-detail" id="case-detail"><p class="cases-muted">Select a case to inspect its diagnostics and evidence timeline.</p></article></div>`;
+panel.innerHTML = `<div class="cases-head"><div><span class="section-label">SUPPORT CASES</span><h2 class="fl-panel-title fl-mt-1">Cases &amp; evidence packages</h2></div><div class="cases-actions"${runtime.isPublicDemo ? ' hidden aria-hidden="true"' : ""}><button class="secondary-button" id="case-refresh">Refresh</button><button class="primary-button" id="case-new">New case</button></div></div><p class="cases-muted" id="case-summary"></p><div class="case-layout"><div class="case-list" id="case-list"></div><article class="case-detail" id="case-detail"><p class="cases-muted">Select a case to inspect its diagnostics and evidence timeline.</p></article></div>`;
 if (lowerGrid?.dataset?.mount) lowerGrid.appendChild(panel);
 else lowerGrid?.parentNode?.insertBefore(panel, lowerGrid);
 
@@ -104,7 +111,7 @@ const summary = panel.querySelector("#case-summary");
 const list = panel.querySelector("#case-list");
 const detail = panel.querySelector("#case-detail");
 panel.querySelector("#case-new").addEventListener("click", () => {
-  if (!token()) return document.getElementById("auth-open")?.click();
+  if (!token()) return void auth.promptUnlock();
   createCaseDialog.showModal();
 });
 panel.querySelector("#case-refresh").addEventListener("click", refresh);
@@ -142,7 +149,7 @@ async function renderDetail() {
 }
 
 function renderList() {
-  summary.textContent = token() ? `${cases.length} support case${cases.length === 1 ? "" : "s"}. Evidence exports redact local network identifiers by default in the dashboard.` : "Unlock live data to manage support cases.";
+  summary.textContent = token() ? `${cases.length} support case${cases.length === 1 ? "" : "s"}. Evidence exports redact local network identifiers by default in the dashboard.` : lockedMessage("The support case workspace");
   list.innerHTML = cases.length ? cases.map(item => `<button class="case-card ${item.id === activeCaseId ? "active" : ""}" data-case-id="${escapeHtml(item.id)}"><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.customer)} · ${escapeHtml(item.status)} · ${item.diagnosticCount} diagnostics</small></button>`).join("") : '<p class="cases-muted">No support cases yet.</p>';
   list.querySelectorAll("[data-case-id]").forEach(button => button.addEventListener("click", async () => { activeCaseId = button.dataset.caseId; renderList(); await renderDetail(); }));
 }

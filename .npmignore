@@ -1,0 +1,28 @@
+# Keep the runtime package deterministic when Faultline is installed directly
+# from Git (used by the hosted Vercel deployment).
+#
+# NOTE ON fixtures/
+#
+# `fixtures/recorder/` is RUNTIME data, not test data, despite the directory
+# name. src/recorder/simulate.mjs reads it through loadScenario()/listScenarios()
+# to drive the Flight Recorder, and the hosted demo's recorded investigations
+# replay those scenarios - so /api/demo/incidents/* returns 404 without them.
+#
+# It used to be excluded here alongside tests/, which packaged a build whose
+# demo investigations could not load. Test fixtures are a separate tree
+# (tests/fixtures/) and are still excluded with the rest of tests/.
+#
+# tests/packaging.test.mjs asserts the packed tarball still contains every
+# scenario the demo catalogue names, so this cannot silently regress again.
+
+.github/
+build/
+data/
+docs/
+test/
+tests/
+coverage/
+Dockerfile
+.dockerignore
+docker-compose.yml
+ROADMAP.md
