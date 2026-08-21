@@ -409,4 +409,14 @@ The current suite contains 453 tests, with 451 passing and 2 skipped at the time
 
 ## License
 
-MIT
+Faultline is licensed under the **GNU Affero General Public License v3.0 only (`AGPL-3.0-only`)**. See [LICENSE](LICENSE).
+
+Copyright (C) 2026 Jamie Blair.
+
+Versions of Faultline that were previously released under the MIT License remain subject to the rights already granted for those versions. The current code and subsequent contributions are licensed as stated above unless separately agreed in writing.
+
+### Commercial licensing
+
+A separate commercial licence may be available for organisations that want to embed, redistribute, modify, or offer Faultline under terms that do not require compliance with the AGPL. Contact the project owner through this GitHub repository to discuss commercial licensing.
+
+Contributions are accepted under the terms in [CONTRIBUTING.md](CONTRIBUTING.md), which include a relicensing grant so the project can continue to support both the public AGPL edition and separately licensed commercial use.
