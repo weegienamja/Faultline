@@ -3,8 +3,11 @@
 # Kept explicit rather than inherited, because the hosted public demo READS
 # fixtures/recorder/*.json at runtime: the recorded investigations are replayed
 # from those scenario files through the production Flight Recorder. Excluding
-# them - which .npmignore does, correctly, for a packaged install - would leave
-# the demo with three cards and nothing behind them.
+# them leaves the demo with three cards and nothing behind them, so this list
+# must never grow a `fixtures/` line.
+#
+# .npmignore and Dockerfile carry the same requirement for the packaged and
+# containerised builds; tests/packaging.test.mjs holds all of them to it.
 
 .github/
 build/

@@ -5,6 +5,10 @@ WORKDIR /app
 COPY --chown=node:node package.json ./
 COPY --chown=node:node src ./src
 COPY --chown=node:node public ./public
+# Runtime data, not test data: src/recorder/simulate.mjs loads these scenarios
+# through loadScenario()/listScenarios(). Without them /api/recorder/scenarios
+# is empty and the Flight Recorder cannot replay a simulation.
+COPY --chown=node:node fixtures ./fixtures
 
 RUN mkdir -p /data && chown node:node /data
 
