@@ -1,0 +1,173 @@
+From 49b904bb774c6547f93b3a8bac589aa2eefee958 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Thu, 20 Aug 2026 21:08:00 +0000
+Subject: [PATCH] Make the hosted demo answer a visitor instead of an operator
+
+QA pass over the public deployment as a first-time visitor with no
+credential. The demo surface itself was already strong; what was not was
+everything a visitor reaches when they click past it.
+
+NO PUBLIC PATH ENDS AT AN ADMIN TOKEN
+
+Network Bisect offered a target field, a repeat count, a strategy toggle
+and an enabled cyan Isolate button. Pressing it produced a red error AND
+opened the "Operator sign-in - ADMIN TOKEN" dialog. Live Diagnostics did
+the same with a mode strip and a Run button. A visitor's reasonable
+reading of that is "I need the developer's password to use this", which
+is the one impression a portfolio demo cannot afford.
+
+auth.promptUnlock() now refuses to open that dialog on a public demo, and
+the operator control bars are not rendered there at all: those views lead
+with the designed operator-surface state and a single action that works.
+Every button and link reachable in the content area of all twelve views
+was clicked; the credential dialog no longer appears from any of them.
+
+The one place it should appear now does - Settings, which the rail
+reaches at every width, because the narrow topbar drops the operator
+button so the public call to action can keep its place.
+
+Cases and the invitation dialog took the same treatment.
+
+THE BRAND MARK POINTED AT A LOCKED PAGE
+
+It linked to Overview, which on a hosted deployment renders "Live data is
+locked". Clicking the logo from the demo therefore looked like hitting a
+paywall. It points at the demo, and Overview now uses the shared
+operator-surface state rather than credential language.
+
+VANTAGE LANGUAGE
+
+Four surfaces claimed a local reading a hosted deployment cannot take:
+
+  Network Bisect  a "Measured locally" chip
+  Topology        "Local topology inferred from routing, adapter and
+                  neighbour evidence", with an empty state promising a map
+                  that would appear after a run - and a CTA into a locked
+                  page to get it
+  Settings        "Local measurement - DNS, TCP, TLS, HTTP, ICMP, path",
+                  tagged MEASURED, on a runtime with no raw socket
+  Live/Environment  "ICMP and path" measurements and "off this machine"
+
+Each now asks the runtime. words.measuredHere and words.thisMachine join
+the existing vocabulary so this stays in one place, and the two static
+paragraphs in index.html are gated by the attribute the server already
+stamps onto <html>, so the first paint is correct without JavaScript.
+
+A test pins all three phrases: they must be reachable only through a
+runtime branch, never as a bare literal.
+
+THE CAPSULE NEVER OPENED
+
+Preserve is a third of the product model and its control says "Open the
+capsule", but the route served content-disposition: attachment - so the
+browser downloaded a file and left the tab blank. It is inline by
+default, with ?download=1 for the file, and pinned behind a CSP that
+matches what a capsule actually is: its own inline integrity check, no
+network access, no framing.
+
+REFUSED TARGETS NO LONGER SPEND THE DIAGNOSTIC BUDGET
+
+Ten refused targets exhausted a visitor's ten live diagnostics. Since the
+demo publishes its allowlist, discovering it by typing three hostnames
+locked you out before you ran anything. A refusal decided on the string
+alone - bad scheme, bad port, literal address, unlisted host - resolves
+nothing and connects to nothing, so it is refunded and charged to a
+separate, wider bucket instead. A refusal after resolution still costs a
+slot, because that one did real work. Thirty SSRF probes in a row now
+leave the eleventh legitimate diagnostic working.
+
+MOBILE
+
+At 390px the topbar's only two buttons were "Analyst" and "Operator
+sign-in": the public call to action was the element being dropped for
+space. It keeps its place now and the duplicated chrome goes instead. The
+brand mark - a 20px square rotated 45deg, so 28px wide - was clipped by
+4px against the viewport edge in the horizontal rail, and the demo flag
+collided with the truncated page title.
+
+In the stacked sample table, a cell like `FAIL <small>ENETUNREACH</small>`
+is two grid items, and the second was auto-placing onto a new row under
+the label - the table read "TARGET / ENETUNREACH" with the state stranded
+beside it.
+
+ALSO
+
+- withTimeout unref'd its timer, so a budget whose only pending work was
+  the timer could be skipped entirely and never fire. It also made the
+  test for it fail. Both settle paths clear the timer, so the unref was
+  buying nothing.
+- HTTP PASS means the exchange completed, which is the right answer for a
+  connectivity tool - a 403 from a bot filter is not a network fault. But
+  green beside a 4xx reads as Faultline calling it healthy, so a
+  non-success status now says what the PASS does and does not cover.
+- Two links pointed at github.com/weegienamja/Faultline, which is not
+  this repository.
+- The demo status line and the live status line are aria-live regions;
+  neither result nor error was announced before.
+
+Verified against a hosted-runtime server: 521 tests pass, 2 skipped for
+Ollama. Thirty SSRF and malformed-target cases refused, every admin
+endpoint still 401, no console errors and no horizontal overflow at 390,
+768, 1024, 1440 and 1920.
+---
+ public/app.js               |  13 ++--
+ public/bisect-panel.js      |  26 +++++--
+ public/cases-panel.js       |   6 +-
+ public/css/components.css   |  11 +++
+ public/css/demo.css         |  26 +++++--
+ public/css/layout.css       |  10 +++
+ public/demo-panel.js        |   9 ++-
+ public/index.html           |  15 +++-
+ public/invite-admin.js      |   4 +-
+ public/live-panel.js        |  23 ++++--
+ public/shell.js             |  38 ++++++++-
+ public/views.js             |  68 +++++++++++++---
+ src/demo/diagnose.mjs       |   9 ++-
+ src/demo/limits.mjs         |  68 ++++++++++++++--
+ src/demo/policy.mjs         |  21 ++++-
+ src/demo/routes.mjs         |  43 ++++++++---
+ src/integrations/http.mjs   |   2 +-
+ tests/demo-routes.test.mjs  |  46 ++++++++++-
+ tests/demo-runtime.test.mjs | 149 ++++++++++++++++++++++++++++++++++++
+ 19 files changed, 519 insertions(+), 68 deletions(-)
+
+diff --git a/public/app.js b/public/app.js
+index f527e42..da274e3 100644
+--- a/public/app.js
++++ b/public/app.js
+@@ -1,5 +1,5 @@
+ import { buildLivePathTopology, normaliseTopology } from "./topology-view.js";
+-import { runtime, state, words } from "./shell.js";
++import { auth, runtime, state, words } from "./shell.js";
+ 
+ const ids = [
+   "incident-list", "fault-domain", "confidence", "confidence-ring", "diagnosis-summary",
+@@ -450,13 +450,10 @@ function renderEmptyOverview() {
+                   <a class="fl-btn" href="#/recorder">Start the Flight Recorder</a>
+                   <button class="fl-btn" type="button" data-action="invite">New diagnostic</button>`
+       })
+-    : state({
+-        icon: "◌",
+-        tone: "locked",
+-        title: "Live data is locked",
+-        body: words.lockedBody("The collected diagnostics archive"),
+-        actions: words.lockedAction
+-      })}</section>`;
++    // On a public demo this is not a credential wall the visitor can pass; it
++    // is an operator archive that belongs to a Faultline someone runs
++    // themselves. auth.lockedState says that, and points at the demo.
++    : auth.lockedState("The collected diagnostics archive")}</section>`;
+ 
+   renderProbeFleet();
+   els["topology-panel"].hidden = true;
+diff --git a/public/bisect-panel.js b/public/bisect-panel.js
+index 326c281..8583ba0 100644
+--- a/public/bisect-panel.js
++++ b/public/bisect-panel.js
+@@ -55,21 +55,37 @@ const BASELINE_WHY = {
+ // ---------------------------------------------------------------------------
+ 
+ const host = mount("bisect");
++
++// A hosted deployment cannot bind a connection to a visitor's adapter, hand
++// itself their resolver, or 
